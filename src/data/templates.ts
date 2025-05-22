@@ -1,5 +1,5 @@
 export const templates = {
-    "drake-hotline-bling": {
+    "Scared-Lady": {
         image: "/temp1.jpg",
         textBoxes: [
             { x: 100, y: 370, width: 600, height: 400, fontSize: 100, align: "center" },
@@ -26,7 +26,7 @@ export const templates = {
         ]
     },
 
-    "Puzzle-Haad": {
+    "Puzzle-Head": {
         image: "/temp6.png",
         textBoxes: [
             { id: "topText", x: 150, y: 400, width: 1100, height: 100, fontSize: 200, align: "center" },
@@ -37,9 +37,9 @@ export const templates = {
     "Grim-Reaper-Doors": {
         image: "/temp7.png",
         textBoxes: [
-            { id: 'door-1', x: 58, y: 1050, width: 508, height: 300, fontSize: 250, align: 'center' },
-            { id: 'door-2', x: 708, y: 1300, width: 630, height: 400, fontSize: 250, align: 'center' },
-            { id: 'door-3', x: 1758, y: 1244, width: 658, height: 300, fontSize: 250, align: 'center' },
+            { id: 'door-1', x: 58, y: 1050, width: 508, height: 300, fontSize: 100, align: 'center' },
+            { id: 'door-2', x: 708, y: 1300, width: 630, height: 400, fontSize: 150, align: 'center' },
+            { id: 'door-3', x: 1758, y: 1244, width: 658, height: 300, fontSize: 200, align: 'center' },
             { id: 'door-4', x: 3290, y: 1320, width: 958, height: 400, fontSize: 250, align: 'center' },
             { id: 'reaper-body', x: 2600, y: 1880, width: 710, height: 400, fontSize: 300, align: 'center' },
         ],

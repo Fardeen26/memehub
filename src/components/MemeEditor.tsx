@@ -110,7 +110,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         ctx.shadowColor = 'black';
         ctx.shadowOffsetX = 5;
         ctx.shadowOffsetY = 5;
-        ctx.shadowBlur = 40;
+        ctx.shadowBlur = 20;
 
         const lineHeight = fontSize * 1.2;
         let currentY = box.y;
@@ -152,20 +152,30 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     return (
         <section className="space-y-4">
-            <button className="px-4 py-2 bg-red-500 text-white rounded" onClick={onReset}>Change Template</button>
+            <button
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                onClick={onReset}
+            >
+                Change Template
+            </button>
             <div className="space-y-2">
                 {texts.map((txt, i) => (
                     <input
                         key={i}
-                        className="w-full p-2 border rounded"
+                        className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                         placeholder={`Text #${i + 1}`}
                         value={txt}
                         onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
                     />
                 ))}
             </div>
-            <canvas ref={canvasRef} className="border w-[400px] h-fit" />
-            <button className="px-4 py-2 bg-green-500 text-white rounded" onClick={downloadMeme}>Download Meme</button>
+            <canvas ref={canvasRef} className="border border-gray-300 dark:border-gray-700 w-[400px] h-fit bg-white" />
+            <button
+                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
+                onClick={downloadMeme}
+            >
+                Download Meme
+            </button>
         </section>
     );
 }
