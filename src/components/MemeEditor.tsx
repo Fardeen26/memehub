@@ -1,5 +1,6 @@
 "use client"
 import { Template } from '@/types/template';
+import { MoveLeft } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 
 type MemeEditorProps = {
@@ -153,29 +154,32 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     return (
         <section className="space-y-4">
             <button
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                className="bg-transparent flex items-center cursor-none"
                 onClick={onReset}
             >
-                Change Template
+                <MoveLeft className='h-4 w-4' /> &nbsp; Back
             </button>
-            <div className="space-y-2">
-                {texts.map((txt, i) => (
-                    <input
-                        key={i}
-                        className="w-full p-2 border rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                        placeholder={`Text #${i + 1}`}
-                        value={txt}
-                        onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
-                    />
-                ))}
+            <div className="flex max-sm:flex-col max-sm:space-y-10 items-start space-x-10">
+                <canvas ref={canvasRef} className="border border-gray-300 dark:border-gray-700 w-[400px] max-sm:w-full h-fit bg-white" />
+                <div className="space-y-2">
+                    {texts.map((txt, i) => (
+                        <input
+                            key={i}
+                            className="w-full p-2 text-sm border rounded-md bg-[#151515] border-white/20 text-white placeholder:text-white/60 cursor-none"
+                            placeholder={`Text #${i + 1}`}
+                            value={txt}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
+                        />
+                    ))}
+                    <button
+                        className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] cursor-none border border-white/20 text-sm text-white rounded-sm transition-colors"
+                        onClick={downloadMeme}
+                    >
+                        Download Meme
+                    </button>
+                </div>
             </div>
-            <canvas ref={canvasRef} className="border border-gray-300 dark:border-gray-700 w-[400px] h-fit bg-white" />
-            <button
-                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded transition-colors"
-                onClick={downloadMeme}
-            >
-                Download Meme
-            </button>
+
         </section>
     );
 }

@@ -18,8 +18,7 @@ export default function MainContainer() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-4">
-            <h1 className="text-3xl font-bold text-center mb-6">Meme Generator</h1>
+        <div className="max-w-5xl max-sm:w-full mx-auto p-4 max-sm:p-1">
             {!selected ? (
                 <TemplateSelector
                     templates={templates as Record<string, Template>}

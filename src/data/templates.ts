@@ -7,14 +7,6 @@ export const templates = {
         ]
     },
 
-    "Water-UNO-Reverse": {
-        image: "/temp3.png",
-        textBoxes: [
-            { x: 100, y: 200, width: 2000, height: 400, fontSize: 200, align: "center" },
-            { x: 100, y: 2200, width: 2000, height: 300, fontSize: 200, align: "center" },
-        ]
-    },
-
     "Trojan-Horse": {
         image: "/temp4.png",
         textBoxes: [
@@ -26,14 +18,6 @@ export const templates = {
         ]
     },
 
-    "Puzzle-Head": {
-        image: "/temp6.png",
-        textBoxes: [
-            { id: "topText", x: 150, y: 400, width: 1100, height: 100, fontSize: 200, align: "center" },
-            { id: "handText", x: 910, y: 1000, width: 600, height: 100, fontSize: 200, align: "center" },
-        ],
-    },
-
     "Grim-Reaper-Doors": {
         image: "/temp7.png",
         textBoxes: [
@@ -42,6 +26,22 @@ export const templates = {
             { id: 'door-3', x: 1758, y: 1244, width: 658, height: 300, fontSize: 200, align: 'center' },
             { id: 'door-4', x: 3290, y: 1320, width: 958, height: 400, fontSize: 250, align: 'center' },
             { id: 'reaper-body', x: 2600, y: 1880, width: 710, height: 400, fontSize: 300, align: 'center' },
+        ],
+    },
+
+    "Water-UNO-Reverse": {
+        image: "/temp3.png",
+        textBoxes: [
+            { x: 100, y: 200, width: 2000, height: 400, fontSize: 200, align: "center" },
+            { x: 100, y: 2200, width: 2000, height: 300, fontSize: 200, align: "center" },
+        ]
+    },
+
+    "Puzzle-Head": {
+        image: "/temp6.png",
+        textBoxes: [
+            { id: "topText", x: 150, y: 400, width: 1100, height: 100, fontSize: 200, align: "center" },
+            { id: "handText", x: 910, y: 1000, width: 600, height: 100, fontSize: 200, align: "center" },
         ],
     },
 
