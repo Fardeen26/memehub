@@ -3,6 +3,7 @@ import { Bricolage_Grotesque } from "next/font/google";
 import { SmoothCursor } from "@/components/ui/smooth-cursor";
 import { ThemeProvider } from "next-themes";
 import Navbar from "@/components/Navbar";
+import PageTransition from "@/components/PageTransition";
 import "./globals.css";
 
 const bricolage_grotesque_init = Bricolage_Grotesque({
@@ -26,11 +27,13 @@ export default function RootLayout({
         className={`${bricolage_grotesque_init.className} antialiased !cursor-none min-h-screen bg-white dark:bg-black`}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Navbar />
-          <main className="container mx-auto px-4 py-8">
-            {children}
-          </main>
-          <SmoothCursor />
+          <PageTransition>
+            <Navbar />
+            <main className="container mx-auto px-4 py-8">
+              {children}
+            </main>
+            <SmoothCursor />
+          </PageTransition>
         </ThemeProvider>
       </body>
     </html>

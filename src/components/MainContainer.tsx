@@ -3,12 +3,16 @@
 import React, { useState } from 'react';
 import TemplateSelector from './TemplateSelector';
 import MemeEditor from './MemeEditor';
-import { templates } from '@/data/templates';
 import type { Template } from '@/types/template';
+import { motion, AnimatePresence } from 'framer-motion';
 
-type TemplateKey = keyof typeof templates;
+type TemplateKey = string;
 
-export default function MainContainer() {
+type MainContainerProps = {
+    templates: Record<string, Template>;
+};
+
+export default function MainContainer({ templates }: MainContainerProps) {
     const [selected, setSelected] = useState<TemplateKey | null>(null);
 
     const handleSelect = (key: string) => {
@@ -19,17 +23,51 @@ export default function MainContainer() {
 
     return (
         <div className="max-w-5xl max-sm:w-full mx-auto p-4 max-sm:p-1">
-            {!selected ? (
-                <TemplateSelector
-                    templates={templates as Record<string, Template>}
-                    onSelect={handleSelect}
-                />
-            ) : (
-                <MemeEditor
-                    template={templates[selected] as Template}
-                    onReset={() => setSelected(null)}
-                />
-            )}
+            <AnimatePresence mode="wait">
+                {!selected ? (
+                    <motion.div
+                        key="selector"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{
+                            duration: 0.4,
+                            ease: [0.22, 1, 0.36, 1]
+                        }}
+                    >
+                        <TemplateSelector
+                            templates={templates}
+                            onSelect={handleSelect}
+                        />
+                    </motion.div>
+                ) : (
+                    <motion.div
+                        key="editor"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{
+                            duration: 0.4,
+                            ease: [0.22, 1, 0.36, 1]
+                        }}
+                    >
+                        {selected && templates[selected] ? (
+                            <MemeEditor
+                                template={templates[selected]}
+                                onReset={() => setSelected(null)}
+                            />
+                        ) : (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-center text-lg"
+                            >
+                                Template not found. Please try again.
+                            </motion.div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

@@ -2,6 +2,7 @@
 import { Template } from '@/types/template';
 import { MoveLeft } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
+import { motion } from 'framer-motion';
 
 type MemeEditorProps = {
     template: Template;
@@ -152,34 +153,59 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     };
 
     return (
-        <section className="space-y-4">
-            <button
+        <motion.section
+            className="space-y-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+        >
+            <motion.button
                 className="bg-transparent flex items-center cursor-none"
                 onClick={onReset}
+                whileHover={{ x: -5 }}
+                transition={{ duration: 0.2 }}
             >
                 <MoveLeft className='h-4 w-4' /> &nbsp; Back
-            </button>
+            </motion.button>
             <div className="flex max-sm:flex-col max-sm:space-y-10 items-start space-x-10">
-                <canvas ref={canvasRef} className="border border-gray-300 dark:border-gray-700 w-[400px] max-sm:w-full h-fit bg-white" />
-                <div className="space-y-2">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.4, delay: 0.1 }}
+                >
+                    <canvas ref={canvasRef} className="border border-gray-300 dark:border-gray-700 w-[400px] max-sm:w-full h-fit bg-white" />
+                </motion.div>
+                <motion.div
+                    className="space-y-2"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.4, delay: 0.2 }}
+                >
                     {texts.map((txt, i) => (
-                        <input
+                        <motion.input
                             key={i}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.3 + (i * 0.1) }}
                             className="w-full p-2 text-sm border rounded-md bg-[#151515] border-white/20 text-white placeholder:text-white/60 cursor-none"
                             placeholder={`Text #${i + 1}`}
                             value={txt}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
                         />
                     ))}
-                    <button
+                    <motion.button
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: 0.5 }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] cursor-none border border-white/20 text-sm text-white rounded-sm transition-colors"
                         onClick={downloadMeme}
                     >
                         Download Meme
-                    </button>
-                </div>
+                    </motion.button>
+                </motion.div>
             </div>
-
-        </section>
+        </motion.section>
     );
 }
