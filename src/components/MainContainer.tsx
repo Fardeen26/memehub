@@ -1,10 +1,11 @@
 "use client"
 
-import React, { useState } from 'react';
+import React from 'react';
 import TemplateSelector from './TemplateSelector';
 import MemeEditor from './MemeEditor';
 import type { Template } from '@/types/template';
 import { motion, AnimatePresence } from 'framer-motion';
+import useSelected from '@/hooks/useSelected';
 
 type TemplateKey = string;
 
@@ -13,7 +14,8 @@ type MainContainerProps = {
 };
 
 export default function MainContainer({ templates }: MainContainerProps) {
-    const [selected, setSelected] = useState<TemplateKey | null>(null);
+    // const [selected, setSelected] = useState<TemplateKey | null>(null);
+    const { selected, setSelected } = useSelected()
 
     const handleSelect = (key: string) => {
         if (key in templates) {
@@ -54,7 +56,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                         {selected && templates[selected] ? (
                             <MemeEditor
                                 template={templates[selected]}
-                                onReset={() => setSelected(null)}
+                                onReset={() => setSelected('')}
                             />
                         ) : (
                             <motion.div

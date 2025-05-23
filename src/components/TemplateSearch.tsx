@@ -5,9 +5,11 @@ import { ArrowDownRight } from "lucide-react";
 import { templates } from "@/data/templates";
 import MainContainer from "./MainContainer";
 import { motion } from "framer-motion";
+import useSelected from "@/hooks/useSelected";
 
 export default function TemplateSearch() {
     const [searchQuery, setSearchQuery] = useState("");
+    const { selected } = useSelected()
 
     const filteredTemplates = Object.entries(templates).filter(([key]) =>
         key.toLowerCase().replace(/-/g, ' ').includes(searchQuery.toLowerCase())
@@ -19,7 +21,7 @@ export default function TemplateSearch() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
-            <div className="flex justify-center pb-16 relative w-full">
+            <div className={`justify-center pb-16 relative w-full ${selected ? 'hidden' : 'flex'}`}>
                 <motion.div
                     className="relative w-full max-w-md"
                     whileFocus={{ scale: 1.02 }}

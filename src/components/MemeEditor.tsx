@@ -1,4 +1,5 @@
 "use client"
+
 import { Template } from '@/types/template';
 import { MoveLeft } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
@@ -177,7 +178,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 </motion.div>
                 <motion.div
                     className="space-y-2"
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: 0 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.2 }}
                 >
@@ -188,7 +189,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.3 + (i * 0.1) }}
                             className="w-full p-2 text-sm border rounded-md bg-[#151515] border-white/20 text-white placeholder:text-white/60 cursor-none"
-                            placeholder={`Text #${i + 1}`}
+                            placeholder={`Text position ${i + 1}`}
                             value={txt}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
                         />
@@ -197,7 +198,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: 0.5 }}
-                        whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] cursor-none border border-white/20 text-sm text-white rounded-sm transition-colors"
                         onClick={downloadMeme}
