@@ -14,7 +14,7 @@ const bricolage_grotesque_init = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
-  title: "Memify",
+  title: "MemeHub",
   description: "Developed by Fardeen",
 };
 

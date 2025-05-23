@@ -104,16 +104,30 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!text) return;
 
         const { fontSize, lines } = calculateFontSize(ctx, text, box, box.fontSize);
-        ctx.font = `${fontSize}px Impact`;
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        if (isMobile) {
+            ctx.font = `1000 ${fontSize}px Impact`;
+            ctx.lineWidth = 1;
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+        } else {
+            ctx.font = `${fontSize}px Impact`;
+            ctx.lineWidth = 1;
+            ctx.shadowBlur = 20;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 5;
+        }
+
         ctx.fillStyle = 'white';
         ctx.strokeStyle = 'black';
-        ctx.lineWidth = 1;
         ctx.textAlign = box.align || 'center';
 
         ctx.shadowColor = 'black';
-        ctx.shadowOffsetX = 5;
-        ctx.shadowOffsetY = 5;
-        ctx.shadowBlur = 20;
+
+
 
         const lineHeight = fontSize * 1.2;
         let currentY = box.y;

@@ -2,7 +2,7 @@
 
 import { MoonIcon, SunIcon } from "lucide-react"
 import { useTheme } from "next-themes"
-import Image from "next/image"
+// import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
@@ -24,10 +24,10 @@ export default function Navbar() {
                 <div className="flex items-center justify-between h-16">
                     <div className="flex-shrink-0">
                         <Link href="/" className="cursor-none">
-                            <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center space-x-1">
-                                <Image src="/logo.png" alt="logo" width={30} height={30} loading="lazy" />
+                            <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center -space-x-2.5">
+                                {/* <Image src="/logo.png" alt="logo" width={30} height={30} loading="lazy" /> */}
                                 <span>
-                                    Memify
+                                    <span className="px-2 py-0.5 bg-transparent"></span>Meme <span className="bg-[#6a7bd1] rounded-sm text-white px-2 py-0.5">Hub</span>
                                 </span>
                             </h1>
                         </Link>
