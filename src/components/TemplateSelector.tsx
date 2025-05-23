@@ -38,6 +38,7 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
                                 alt={key}
                                 fill
                                 className="object-cover rounded-2xl shadow"
+                                loading='lazy'
                             />
                         </motion.div>
                         <motion.p

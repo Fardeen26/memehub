@@ -6,6 +6,7 @@ import PageTransition from "@/components/PageTransition";
 import "./globals.css";
 import Providers from "./Provider";
 import Footer from "@/components/Footer";
+import Script from "next/script";
 
 const bricolage_grotesque_init = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -37,6 +38,11 @@ export default function RootLayout({
             <SmoothCursor />
           </PageTransition>
         </Providers>
+        <Script
+          defer
+          data-domain="memify.fardeen.tech"
+          src="https://analytics-code.vercel.app/tracking-script.js"
+        />
       </body>
     </html>
   );

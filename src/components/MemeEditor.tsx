@@ -168,7 +168,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             >
                 <MoveLeft className='h-4 w-4' /> &nbsp; Back
             </motion.button>
-            <div className="flex max-sm:flex-col max-sm:space-y-10 items-start space-x-10">
+            <div className="flex max-sm:flex-col max-sm:space-y-10 items-start space-x-16">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -189,7 +189,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.3 + (i * 0.1) }}
-                            className="w-full p-2 text-sm border rounded-md bg-[#151515] border-white/20 text-white placeholder:text-white/60 cursor-none"
+                            className="w-full p-2 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/60 cursor-none"
                             placeholder={`Text position ${i + 1}`}
                             value={txt}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
@@ -200,7 +200,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: 0.5 }}
                         whileTap={{ scale: 0.98 }}
-                        className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] cursor-none border border-white/20 text-sm text-white rounded-sm transition-colors"
+                        className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium cursor-none border border-white/20 text-sm text-white rounded-md transition-colors"
                         onClick={downloadMeme}
                     >
                         Download Meme

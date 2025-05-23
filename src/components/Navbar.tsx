@@ -25,7 +25,7 @@ export default function Navbar() {
                     <div className="flex-shrink-0">
                         <Link href="/" className="cursor-none">
                             <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center space-x-1">
-                                <Image src="/logo.png" alt="logo" width={30} height={30} />
+                                <Image src="/logo.png" alt="logo" width={30} height={30} loading="lazy" />
                                 <span>
                                     Memify
                                 </span>
