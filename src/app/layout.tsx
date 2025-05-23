@@ -7,6 +7,7 @@ import "./globals.css";
 import Providers from "./Provider";
 import Footer from "@/components/Footer";
 import Script from "next/script";
+import { Analytics } from "@vercel/analytics/next"
 
 const bricolage_grotesque_init = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -38,9 +39,10 @@ export default function RootLayout({
             <SmoothCursor />
           </PageTransition>
         </Providers>
+        <Analytics />
         <Script
           defer
-          data-domain="memify.fardeen.tech"
+          data-domain="memehub.fardeen.tech"
           src="https://analytics-code.vercel.app/tracking-script.js"
         />
       </body>
