@@ -50,7 +50,7 @@ export default function TemplateSearch() {
                 </motion.div>
             </div>
             {
-                filteredTemplates.length < 1 ? <p className="text-center">No templates found</p> : <MainContainer templates={Object.fromEntries(filteredTemplates)} />
+                filteredTemplates.length < 1 ? <div className="min-h-[30vh] max-sm:min-h-[50vh]"><p className="text-center">No templates found</p></div> : <MainContainer templates={Object.fromEntries(filteredTemplates)} />
             }
         </motion.div>
     );

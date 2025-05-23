@@ -155,7 +155,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     return (
         <motion.section
-            className="space-y-4"
+            className="space-y-4 min-h-[65vh] max-sm:min-h-[75vh]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
@@ -173,6 +173,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.1 }}
+                    className='max-sm:mx-auto'
                 >
                     <canvas ref={canvasRef} className="border border-gray-300 dark:border-gray-700 w-[400px] max-sm:w-full h-fit bg-white" />
                 </motion.div>

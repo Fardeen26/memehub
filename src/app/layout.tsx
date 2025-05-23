@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import PageTransition from "@/components/PageTransition";
 import "./globals.css";
 import Providers from "./Provider";
+import Footer from "@/components/Footer";
 
 const bricolage_grotesque_init = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -24,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${bricolage_grotesque_init.className} antialiased !cursor-none min-h-screen bg-white dark:bg-black`}
+        className={`${bricolage_grotesque_init.className} antialiased !cursor-none min-h-screen bg-white dark:bg-black relative`}
       >
         <Providers>
           <PageTransition>
@@ -32,6 +33,7 @@ export default function RootLayout({
             <main className="container mx-auto px-4 py-8">
               {children}
             </main>
+            <Footer />
             <SmoothCursor />
           </PageTransition>
         </Providers>

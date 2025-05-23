@@ -10,7 +10,7 @@ export default function ShakeyImage() {
                 width={15}
                 style={{
                     position: "absolute",
-                    right: "28.5rem",
+                    right: 456,
                     top: 51,
                     animation: "shake 0.4s infinite cubic-bezier(.36,.07,.19,.97)",
                     willChange: "transform"
