@@ -8,6 +8,7 @@ import Providers from "./Provider";
 import Footer from "@/components/Footer";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next"
+import Head from 'next/head';
 
 const bricolage_grotesque_init = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -26,6 +27,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <Head>
+        <link
+          href="https://fonts.cdnfonts.com/css/impact"
+          rel="stylesheet"
+        />
+      </Head>
       <body
         className={`${bricolage_grotesque_init.className} antialiased !cursor-none min-h-screen bg-white dark:bg-black relative`}
       >

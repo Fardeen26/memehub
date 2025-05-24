@@ -96,6 +96,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         return { fontSize, lines };
     };
 
+    const waitForFont = async (font: string) => {
+        if (document.fonts && document.fonts.load) {
+            await document.fonts.load(`bold 20px ${font}`);
+            await document.fonts.ready;
+        }
+    };
+
     const drawText = useCallback(() => (
         ctx: CanvasRenderingContext2D,
         text: string,
@@ -105,29 +112,42 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const { fontSize, lines } = calculateFontSize(ctx, text, box, box.fontSize);
 
+        ctx.font = `bold ${fontSize}px Impact, Arial, sans-serif`;
+
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
         if (isMobile) {
-            ctx.font = `1000 ${fontSize}px Impact`;
-            ctx.lineWidth = 1;
-            ctx.shadowBlur = 0;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 0;
+            ctx.font = `900 ${fontSize}px Impact`;
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 5;
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = 'white';
+            ctx.textAlign = box.align || 'center';
+
+            const lineHeight = fontSize * 1.2;
+            let currentY = box.y;
+            lines.forEach(line => {
+                const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
+                ctx.strokeText(line, x, currentY);
+                ctx.fillText(line, x, currentY);
+                currentY += lineHeight;
+            });
         } else {
             ctx.font = `${fontSize}px Impact`;
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 5;
             ctx.shadowBlur = 20;
             ctx.shadowOffsetX = 5;
             ctx.shadowOffsetY = 5;
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = 'black';
         }
 
-        ctx.fillStyle = 'white';
-        ctx.strokeStyle = 'black';
-        ctx.textAlign = box.align || 'center';
-
         ctx.shadowColor = 'black';
-
-
+        ctx.fillStyle = 'white';
+        ctx.textAlign = box.align || 'center';
 
         const lineHeight = fontSize * 1.2;
         let currentY = box.y;
@@ -135,27 +155,36 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         lines.forEach(line => {
             const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
             ctx.fillText(line, x, currentY);
-            ctx.strokeText(line, x, currentY);
             currentY += lineHeight;
         });
-    }, [])
+    }, []);
 
     useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        const img = new window.Image();
-        img.src = template.image;
-        img.onload = () => {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-            template.textBoxes.forEach((box, i) => {
-                drawText()(ctx, texts[i], box);
-            });
+        const draw = async () => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            await waitForFont('Impact');
+
+            const img = new window.Image();
+            img.src = template.image;
+
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+
+                template.textBoxes.forEach((box, i) => {
+                    drawText()(ctx, texts[i], box);
+                });
+            };
         };
+
+        draw();
     }, [texts, template, drawText]);
 
     const downloadMeme = () => {

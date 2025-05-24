@@ -11,7 +11,7 @@ export const templates = {
         image: "/temp10.png",
         textBoxes: [
             { x: 11, y: 58, width: 700, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
-            { x: 9, y: 425, width: 700, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
+            { x: 9, y: 425, width: 700, height: 100, fontSize: 40, minFont: 20, align: "center" as const },
         ]
     },
 
@@ -40,8 +40,8 @@ export const templates = {
     "Haarish-bruh": {
         image: "/temp9.png",
         textBoxes: [
-            { x: 10, y: 100, width: 570, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
-            { x: 10, y: 795, width: 570, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
+            { x: 20, y: 100, width: 570, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
+            { x: 10, y: 795, width: 570, height: 100, fontSize: 40, minFont: 20, align: "center" as const },
         ]
     },
 
