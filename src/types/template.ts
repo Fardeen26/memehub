@@ -4,6 +4,7 @@ type TextBox = {
     width: number;
     height: number;
     fontSize: number;
+    minFont: number;
     align: "center" | "left" | "right";
     id?: string;
 };

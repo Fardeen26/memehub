@@ -20,7 +20,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setTexts(arr);
     };
 
-    const MIN_FONT_SIZE = 40; // min font size when makeing it smaller
+    const MIN_FONT_SIZE = template.textBoxes[0].minFont; // min font size when makeing it smaller
 
     const calculateFontSize = (
         ctx: CanvasRenderingContext2D,
