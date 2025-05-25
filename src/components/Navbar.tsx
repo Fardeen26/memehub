@@ -23,7 +23,7 @@ export default function Navbar() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex-shrink-0">
-                        <Link href="/" className="cursor-none">
+                        <Link href="/" className="!cursor-none">
                             <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center -space-x-2.5">
                                 {/* <Image src="/logo.png" alt="logo" width={30} height={30} loading="lazy" /> */}
                                 <span>
@@ -35,7 +35,7 @@ export default function Navbar() {
                     <div className="flex items-center">
                         <button
                             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                            className="p-2 rounded-lg bg-[#6a7bd1] cursor-none dark:bg-[#6a7bd1] text-white hover:bg-[#6975b3] dark:hover:bg-[#6975b3] transition-colors"
+                            className="p-2 rounded-lg bg-[#6a7bd1] !cursor-none dark:bg-[#6a7bd1] text-white hover:bg-[#6975b3] dark:hover:bg-[#6975b3] transition-colors"
                         >
                             {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
                         </button>

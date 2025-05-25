@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next"
 import Head from 'next/head';
+import { Toaster } from "sonner";
 
 const bricolage_grotesque_init = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -45,6 +46,7 @@ export default function RootLayout({
             <Footer />
             <SmoothCursor />
           </PageTransition>
+          <Toaster />
         </Providers>
         <Analytics />
         <Script

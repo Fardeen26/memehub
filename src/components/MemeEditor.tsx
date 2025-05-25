@@ -4,6 +4,7 @@ import { Template } from '@/types/template';
 import { MoveLeft } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 
 type MemeEditorProps = {
     template: Template;
@@ -196,6 +197,29 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         link.click();
     };
 
+    const copyMeme = async () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        try {
+            // Convert canvas to blob
+            const blob = await new Promise<Blob>((resolve) => {
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob);
+                }, 'image/png');
+            });
+
+            const data = new ClipboardItem({
+                'image/png': blob
+            });
+
+            await navigator.clipboard.write([data]);
+            toast.success("meme copied to clipboard :)")
+        } catch (err) {
+            console.error('Failed to copy meme:', err);
+        }
+    }
+
     return (
         <motion.section
             className="space-y-4 min-h-[65vh] max-sm:min-h-[75vh]"
@@ -204,7 +228,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             transition={{ duration: 0.3 }}
         >
             <motion.button
-                className="bg-transparent flex items-center cursor-none"
+                className="bg-transparent flex items-center !cursor-none"
                 onClick={onReset}
                 whileHover={{ x: -5 }}
                 transition={{ duration: 0.2 }}
@@ -221,7 +245,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     <canvas ref={canvasRef} className="border border-gray-300 dark:border-gray-700 w-[400px] max-sm:w-full h-fit bg-white" />
                 </motion.div>
                 <motion.div
-                    className="space-y-2"
+                    className="space-y-2 w-full"
                     initial={{ opacity: 0, x: 0 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.2 }}
@@ -232,22 +256,34 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.3 + (i * 0.1) }}
-                            className="w-full p-2 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/60 cursor-none"
+                            className="w-full p-2 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/60 !cursor-none"
                             placeholder={`Text position ${i + 1}`}
                             value={txt}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
                         />
                     ))}
-                    <motion.button
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: 0.5 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium cursor-none border border-white/20 text-sm text-white rounded-md transition-colors"
-                        onClick={downloadMeme}
-                    >
-                        Download Meme
-                    </motion.button>
+                    <div className="flex w-full space-x-2 mt-2">
+                        <motion.button
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.5 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium !cursor-none border border-white/20 text-sm text-white rounded-md transition-colors"
+                            onClick={downloadMeme}
+                        >
+                            Download
+                        </motion.button>
+                        <motion.button
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.5 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="px-4 py-2 w-full bg-transparent hover:bg-white/5 font-medium !cursor-none border border-[#6a7bd1] text-sm text-white rounded-md transition-colors"
+                            onClick={copyMeme}
+                        >
+                            Copy
+                        </motion.button>
+                    </div>
                 </motion.div>
             </div>
         </motion.section>

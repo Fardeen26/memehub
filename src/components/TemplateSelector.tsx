@@ -37,7 +37,7 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
                                 src={tpl.image}
                                 alt={key}
                                 fill
-                                className="object-cover rounded-2xl shadow"
+                                className="object-cover rounded-2xl !cursor-none shadow"
                                 loading='lazy'
                             />
                         </motion.div>
