@@ -69,4 +69,21 @@ export const templates = {
             { id: "handText", x: 910, y: 1000, width: 600, height: 100, fontSize: 200, minFont: 30, align: "center" as const },
         ],
     },
+
+    "Buzz-And-Woody": {
+        image: "/temp11.png",
+        textBoxes: [
+            { id: "topText", x: 25, y: 60, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+            { id: "handText", x: 25, y: 445, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    // "Butterfly-Man": {
+    //     image: "/temp12.png",
+    //     textBoxes: [
+    //         { id: "topText", x: 500, y: 200, width: 200, height: 100, fontSize: 60, minFont: 50, align: "center" as const },
+    //         { id: "handText", x: 25, y: 445, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+    //         { id: "handText", x: 25, y: 545, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+    //     ],
+    // },
 };
