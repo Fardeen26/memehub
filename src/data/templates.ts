@@ -78,12 +78,12 @@ export const templates = {
         ],
     },
 
-    // "Butterfly-Man": {
-    //     image: "/temp12.png",
-    //     textBoxes: [
-    //         { id: "topText", x: 500, y: 200, width: 200, height: 100, fontSize: 60, minFont: 50, align: "center" as const },
-    //         { id: "handText", x: 25, y: 445, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
-    //         { id: "handText", x: 25, y: 545, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
-    //     ],
-    // },
+    "Butterfly-Man": {
+        image: "/temp12.png",
+        textBoxes: [
+            { id: "topText", x: 430, y: 200, width: 280, height: 150, fontSize: 52, minFont: 20, align: "center" as const },
+            { id: "handText", x: 0, y: 545, width: 400, height: 150, fontSize: 52, minFont: 14, align: "center" as const },
+            { id: "handText2", x: 5, y: 700, width: 700, height: 60, fontSize: 100, minFont: 10, align: "center" as const },
+        ],
+    },
 };
