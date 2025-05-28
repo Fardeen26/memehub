@@ -54,6 +54,24 @@ export const templates = {
         ]
     },
 
+    "Ladies-Gang": {
+        image: "/temp15.jpg",
+        textBoxes: [
+            { id: "topText", x: 0, y: 210, width: 200, height: 100, fontSize: 30, minFont: 8, align: "center" as const },
+            { id: "handText", x: 90, y: 360, width: 200, height: 50, fontSize: 30, minFont: 8, align: "center" as const },
+            { id: "handText", x: 330, y: 260, width: 200, height: 100, fontSize: 30, minFont: 8, align: "center" as const },
+            { id: "handText", x: 510, y: 200, width: 200, height: 100, fontSize: 30, minFont: 8, align: "center" as const },
+        ],
+    },
+
+    "Buzz-And-Woody": {
+        image: "/temp11.png",
+        textBoxes: [
+            { id: "topText", x: 25, y: 60, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+            { id: "handText", x: 25, y: 445, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+        ],
+    },
+
     "Water-UNO-Reverse": {
         image: "/temp3.png",
         textBoxes: [
@@ -70,11 +88,11 @@ export const templates = {
         ],
     },
 
-    "Buzz-And-Woody": {
-        image: "/temp11.png",
+    "Bad-Horse": {
+        image: "/temp13.jpg",
         textBoxes: [
-            { id: "topText", x: 25, y: 60, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
-            { id: "handText", x: 25, y: 445, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+            { id: "topText", x: 10, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+            { id: "handText", x: 510, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
         ],
     },
 
@@ -86,4 +104,12 @@ export const templates = {
             { id: "handText2", x: 5, y: 700, width: 700, height: 60, fontSize: 100, minFont: 10, align: "center" as const },
         ],
     },
+
+    // "Epic-Handshake": {
+    //     image: "/temp14.jpg",
+    //     textBoxes: [
+    //         { id: "topText", x: 10, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+    //         { id: "handText", x: 510, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+    //     ],
+    // },
 };
