@@ -105,6 +105,14 @@ export const templates = {
         ],
     },
 
+    "Hunter-Eyes": {
+        image: "/temp16.jpg",
+        textBoxes: [
+            { x: 50, y: 240, width: 2000, height: 500, fontSize: 180, minFont: 40, align: "center" as const },
+            { x: 50, y: 1880, width: 2000, height: 300, fontSize: 180, minFont: 40, align: "center" as const },
+        ]
+    },
+
     // "Epic-Handshake": {
     //     image: "/temp14.jpg",
     //     textBoxes: [
