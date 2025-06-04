@@ -15,6 +15,29 @@ export const templates = {
         ]
     },
 
+    "Kirat-humble-guy": {
+        image: "/temp18.jpeg",
+        textBoxes: [
+            { x: 5, y: 50, width: 470, height: 100, fontSize: 40, minFont: 10, align: "center" as const },
+            { x: 5, y: 395, width: 470, height: 90, fontSize: 40, minFont: 10, align: "center" as const },
+        ]
+    },
+
+    "Bhola-Bachcha": {
+        image: "/temp16.jpg",
+        textBoxes: [
+            { x: 50, y: 240, width: 2000, height: 500, fontSize: 180, minFont: 40, align: "center" as const },
+            { x: 50, y: 1880, width: 2000, height: 300, fontSize: 180, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "sympathy-girl": {
+        image: "/temp20.jpeg",
+        textBoxes: [
+            { x: 50, y: 1000, width: 1150, height: 200, fontSize: 100, minFont: 50, align: "center" as const },
+        ]
+    },
+
     "Trojan-Horse": {
         image: "/temp4.png",
         textBoxes: [
@@ -26,22 +49,10 @@ export const templates = {
         ]
     },
 
-    "Grim-Reaper-Doors": {
-        image: "/temp7.png",
+    "aaja-bhidle": {
+        image: "/temp19.jpeg",
         textBoxes: [
-            { id: 'door-1', x: 58, y: 1050, width: 508, height: 300, fontSize: 100, minFont: 40, align: 'center' as const },
-            { id: 'door-2', x: 708, y: 1300, width: 630, height: 400, fontSize: 150, minFont: 40, align: 'center' as const },
-            { id: 'door-3', x: 1758, y: 1244, width: 658, height: 300, fontSize: 200, minFont: 40, align: 'center' as const },
-            { id: 'door-4', x: 3290, y: 1320, width: 958, height: 400, fontSize: 250, minFont: 40, align: 'center' as const },
-            { id: 'reaper-body', x: 2600, y: 1880, width: 710, height: 400, fontSize: 300, minFont: 40, align: 'center' as const },
-        ],
-    },
-
-    "Haarish-bruh": {
-        image: "/temp9.png",
-        textBoxes: [
-            { x: 20, y: 100, width: 570, height: 100, fontSize: 40, minFont: 20, align: "center" as const },
-            { x: 10, y: 795, width: 570, height: 100, fontSize: 40, minFont: 20, align: "center" as const },
+            { x: 0, y: 550, width: 480, height: 100, fontSize: 40, minFont: 10, align: "center" as const },
         ]
     },
 
@@ -69,6 +80,17 @@ export const templates = {
         textBoxes: [
             { id: "topText", x: 25, y: 60, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
             { id: "handText", x: 25, y: 445, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    "Grim-Reaper-Doors": {
+        image: "/temp7.png",
+        textBoxes: [
+            { id: 'door-1', x: 58, y: 1050, width: 508, height: 300, fontSize: 100, minFont: 40, align: 'center' as const },
+            { id: 'door-2', x: 708, y: 1300, width: 630, height: 400, fontSize: 150, minFont: 40, align: 'center' as const },
+            { id: 'door-3', x: 1758, y: 1244, width: 658, height: 300, fontSize: 200, minFont: 40, align: 'center' as const },
+            { id: 'door-4', x: 3290, y: 1320, width: 958, height: 400, fontSize: 250, minFont: 40, align: 'center' as const },
+            { id: 'reaper-body', x: 2600, y: 1880, width: 710, height: 400, fontSize: 300, minFont: 40, align: 'center' as const },
         ],
     },
 
@@ -105,19 +127,10 @@ export const templates = {
         ],
     },
 
-    "Hunter-Eyes": {
-        image: "/temp16.jpg",
+    "Kirat-Hunter-Eyes": {
+        image: "/temp17.png",
         textBoxes: [
-            { x: 50, y: 240, width: 2000, height: 500, fontSize: 180, minFont: 40, align: "center" as const },
-            { x: 50, y: 1880, width: 2000, height: 300, fontSize: 180, minFont: 40, align: "center" as const },
+            { x: 2, y: 147, width: 130, height: 200, fontSize: 12, minFont: 10, align: "center" as const },
         ]
     },
-
-    // "Epic-Handshake": {
-    //     image: "/temp14.jpg",
-    //     textBoxes: [
-    //         { id: "topText", x: 10, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
-    //         { id: "handText", x: 510, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
-    //     ],
-    // },
 };
