@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque } from "next/font/google";
-import { SmoothCursor } from "@/components/ui/smooth-cursor";
 import Navbar from "@/components/Navbar";
 import PageTransition from "@/components/PageTransition";
 import "./globals.css";
@@ -35,7 +34,7 @@ export default function RootLayout({
         />
       </Head>
       <body
-        className={`${bricolage_grotesque_init.className} antialiased !cursor-none min-h-screen bg-white dark:bg-black relative`}
+        className={`${bricolage_grotesque_init.className} antialiased min-h-screen bg-white dark:bg-black relative`}
       >
         <Providers>
           <PageTransition>
@@ -44,7 +43,6 @@ export default function RootLayout({
               {children}
             </main>
             <Footer />
-            <SmoothCursor />
           </PageTransition>
           <Toaster />
         </Providers>

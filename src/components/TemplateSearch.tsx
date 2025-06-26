@@ -32,7 +32,7 @@ export default function TemplateSearch() {
                         placeholder="Search template"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="rounded-3xl !cursor-none text-sm py-2 pl-4 pr-10 w-full bg-[#0f0f0f] border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#6a7bd1] transition"
+                        className="rounded-3xl text-sm py-2 pl-4 pr-10 w-full bg-[#0f0f0f] border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#6a7bd1] transition"
                         style={{
                             boxShadow: "0 0 0 2px rgba(106,123,209,0.3), 0 4px 24px 0px rgba(106,123,209,0.5), 0 0 0 0 transparent",
                         }}

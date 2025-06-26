@@ -25,7 +25,6 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
                             delay: index * 0.05,
                             ease: [0.22, 1, 0.36, 1]
                         }}
-                        className="!cursor-none"
                         onClick={() => onSelect(key)}
                     >
                         <motion.div
@@ -37,7 +36,7 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
                                 src={tpl.image}
                                 alt={key}
                                 fill
-                                className="object-cover rounded-2xl !cursor-none shadow"
+                                className="object-cover rounded-2xl shadow"
                                 loading='lazy'
                             />
                         </motion.div>
