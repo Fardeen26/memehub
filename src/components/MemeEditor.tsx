@@ -228,7 +228,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             transition={{ duration: 0.3 }}
         >
             <motion.button
-                className="bg-transparent flex items-center !cursor-none"
+                className="bg-transparent cursor-pointer flex items-center"
                 onClick={onReset}
                 whileHover={{ x: -5 }}
                 transition={{ duration: 0.2 }}
@@ -256,7 +256,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.3 + (i * 0.1) }}
-                            className="w-full p-2 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/60 !cursor-none"
+                            className="w-full p-2 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/60"
                             placeholder={`Text position ${i + 1}`}
                             value={txt}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
@@ -268,7 +268,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.5 }}
                             whileTap={{ scale: 0.98 }}
-                            className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium !cursor-none border border-white/20 text-sm text-white rounded-md transition-colors"
+                            className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium border border-white/20 text-sm text-white rounded-md transition-colors"
                             onClick={downloadMeme}
                         >
                             Download
@@ -278,7 +278,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.5 }}
                             whileTap={{ scale: 0.98 }}
-                            className="px-4 py-2 w-full bg-transparent text-black hover:bg-gray-100/50 dark:hover:bg-white/5 font-medium !cursor-none border border-[#6a7bd1] text-sm dark:text-white rounded-md transition-colors"
+                            className="px-4 py-2 w-full bg-transparent text-black hover:bg-gray-100/50 dark:hover:bg-white/5 font-medium  border border-[#6a7bd1] text-sm dark:text-white rounded-md transition-colors"
                             onClick={copyMeme}
                         >
                             Copy
