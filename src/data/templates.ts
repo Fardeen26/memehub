@@ -130,7 +130,38 @@ export const templates = {
     "Kirat-Hunter-Eyes": {
         image: "/temp17.png",
         textBoxes: [
-            { x: 2, y: 147, width: 130, height: 200, fontSize: 12, minFont: 10, align: "center" as const },
+                { x: 2, y: 147, width: 130, height: 200, fontSize: 12, minFont: 10, align: "center" as const },
         ]
+    },
+
+    "Disaster-Girl": {
+        image: "/temp21.png",
+        textBoxes: [
+            { id: "topText", x: 10, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+            { id: "handText", x: 200, y: 350, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+        ],
+    },
+
+    "Doge Vs. Cheems": {
+        image: "/temp22.png",
+        textBoxes: [
+            { id: "topText", x: 150, y: 400, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+            { id: "handText", x: 700, y: 400, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+        ],
+    },
+
+    "I Bet He's Thinking About Other Women": {
+        image: "/temp23.png",
+        textBoxes: [
+            { x: 100, y: 470, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
+            { x: 800, y: 650, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const }
+        ],
+    },
+
+    "Ch*d gaye guru": {
+        image: "/temp24.png",
+        textBoxes: [
+            { x: 100, y: 470, width: 300, height: 100, fontSize: 40, minFont: 20, align: "center" as const },
+        ],
     },
 };
