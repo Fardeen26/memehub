@@ -130,7 +130,7 @@ export const templates = {
     "Kirat-Hunter-Eyes": {
         image: "/temp17.png",
         textBoxes: [
-                { x: 2, y: 147, width: 130, height: 200, fontSize: 12, minFont: 10, align: "center" as const },
+            { x: 2, y: 147, width: 130, height: 200, fontSize: 12, minFont: 10, align: "center" as const },
         ]
     },
 
@@ -145,8 +145,8 @@ export const templates = {
     "Doge Vs. Cheems": {
         image: "/temp22.png",
         textBoxes: [
-            { id: "topText", x: 150, y: 400, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
-            { id: "handText", x: 700, y: 400, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+            { id: "topText", x: 50, y: 400, width: 400, height: 200, fontSize: 60, minFont: 14, align: "center" as const },
+            { id: "handText", x: 600, y: 400, width: 400, height: 200, fontSize: 60, minFont: 14, align: "center" as const },
         ],
     },
 
