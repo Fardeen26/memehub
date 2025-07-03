@@ -19,6 +19,15 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import { toast } from 'sonner';
 import { MemeEditorProps, TextSettings, ImageOverlay } from '@/types/editor';
 
@@ -79,6 +88,37 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [rotateStartAngle, setRotateStartAngle] = useState<number>(0);
     const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Dialog states
+    const [isUploadDialogOpen, setIsUploadDialogOpen] = useState<boolean>(false);
+    const [uploadMethod, setUploadMethod] = useState<'file' | 'paste'>('file');
+    const [pastedImageData, setPastedImageData] = useState<string | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+    // Image cache to prevent reloading images on every draw
+    const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+
+    // Performance optimization: throttle canvas redraws during drag operations
+    const lastDrawTime = useRef<number>(0);
+    const isOptimizedDrawing = useRef<boolean>(false);
+
+    // Function to load and cache an image
+    const loadAndCacheImage = async (src: string): Promise<HTMLImageElement> => {
+        if (imageCache.current.has(src)) {
+            return imageCache.current.get(src)!;
+        }
+
+        return new Promise((resolve, reject) => {
+            const img = new window.Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                imageCache.current.set(src, img);
+                resolve(img);
+            };
+            img.onerror = reject;
+            img.src = src;
+        });
+    };
 
     useEffect(() => {
         const defaultFont = getDefaultFont();
@@ -171,20 +211,22 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const img = imageOverlays[i];
 
             // Check rotation handle first (small circle above the image)
-            const rotationHandleSize = 30;
-            const rotationHandleX = (img.x + img.width / 2) + 60;
-            const rotationHandleY = img.y + 60;
+            // Make handles larger for mobile devices
+            const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const rotationHandleSize = isMobile ? 60 : 50;
+            const rotationHandleX = img.x + img.width / 2;
+            const rotationHandleY = img.y - 35; // Position above the image
             const distToRotationHandle = Math.sqrt(
-                Math.pow(x - rotationHandleX, 2) + Math.pow(y - rotationHandleY, 2) + 100
+                Math.pow(x - rotationHandleX, 2) + Math.pow(y - rotationHandleY, 2)
             );
             if (distToRotationHandle <= rotationHandleSize / 2) {
                 return { index: i, handle: 'rotate' };
             }
 
-            // Check resize handles (small squares at corners and edges)
-            const handleSize = 60;
+            // Check resize handles (larger squares for better usability)
+            const handleSize = isMobile ? 60 : 60;
             const handles = [
-                { name: 'nw', x: (img.x - handleSize / 2) + 100, y: (img.y - handleSize / 2) + 100 },
+                { name: 'nw', x: img.x - handleSize / 2, y: img.y - handleSize / 2 },
                 { name: 'ne', x: img.x + img.width - handleSize / 2, y: img.y - handleSize / 2 },
                 { name: 'sw', x: img.x - handleSize / 2, y: img.y + img.height - handleSize / 2 },
                 { name: 'se', x: img.x + img.width - handleSize / 2, y: img.y + img.height - handleSize / 2 },
@@ -226,50 +268,38 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 });
             }
 
-            const img = new window.Image();
-            img.onload = () => {
-                const canvas = canvasRef.current;
-                if (!canvas) return;
+            // Load and cache the image
+            const img = await loadAndCacheImage(imageSrc);
 
-                // Calculate appropriate size (max 200px width/height while maintaining aspect ratio)
-                const maxSize = 200;
-                let width = img.width;
-                let height = img.height;
+            const canvas = canvasRef.current;
+            if (!canvas) return;
 
-                if (width > maxSize || height > maxSize) {
-                    const ratio = Math.min(maxSize / width, maxSize / height);
-                    width = width * ratio;
-                    height = height * ratio;
-                }
+            // Calculate appropriate size (max 200px width/height while maintaining aspect ratio)
+            const maxSize = 200;
+            let width = img.width;
+            let height = img.height;
 
-                const newOverlay: ImageOverlay = {
-                    id: generateImageId(),
-                    src: imageSrc,
-                    x: (canvas.width - width) / 2, // Center the image
-                    y: (canvas.height - height) / 2,
-                    width,
-                    height,
-                    originalWidth: img.width,
-                    originalHeight: img.height,
-                    opacity: 1,
-                    rotation: 0
-                };
+            if (width > maxSize || height > maxSize) {
+                const ratio = Math.min(maxSize / width, maxSize / height);
+                width = width * ratio;
+                height = height * ratio;
+            }
 
-                setImageOverlays(prev => {
-                    const updated = [...prev, newOverlay];
-                    console.log('Image overlays updated:', updated.length);
-                    return updated;
-                });
-
-                toast.success('Image added successfully!');
+            const newOverlay: ImageOverlay = {
+                id: generateImageId(),
+                src: imageSrc,
+                x: (canvas.width - width) / 2, // Center the image
+                y: (canvas.height - height) / 2,
+                width,
+                height,
+                originalWidth: img.width,
+                originalHeight: img.height,
+                opacity: 1,
+                rotation: 0
             };
 
-            img.onerror = () => {
-                console.error('Failed to load image');
-                toast.error('Failed to load image');
-            };
+            setImageOverlays(prev => [...prev, newOverlay]);
 
-            img.src = imageSrc;
         } catch (error) {
             console.error('Error adding image overlay:', error);
             toast.error('Failed to add image');
@@ -280,17 +310,118 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const file = event.target.files?.[0];
         if (file) {
             if (file.type.startsWith('image/')) {
-                addImageOverlay(file);
+                setSelectedFile(file);
             } else {
                 toast.error('Please select an image file');
             }
         }
+    };
+
+    const handleDialogFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            if (file.type.startsWith('image/')) {
+                setSelectedFile(file);
+                setUploadMethod('file');
+            } else {
+                toast.error('Please select an image file');
+            }
+        }
+    };
+
+    const handleDialogPaste = async (event: React.ClipboardEvent<HTMLDivElement>) => {
+        const items = event.clipboardData?.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const result = e.target?.result as string;
+                        setPastedImageData(result);
+                        setUploadMethod('paste');
+                    };
+                    reader.readAsDataURL(file);
+                    event.preventDefault();
+                    return;
+                }
+            }
+        }
+    };
+
+    const handleUploadConfirm = async () => {
+        try {
+            if (uploadMethod === 'file' && selectedFile) {
+                await addImageOverlay(selectedFile);
+            } else if (uploadMethod === 'paste' && pastedImageData) {
+                await addImageOverlay(pastedImageData, true);
+            } else {
+                toast.error('Please select a file or paste an image');
+                return;
+            }
+
+            // Reset dialog state
+            setIsUploadDialogOpen(false);
+            setSelectedFile(null);
+            setPastedImageData(null);
+            setUploadMethod('file');
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            toast.error('Failed to upload image');
+        }
+    };
+
+    const resetDialogState = () => {
+        setSelectedFile(null);
+        setPastedImageData(null);
+        setUploadMethod('file');
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
     };
 
+    // Mobile clipboard paste function
+    const handleMobilePaste = async () => {
+        try {
+            if (!navigator.clipboard || !navigator.clipboard.read) {
+                toast.error('Clipboard access not supported on this device');
+                return;
+            }
+
+            const clipboardItems = await navigator.clipboard.read();
+
+            for (const clipboardItem of clipboardItems) {
+                for (const type of clipboardItem.types) {
+                    if (type.startsWith('image/')) {
+                        const blob = await clipboardItem.getType(type);
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const result = e.target?.result as string;
+                            setPastedImageData(result);
+                            setUploadMethod('paste');
+                        };
+                        reader.readAsDataURL(blob);
+                        return;
+                    }
+                }
+            }
+            toast.error('No image found in clipboard');
+        } catch (error) {
+            console.error('Failed to read clipboard:', error);
+            toast.error('Failed to access clipboard. Try copying the image again.');
+        }
+    };
+
     const handlePaste = async (event: ClipboardEvent) => {
+        // Don't handle paste if the upload dialog is open
+        if (isUploadDialogOpen) return;
+
         const items = event.clipboardData?.items;
         if (!items) return;
 
@@ -308,7 +439,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     };
 
     const removeImageOverlay = (index: number) => {
-        setImageOverlays(prev => prev.filter((_, i) => i !== index));
+        setImageOverlays(prev => {
+            const overlay = prev[index];
+            if (overlay) {
+                // Clean up the cached image
+                imageCache.current.delete(overlay.src);
+            }
+            return prev.filter((_, i) => i !== index);
+        });
     };
 
     const handleMouseDown = (e: any) => {
@@ -467,18 +605,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             // Constrain to canvas bounds
             if (newX < 0) {
-                newWidth += newX;
+                newWidth = Math.max(20, newWidth + newX);
                 newX = 0;
             }
             if (newY < 0) {
-                newHeight += newY;
+                newHeight = Math.max(20, newHeight + newY);
                 newY = 0;
             }
             if (newX + newWidth > canvas.width) {
-                newWidth = canvas.width - newX;
+                newWidth = Math.max(20, canvas.width - newX);
             }
             if (newY + newHeight > canvas.height) {
-                newHeight = canvas.height - newY;
+                newHeight = Math.max(20, canvas.height - newY);
             }
 
             setImageOverlays(prev => {
@@ -580,6 +718,16 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 const centerY = img.y + img.height / 2;
                 const angle = Math.atan2(y - centerY, x - centerX) * 180 / Math.PI;
                 setRotateStartAngle(angle - img.rotation);
+            } else {
+                // Handle resize
+                setIsResizingImage(true);
+                setResizeImageIndex(imageResult.index);
+                setResizeHandle(imageResult.handle);
+                setResizeStartPos({ x, y });
+                setResizeStartSize({
+                    width: imageOverlays[imageResult.index].width,
+                    height: imageOverlays[imageResult.index].height
+                });
             }
             return;
         } else {
@@ -602,10 +750,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const canvas = canvasRef.current;
         if (!canvas || e.touches.length !== 1) return;
 
-        if (!isDragging && !isDraggingImage && !isRotatingImage) return;
+        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage) return;
         if (isDragging && dragIndex === -1) return;
         if (isDraggingImage && dragImageIndex === -1) return;
         if (isRotatingImage && rotateImageIndex === -1) return;
+        if (isResizingImage && resizeImageIndex === -1) return;
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -647,6 +796,80 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 };
                 return updated;
             });
+        } else if (isResizingImage && resizeImageIndex !== -1) {
+            const deltaX = x - resizeStartPos.x;
+            const deltaY = y - resizeStartPos.y;
+
+            let newWidth = resizeStartSize.width;
+            let newHeight = resizeStartSize.height;
+            let newX = imageOverlays[resizeImageIndex].x;
+            let newY = imageOverlays[resizeImageIndex].y;
+
+            // Calculate new dimensions based on resize handle
+            switch (resizeHandle) {
+                case 'se': // bottom-right
+                    newWidth = Math.max(20, resizeStartSize.width + deltaX);
+                    newHeight = Math.max(20, resizeStartSize.height + deltaY);
+                    break;
+                case 'sw': // bottom-left
+                    newWidth = Math.max(20, resizeStartSize.width - deltaX);
+                    newHeight = Math.max(20, resizeStartSize.height + deltaY);
+                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    break;
+                case 'ne': // top-right
+                    newWidth = Math.max(20, resizeStartSize.width + deltaX);
+                    newHeight = Math.max(20, resizeStartSize.height - deltaY);
+                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    break;
+                case 'nw': // top-left
+                    newWidth = Math.max(20, resizeStartSize.width - deltaX);
+                    newHeight = Math.max(20, resizeStartSize.height - deltaY);
+                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    break;
+                case 'n': // top
+                    newHeight = Math.max(20, resizeStartSize.height - deltaY);
+                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    break;
+                case 's': // bottom
+                    newHeight = Math.max(20, resizeStartSize.height + deltaY);
+                    break;
+                case 'w': // left
+                    newWidth = Math.max(20, resizeStartSize.width - deltaX);
+                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    break;
+                case 'e': // right
+                    newWidth = Math.max(20, resizeStartSize.width + deltaX);
+                    break;
+            }
+
+            // Constrain to canvas bounds
+            if (newX < 0) {
+                newWidth = Math.max(20, newWidth + newX);
+                newX = 0;
+            }
+            if (newY < 0) {
+                newHeight = Math.max(20, newHeight + newY);
+                newY = 0;
+            }
+            if (newX + newWidth > canvas.width) {
+                newWidth = Math.max(20, canvas.width - newX);
+            }
+            if (newY + newHeight > canvas.height) {
+                newHeight = Math.max(20, canvas.height - newY);
+            }
+
+            setImageOverlays(prev => {
+                const updated = [...prev];
+                updated[resizeImageIndex] = {
+                    ...updated[resizeImageIndex],
+                    x: newX,
+                    y: newY,
+                    width: newWidth,
+                    height: newHeight
+                };
+                return updated;
+            });
         } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
@@ -674,6 +897,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsDraggingImage(false);
         setDragImageIndex(-1);
         setDragImageOffset({ x: 0, y: 0 });
+        setIsResizingImage(false);
+        setResizeImageIndex(-1);
+        setResizeHandle('');
+        setResizeStartPos({ x: 0, y: 0 });
+        setResizeStartSize({ width: 0, height: 0 });
         setIsRotatingImage(false);
         setRotateImageIndex(-1);
         setRotateStartAngle(0);
@@ -947,142 +1175,171 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     }, [isMobileDevice]);
 
-    useEffect(() => {
-        const draw = async () => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
+    // Optimize draw function with useCallback to prevent unnecessary recreations
+    const draw = useCallback(async () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-            const fontsToLoad = [...new Set(textSettings.map(setting => setting.fontFamily))];
-            await Promise.all(fontsToLoad.map(font => waitForFont(font)));
+        // Performance optimization: throttle redraws during drag operations
+        const now = Date.now();
+        const isActivelyDragging = isDraggingImage || isResizingImage || isRotatingImage || isDragging;
 
-            const img = new window.Image();
-            img.src = template.image;
+        if (isActivelyDragging && isOptimizedDrawing.current && (now - lastDrawTime.current) < 16) {
+            // Skip this draw if we're dragging and it's been less than 16ms (60fps limit)
+            return;
+        }
 
-            img.onload = async () => {
-                canvas.width = img.width;
-                canvas.height = img.height;
+        lastDrawTime.current = now;
+        isOptimizedDrawing.current = isActivelyDragging;
 
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0);
+        const fontsToLoad = [...new Set(textSettings.map(setting => setting.fontFamily))];
+        await Promise.all(fontsToLoad.map(font => waitForFont(font)));
 
-                // Draw image overlays
-                console.log('Drawing image overlays:', imageOverlays.length);
-                for (const overlay of imageOverlays) {
-                    console.log('Processing overlay:', overlay.id, overlay.src.substring(0, 50) + '...');
-                    try {
-                        const overlayImg = new window.Image();
-                        overlayImg.crossOrigin = 'anonymous';
+        const img = new window.Image();
+        img.src = template.image;
 
-                        await new Promise<void>((resolve, reject) => {
-                            overlayImg.onload = () => {
-                                try {
-                                    ctx.save();
-                                    ctx.globalAlpha = overlay.opacity;
+        img.onload = async () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
 
-                                    if (overlay.rotation !== 0) {
-                                        const centerX = overlay.x + overlay.width / 2;
-                                        const centerY = overlay.y + overlay.height / 2;
-                                        ctx.translate(centerX, centerY);
-                                        ctx.rotate((overlay.rotation * Math.PI) / 180);
-                                        ctx.drawImage(overlayImg, -overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
-                                    } else {
-                                        ctx.drawImage(overlayImg, overlay.x, overlay.y, overlay.width, overlay.height);
-                                    }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
 
-                                    ctx.restore();
-                                    resolve();
-                                } catch (error) {
-                                    console.error('Error drawing overlay image:', error);
-                                    ctx.restore();
-                                    resolve();
-                                }
-                            };
+            // Pre-load all images before drawing
+            const imagePromises = imageOverlays.map(overlay => loadAndCacheImage(overlay.src));
 
-                            overlayImg.onerror = () => {
-                                console.error('Failed to load overlay image:', overlay.src);
-                                resolve();
-                            };
+            try {
+                await Promise.all(imagePromises);
+            } catch (error) {
+                console.warn('Some images failed to load:', error);
+            }
 
-                            overlayImg.src = overlay.src;
-                        });
-                    } catch (error) {
-                        console.error('Error processing overlay:', error);
+            // Draw image overlays using cached images (synchronous)
+            for (const overlay of imageOverlays) {
+                try {
+                    const overlayImg = imageCache.current.get(overlay.src);
+                    if (!overlayImg) continue; // Skip if image failed to load
+
+                    ctx.save();
+                    ctx.globalAlpha = overlay.opacity;
+
+                    if (overlay.rotation !== 0) {
+                        const centerX = overlay.x + overlay.width / 2;
+                        const centerY = overlay.y + overlay.height / 2;
+                        ctx.translate(centerX, centerY);
+                        ctx.rotate((overlay.rotation * Math.PI) / 180);
+                        ctx.drawImage(overlayImg, -overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
+                    } else {
+                        ctx.drawImage(overlayImg, overlay.x, overlay.y, overlay.width, overlay.height);
                     }
+
+                    ctx.restore();
+                } catch (error) {
+                    console.error('Error drawing overlay image:', error);
                 }
+            }
 
-                // Draw image handles for selected image
-                if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length) {
-                    const selectedImg = imageOverlays[selectedImageIndex];
+            // Draw image handles for selected image
+            if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length) {
+                const selectedImg = imageOverlays[selectedImageIndex];
 
-                    // Draw resize handles
-                    const handleSize = 12;
-                    const handles = [
-                        { x: selectedImg.x - handleSize / 2, y: selectedImg.y - handleSize / 2 },
-                        { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y - handleSize / 2 },
-                        { x: selectedImg.x - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
-                        { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
-                        { x: selectedImg.x + selectedImg.width / 2 - handleSize / 2, y: selectedImg.y - handleSize / 2 },
-                        { x: selectedImg.x + selectedImg.width / 2 - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
-                        { x: selectedImg.x - handleSize / 2, y: selectedImg.y + selectedImg.height / 2 - handleSize / 2 },
-                        { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y + selectedImg.height / 2 - handleSize / 2 }
-                    ];
+                // Make handles larger for mobile devices
+                const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const handleSize = isMobile ? 60 : 60;
+                const rotationHandleSize = isMobile ? 60 : 50;
 
-                    // Draw selection border
-                    ctx.save();
-                    ctx.strokeStyle = '#6a7bd1';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
-                    ctx.strokeRect(selectedImg.x, selectedImg.y, selectedImg.width, selectedImg.height);
-                    ctx.restore();
+                const handles = [
+                    { x: selectedImg.x - handleSize / 2, y: selectedImg.y - handleSize / 2 },
+                    { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y - handleSize / 2 },
+                    { x: selectedImg.x - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
+                    { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
+                    { x: selectedImg.x + selectedImg.width / 2 - handleSize / 2, y: selectedImg.y - handleSize / 2 },
+                    { x: selectedImg.x + selectedImg.width / 2 - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
+                    { x: selectedImg.x - handleSize / 2, y: selectedImg.y + selectedImg.height / 2 - handleSize / 2 },
+                    { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y + selectedImg.height / 2 - handleSize / 2 }
+                ];
 
-                    // Draw resize handles
-                    handles.forEach(handle => {
-                        ctx.save();
-                        ctx.fillStyle = '#6a7bd1';
-                        ctx.strokeStyle = '#ffffff';
-                        ctx.lineWidth = 2;
-                        ctx.fillRect(handle.x, handle.y, handleSize, handleSize);
-                        ctx.strokeRect(handle.x, handle.y, handleSize, handleSize);
-                        ctx.restore();
-                    });
+                // Draw selection border with thicker line for better visibility
+                ctx.save();
+                ctx.strokeStyle = '#6a7bd1';
+                ctx.lineWidth = isMobile ? 4 : 3;
+                ctx.setLineDash([8, 4]);
+                ctx.strokeRect(selectedImg.x, selectedImg.y, selectedImg.width, selectedImg.height);
+                ctx.restore();
 
-                    // Draw rotation handle
-                    const rotationHandleX = selectedImg.x + selectedImg.width / 2;
-                    const rotationHandleY = selectedImg.y - 25;
-
-                    // Draw line from image to rotation handle
-                    ctx.save();
-                    ctx.strokeStyle = '#6a7bd1';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(selectedImg.x + selectedImg.width / 2, selectedImg.y);
-                    ctx.lineTo(rotationHandleX, rotationHandleY);
-                    ctx.stroke();
-                    ctx.restore();
-
-                    // Draw rotation handle circle
+                // Draw resize handles with better visibility
+                handles.forEach(handle => {
                     ctx.save();
                     ctx.fillStyle = '#6a7bd1';
                     ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(rotationHandleX, rotationHandleY, 6, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
+                    ctx.lineWidth = isMobile ? 4 : 3;
+
+                    // Add shadow for better visibility
+                    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                    ctx.shadowBlur = 4;
+                    ctx.shadowOffsetX = 1;
+                    ctx.shadowOffsetY = 1;
+
+                    ctx.fillRect(handle.x, handle.y, handleSize, handleSize);
+                    ctx.strokeRect(handle.x, handle.y, handleSize, handleSize);
                     ctx.restore();
-                }
-
-                // Draw text on top of images
-                textBoxes.forEach((box, i) => {
-                    drawText()(ctx, texts[i], box, textSettings[i]);
                 });
-            };
-        };
 
+                // Draw rotation handle
+                const rotationHandleX = selectedImg.x + selectedImg.width / 2;
+                const rotationHandleY = selectedImg.y - 35;
+
+                // Draw line from image to rotation handle (thicker for mobile)
+                ctx.save();
+                ctx.strokeStyle = '#6a7bd1';
+                ctx.lineWidth = isMobile ? 5 : 4;
+                ctx.beginPath();
+                ctx.moveTo(selectedImg.x + selectedImg.width / 2, selectedImg.y);
+                ctx.lineTo(rotationHandleX, rotationHandleY);
+                ctx.stroke();
+                ctx.restore();
+
+                // Draw rotation handle circle (larger and more visible)
+                ctx.save();
+                ctx.fillStyle = '#6a7bd1';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = isMobile ? 4 : 3;
+
+                // Add shadow for better visibility
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 1;
+                ctx.shadowOffsetY = 1;
+
+                ctx.beginPath();
+                ctx.arc(rotationHandleX, rotationHandleY, rotationHandleSize / 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+
+                // Add rotation icon in the center
+                ctx.restore();
+                ctx.save();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `${isMobile ? 24 : 20}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('↻', rotationHandleX, rotationHandleY);
+                ctx.restore();
+            }
+
+            // Draw text on top of images
+            textBoxes.forEach((box, i) => {
+                drawText()(ctx, texts[i], box, textSettings[i]);
+            });
+        };
+    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging]);
+
+    // Call draw function when dependencies change
+    useEffect(() => {
         draw();
-    }, [texts, textBoxes, textSettings, imageOverlays, selectedImageIndex, drawText]);
+    }, [draw, texts, textBoxes, textSettings, imageOverlays, selectedImageIndex]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -1102,12 +1359,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     useEffect(() => {
         const pasteHandler = (event: ClipboardEvent) => handlePaste(event);
         document.addEventListener('paste', pasteHandler);
-        console.log('Paste event listener added');
         return () => {
             document.removeEventListener('paste', pasteHandler);
-            console.log('Paste event listener removed');
         };
-    }, []);
+    }, [isUploadDialogOpen]);
 
     // Add keyboard event listener for deleting selected image
     useEffect(() => {
@@ -1121,6 +1376,36 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         document.addEventListener('keydown', keyHandler);
         return () => document.removeEventListener('keydown', keyHandler);
     }, [selectedImageIndex]);
+
+    // Add paste event listener for dialog when paste method is selected
+    useEffect(() => {
+        if (isUploadDialogOpen && uploadMethod === 'paste') {
+            const pasteHandler = async (event: ClipboardEvent) => {
+                const items = event.clipboardData?.items;
+                if (!items) return;
+
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    if (item.type.startsWith('image/')) {
+                        const file = item.getAsFile();
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                const result = e.target?.result as string;
+                                setPastedImageData(result);
+                                setUploadMethod('paste');
+                            };
+                            reader.readAsDataURL(file);
+                            event.preventDefault();
+                            return;
+                        }
+                    }
+                }
+            };
+            document.addEventListener('paste', pasteHandler);
+            return () => document.removeEventListener('paste', pasteHandler);
+        }
+    }, [isUploadDialogOpen, uploadMethod]);
 
     const downloadMeme = () => {
         const canvas = canvasRef.current;
@@ -1462,50 +1747,212 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         transition={{ duration: 0.3, delay: 0.6 }}
                         className="space-y-2 mt-4"
                     >
-                        <div className="flex space-x-2">
-                            <motion.button
-                                whileTap={{ scale: 0.98 }}
-                                className="flex items-center space-x-2 px-3 py-2 bg-[#6a7bd1] hover:bg-[#6975b3] text-white text-xs rounded-md transition-colors"
-                                onClick={() => fileInputRef.current?.click()}
-                            >
-                                <Upload className="h-3 w-3" />
-                                <span>Upload Image</span>
-                            </motion.button>
-                            <motion.div
-                                whileTap={{ scale: 0.98 }}
-                                className="flex items-center space-x-2 px-3 py-2 bg-transparent border border-[#6a7bd1] text-[#6a7bd1] text-xs rounded-md hover:bg-[#6a7bd1]/10 transition-colors cursor-pointer"
-                            >
-                                <ImageIcon className="h-3 w-3" />
-                                <span>Paste Image (Ctrl+V)</span>
-                            </motion.div>
-                        </div>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                        />
+                        <Dialog open={isUploadDialogOpen} onOpenChange={(open) => {
+                            setIsUploadDialogOpen(open);
+                            if (!open) {
+                                resetDialogState();
+                            }
+                        }}>
+                            <DialogTrigger asChild>
+                                <motion.button
+                                    whileTap={{ scale: 0.98 }}
+                                    className="flex items-center space-x-2 px-3 py-2 bg-[#6a7bd1] hover:bg-[#6975b3] text-white text-xs rounded-md transition-colors"
+                                    onClick={() => setIsUploadDialogOpen(true)}
+                                >
+                                    <Upload className="h-3 w-3" />
+                                    <span>Upload Image</span>
+                                </motion.button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md bg-[#0f0f0f] border-white/20">
+                                <DialogHeader>
+                                    <DialogTitle className="text-white">Upload Image</DialogTitle>
+                                    <DialogDescription className="text-white/60">
+                                        Choose how you want to add an image to your meme.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                    {/* Upload Method Selection */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <motion.button
+                                            whileTap={{ scale: 0.98 }}
+                                            className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'file'
+                                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                                }`}
+                                            onClick={() => setUploadMethod('file')}
+                                        >
+                                            <Upload className="h-6 w-6 mx-auto mb-2" />
+                                            <div className="text-xs font-medium">Upload File</div>
+                                        </motion.button>
+                                        <motion.button
+                                            whileTap={{ scale: 0.98 }}
+                                            className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'paste'
+                                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                                }`}
+                                            onClick={() => setUploadMethod('paste')}
+                                        >
+                                            <ImageIcon className="h-6 w-6 mx-auto mb-2" />
+                                            <div className="text-xs font-medium">Paste Image</div>
+                                        </motion.button>
+                                    </div>
+
+                                    {/* File Upload Option */}
+                                    {uploadMethod === 'file' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="space-y-2"
+                                        >
+                                            <label className="block text-sm text-white/80">Select an image file:</label>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleDialogFileUpload}
+                                                className="w-full p-2 text-sm border rounded-md bg-white/5 border-white/20 text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-[#6a7bd1] file:text-white hover:file:bg-[#6975b3] file:cursor-pointer"
+                                            />
+                                            {selectedFile && (
+                                                <div className="text-xs text-green-400 mt-1">
+                                                    ✓ Selected: {selectedFile.name}
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    )}
+
+                                    {/* Paste Option */}
+                                    {uploadMethod === 'paste' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="space-y-2"
+                                        >
+                                            <label className="block text-sm text-white/80">Paste your image here:</label>
+                                            <div
+                                                className="w-full h-32 border-2 border-dashed border-white/20 rounded-md flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                                                onPaste={handleDialogPaste}
+                                                tabIndex={0}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+                                                        // The paste event will be handled by onPaste
+                                                    }
+                                                }}
+                                            >
+                                                {pastedImageData ? (
+                                                    <div className="text-center">
+                                                        <img
+                                                            src={pastedImageData}
+                                                            alt="Pasted preview"
+                                                            className="max-w-full max-h-24 mx-auto mb-2 rounded"
+                                                        />
+                                                        <div className="text-xs text-green-400">✓ Image pasted successfully</div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center text-white/60">
+                                                        <ImageIcon className="h-8 w-8 mx-auto mb-2" />
+                                                        {isMobileDevice() ? (
+                                                            <>
+                                                                <div className="text-sm mb-3">Copy an image and tap below</div>
+                                                                <motion.button
+                                                                    whileTap={{ scale: 0.98 }}
+                                                                    onClick={handleMobilePaste}
+                                                                    className="px-4 text-xs py-2 bg-white/20 text-white rounded-md transition-colors"
+                                                                >
+                                                                    Paste from Clipboard
+                                                                </motion.button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="text-sm">Press Ctrl+V to paste an image</div>
+                                                                <div className="text-xs">or click here and paste</div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <motion.button
+                                        whileTap={{ scale: 0.98 }}
+                                        className="px-4 py-2 bg-transparent border border-white/20 text-white text-sm rounded-md hover:bg-white/5 transition-colors max-sm:mt-1"
+                                        onClick={() => setIsUploadDialogOpen(false)}
+                                    >
+                                        Cancel
+                                    </motion.button>
+                                    <motion.button
+                                        whileTap={{ scale: 0.98 }}
+                                        className="px-4 py-2 bg-[#6a7bd1] hover:bg-[#6975b3] text-white text-sm rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        onClick={handleUploadConfirm}
+                                        disabled={!selectedFile && !pastedImageData}
+                                    >
+                                        Upload Image
+                                    </motion.button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </motion.div>
 
-                    {/* Image Status */}
+                    {/* Images List */}
                     {imageOverlays.length > 0 && (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.7 }}
-                            className="mt-4 p-2 bg-white/5 rounded-md"
+                            className="mt-4 space-y-2"
                         >
-                            <div className="text-xs text-white/60 mb-1">
-                                📷 {imageOverlays.length} image{imageOverlays.length > 1 ? 's' : ''} added
-                            </div>
-                            <div className="text-xs text-white/40">
-                                Click images to select • Drag corners to resize • Use rotation handle • Press Delete to remove
+                            <div className="space-y-1">
+                                {imageOverlays.map((overlay, index) => (
+                                    <motion.div
+                                        key={overlay.id}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -10 }}
+                                        transition={{ duration: 0.2, delay: index * 0.05 }}
+                                        className={`flex items-center justify-between p-2 rounded-md border transition-colors ${selectedImageIndex === index
+                                            ? 'dark:bg-black dark:border-white/15 bg-[#0f0f0f] border-white/20'
+                                            : 'dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 bg-black/80 border-white/20'
+                                            }`}
+                                        onClick={() => setSelectedImageIndex(index)}
+                                    >
+                                        <div className="flex items-center space-x-2 cursor-pointer flex-1">
+                                            <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center">
+                                                <ImageIcon className="h-4 w-4 text-white/60 dark:text-white/60" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-xs text-white/80 dark:text-white/80 truncate">
+                                                    image.png
+                                                </div>
+                                                <div className="text-xs text-white/40 dark:text-white/40">
+                                                    {Math.round(overlay.width)}×{Math.round(overlay.height)}px
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <motion.button
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeImageOverlay(index);
+                                                if (selectedImageIndex === index) {
+                                                    setSelectedImageIndex(-1);
+                                                } else if (selectedImageIndex > index) {
+                                                    setSelectedImageIndex(selectedImageIndex - 1);
+                                                }
+                                            }}
+                                            className="p-1 rounded-full hover:scale-110 transition-colors"
+                                        >
+                                            <Trash2 className="h-4 w-4 text-white" />
+                                        </motion.button>
+                                    </motion.div>
+                                ))}
                             </div>
                         </motion.div>
                     )}
 
-                    <div className="flex w-full space-x-2 mt-2">
+                    <div className="flex w-full space-x-2 mt-4">
                         <motion.button
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}

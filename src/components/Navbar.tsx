@@ -25,7 +25,6 @@ export default function Navbar() {
                     <div className="flex-shrink-0">
                         <Link href="/">
                             <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center -space-x-2.5">
-                                {/* <Image src="/logo.png" alt="logo" width={30} height={30} loading="lazy" /> */}
                                 <span>
                                     <span className="px-2 py-0.5 bg-transparent"></span>Meme <span className="bg-[#6a7bd1] rounded-sm text-white px-2 py-0.5">Hub</span>
                                 </span>
