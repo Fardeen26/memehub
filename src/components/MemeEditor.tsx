@@ -1,7 +1,7 @@
 "use client"
 
 import { Template } from '@/types/template';
-import { MoveLeft, Settings } from 'lucide-react';
+import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -20,30 +20,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { toast } from 'sonner';
-
-type MemeEditorProps = {
-    template: Template;
-    onReset: () => void;
-};
-
-type TextSettings = {
-    fontSize: number;
-    color: string;
-    fontFamily: string;
-    fontWeight: string;
-    letterSpacing: number;
-    textCase: 'uppercase' | 'lowercase' | 'normal';
-    outline: {
-        width: number;
-        color: string;
-    };
-    shadow: {
-        blur: number;
-        offsetX: number;
-        offsetY: number;
-        color: string;
-    };
-};
+import { MemeEditorProps, TextSettings, ImageOverlay } from '@/types/editor';
 
 export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -54,11 +31,22 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [dragIndex, setDragIndex] = useState<number>(-1);
     const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
+    const isMobileDevice = () => {
+        if (typeof window !== 'undefined') {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        return false;
+    };
+
+    const getDefaultFont = () => {
+        return isMobileDevice() ? 'Oswald' : 'Impact';
+    };
+
     const [textSettings, setTextSettings] = useState<TextSettings[]>(
         template.textBoxes.map(box => ({
             fontSize: box.fontSize,
             color: '#ffffff',
-            fontFamily: 'Impact',
+            fontFamily: getDefaultFont(),
             fontWeight: '900',
             letterSpacing: 0,
             textCase: 'uppercase' as const,
@@ -75,6 +63,34 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }))
     );
     const [openDropdown, setOpenDropdown] = useState<number>(-1);
+
+    // Image overlay states
+    const [imageOverlays, setImageOverlays] = useState<ImageOverlay[]>([]);
+    const [isDraggingImage, setIsDraggingImage] = useState<boolean>(false);
+    const [dragImageIndex, setDragImageIndex] = useState<number>(-1);
+    const [dragImageOffset, setDragImageOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [isResizingImage, setIsResizingImage] = useState<boolean>(false);
+    const [resizeImageIndex, setResizeImageIndex] = useState<number>(-1);
+    const [resizeHandle, setResizeHandle] = useState<string>('');
+    const [resizeStartPos, setResizeStartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [resizeStartSize, setResizeStartSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    const [isRotatingImage, setIsRotatingImage] = useState<boolean>(false);
+    const [rotateImageIndex, setRotateImageIndex] = useState<number>(-1);
+    const [rotateStartAngle, setRotateStartAngle] = useState<number>(0);
+    const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const defaultFont = getDefaultFont();
+        setTextSettings(prev =>
+            prev.map(setting => ({
+                ...setting,
+                fontFamily: setting.fontFamily === 'Impact' || setting.fontFamily === 'Oswald'
+                    ? defaultFont
+                    : setting.fontFamily
+            }))
+        );
+    }, []);
 
     const handleChange = (idx: number, value: string) => {
         const arr = [...texts];
@@ -121,10 +137,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         });
     };
 
-    const toggleDropdown = (idx: number) => {
-        setOpenDropdown(openDropdown === idx ? -1 : idx);
-    };
-
     const transformText = (text: string, textCase: TextSettings['textCase']): string => {
         switch (textCase) {
             case 'uppercase':
@@ -137,9 +149,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     };
 
-    const MIN_FONT_SIZE = template.textBoxes[0].minFont; // min font size when makeing it smaller
+    const MIN_FONT_SIZE = template.textBoxes[0].minFont;
 
-    // Add hit detection function
     const getTextAtPosition = (x: number, y: number): number => {
         for (let i = textBoxes.length - 1; i >= 0; i--) {
             const box = textBoxes[i];
@@ -150,7 +161,156 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         return -1;
     };
 
-    // Add mouse event handlers
+    // Image helper functions
+    const generateImageId = (): string => {
+        return `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    };
+
+    const getImageAtPosition = (x: number, y: number): { index: number; handle: string } => {
+        for (let i = imageOverlays.length - 1; i >= 0; i--) {
+            const img = imageOverlays[i];
+
+            // Check rotation handle first (small circle above the image)
+            const rotationHandleSize = 30;
+            const rotationHandleX = (img.x + img.width / 2) + 60;
+            const rotationHandleY = img.y + 60;
+            const distToRotationHandle = Math.sqrt(
+                Math.pow(x - rotationHandleX, 2) + Math.pow(y - rotationHandleY, 2) + 100
+            );
+            if (distToRotationHandle <= rotationHandleSize / 2) {
+                return { index: i, handle: 'rotate' };
+            }
+
+            // Check resize handles (small squares at corners and edges)
+            const handleSize = 60;
+            const handles = [
+                { name: 'nw', x: (img.x - handleSize / 2) + 100, y: (img.y - handleSize / 2) + 100 },
+                { name: 'ne', x: img.x + img.width - handleSize / 2, y: img.y - handleSize / 2 },
+                { name: 'sw', x: img.x - handleSize / 2, y: img.y + img.height - handleSize / 2 },
+                { name: 'se', x: img.x + img.width - handleSize / 2, y: img.y + img.height - handleSize / 2 },
+                { name: 'n', x: img.x + img.width / 2 - handleSize / 2, y: img.y - handleSize / 2 },
+                { name: 's', x: img.x + img.width / 2 - handleSize / 2, y: img.y + img.height - handleSize / 2 },
+                { name: 'w', x: img.x - handleSize / 2, y: img.y + img.height / 2 - handleSize / 2 },
+                { name: 'e', x: img.x + img.width - handleSize / 2, y: img.y + img.height / 2 - handleSize / 2 }
+            ];
+
+            for (const handle of handles) {
+                if (x >= handle.x && x <= handle.x + handleSize &&
+                    y >= handle.y && y <= handle.y + handleSize) {
+                    return { index: i, handle: handle.name };
+                }
+            }
+
+            // Check if click is within image bounds
+            if (x >= img.x && x <= img.x + img.width &&
+                y >= img.y && y <= img.y + img.height) {
+                return { index: i, handle: 'move' };
+            }
+        }
+        return { index: -1, handle: '' };
+    };
+
+    const addImageOverlay = async (file: File | string, isDataUrl: boolean = false) => {
+        try {
+            let imageSrc: string;
+
+            if (isDataUrl) {
+                imageSrc = file as string;
+            } else {
+                const reader = new FileReader();
+                imageSrc = await new Promise<string>((resolve) => {
+                    reader.onload = (e) => {
+                        resolve(e.target?.result as string);
+                    };
+                    reader.readAsDataURL(file as File);
+                });
+            }
+
+            const img = new window.Image();
+            img.onload = () => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+
+                // Calculate appropriate size (max 200px width/height while maintaining aspect ratio)
+                const maxSize = 200;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxSize || height > maxSize) {
+                    const ratio = Math.min(maxSize / width, maxSize / height);
+                    width = width * ratio;
+                    height = height * ratio;
+                }
+
+                const newOverlay: ImageOverlay = {
+                    id: generateImageId(),
+                    src: imageSrc,
+                    x: (canvas.width - width) / 2, // Center the image
+                    y: (canvas.height - height) / 2,
+                    width,
+                    height,
+                    originalWidth: img.width,
+                    originalHeight: img.height,
+                    opacity: 1,
+                    rotation: 0
+                };
+
+                setImageOverlays(prev => {
+                    const updated = [...prev, newOverlay];
+                    console.log('Image overlays updated:', updated.length);
+                    return updated;
+                });
+
+                toast.success('Image added successfully!');
+            };
+
+            img.onerror = () => {
+                console.error('Failed to load image');
+                toast.error('Failed to load image');
+            };
+
+            img.src = imageSrc;
+        } catch (error) {
+            console.error('Error adding image overlay:', error);
+            toast.error('Failed to add image');
+        }
+    };
+
+    const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            if (file.type.startsWith('image/')) {
+                addImageOverlay(file);
+            } else {
+                toast.error('Please select an image file');
+            }
+        }
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handlePaste = async (event: ClipboardEvent) => {
+        const items = event.clipboardData?.items;
+        if (!items) return;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) {
+                    addImageOverlay(file);
+                    event.preventDefault();
+                    return; // Only handle one image at a time
+                }
+            }
+        }
+    };
+
+    const removeImageOverlay = (index: number) => {
+        setImageOverlays(prev => prev.filter((_, i) => i !== index));
+    };
+
     const handleMouseDown = (e: any) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -162,6 +322,47 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
 
+        // Check for image interaction first
+        const imageResult = getImageAtPosition(x, y);
+        if (imageResult.index !== -1) {
+            setSelectedImageIndex(imageResult.index);
+
+            if (imageResult.handle === 'move') {
+                setIsDraggingImage(true);
+                setDragImageIndex(imageResult.index);
+                setDragImageOffset({
+                    x: x - imageOverlays[imageResult.index].x,
+                    y: y - imageOverlays[imageResult.index].y
+                });
+                canvas.style.cursor = 'grabbing';
+            } else if (imageResult.handle === 'rotate') {
+                // Start rotating
+                setIsRotatingImage(true);
+                setRotateImageIndex(imageResult.index);
+                const img = imageOverlays[imageResult.index];
+                const centerX = img.x + img.width / 2;
+                const centerY = img.y + img.height / 2;
+                const angle = Math.atan2(y - centerY, x - centerX) * 180 / Math.PI;
+                setRotateStartAngle(angle - img.rotation);
+                canvas.style.cursor = 'grab';
+            } else {
+                // Start resizing
+                setIsResizingImage(true);
+                setResizeImageIndex(imageResult.index);
+                setResizeHandle(imageResult.handle);
+                setResizeStartPos({ x, y });
+                setResizeStartSize({
+                    width: imageOverlays[imageResult.index].width,
+                    height: imageOverlays[imageResult.index].height
+                });
+                canvas.style.cursor = `${imageResult.handle}-resize`;
+            }
+            return;
+        } else {
+            setSelectedImageIndex(-1);
+        }
+
+        // Check for text interaction
         const textIndex = getTextAtPosition(x, y);
         if (textIndex !== -1) {
             setIsDragging(true);
@@ -185,11 +386,116 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
 
-        if (isDragging && dragIndex !== -1) {
+        if (isDraggingImage && dragImageIndex !== -1) {
+            const newX = x - dragImageOffset.x;
+            const newY = y - dragImageOffset.y;
+
+            const constrainedX = Math.max(0, Math.min(canvas.width - imageOverlays[dragImageIndex].width, newX));
+            const constrainedY = Math.max(0, Math.min(canvas.height - imageOverlays[dragImageIndex].height, newY));
+
+            setImageOverlays(prev => {
+                const updated = [...prev];
+                updated[dragImageIndex] = {
+                    ...updated[dragImageIndex],
+                    x: constrainedX,
+                    y: constrainedY
+                };
+                return updated;
+            });
+        } else if (isRotatingImage && rotateImageIndex !== -1) {
+            // Handle rotation
+            const img = imageOverlays[rotateImageIndex];
+            const centerX = img.x + img.width / 2;
+            const centerY = img.y + img.height / 2;
+            const angle = Math.atan2(y - centerY, x - centerX) * 180 / Math.PI;
+            const newRotation = angle - rotateStartAngle;
+
+            setImageOverlays(prev => {
+                const updated = [...prev];
+                updated[rotateImageIndex] = {
+                    ...updated[rotateImageIndex],
+                    rotation: newRotation
+                };
+                return updated;
+            });
+        } else if (isResizingImage && resizeImageIndex !== -1) {
+            const deltaX = x - resizeStartPos.x;
+            const deltaY = y - resizeStartPos.y;
+
+            let newWidth = resizeStartSize.width;
+            let newHeight = resizeStartSize.height;
+            let newX = imageOverlays[resizeImageIndex].x;
+            let newY = imageOverlays[resizeImageIndex].y;
+
+            // Calculate new dimensions based on resize handle
+            switch (resizeHandle) {
+                case 'se': // bottom-right
+                    newWidth = Math.max(20, resizeStartSize.width + deltaX);
+                    newHeight = Math.max(20, resizeStartSize.height + deltaY);
+                    break;
+                case 'sw': // bottom-left
+                    newWidth = Math.max(20, resizeStartSize.width - deltaX);
+                    newHeight = Math.max(20, resizeStartSize.height + deltaY);
+                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    break;
+                case 'ne': // top-right
+                    newWidth = Math.max(20, resizeStartSize.width + deltaX);
+                    newHeight = Math.max(20, resizeStartSize.height - deltaY);
+                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    break;
+                case 'nw': // top-left
+                    newWidth = Math.max(20, resizeStartSize.width - deltaX);
+                    newHeight = Math.max(20, resizeStartSize.height - deltaY);
+                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    break;
+                case 'n': // top
+                    newHeight = Math.max(20, resizeStartSize.height - deltaY);
+                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    break;
+                case 's': // bottom
+                    newHeight = Math.max(20, resizeStartSize.height + deltaY);
+                    break;
+                case 'w': // left
+                    newWidth = Math.max(20, resizeStartSize.width - deltaX);
+                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    break;
+                case 'e': // right
+                    newWidth = Math.max(20, resizeStartSize.width + deltaX);
+                    break;
+            }
+
+            // Constrain to canvas bounds
+            if (newX < 0) {
+                newWidth += newX;
+                newX = 0;
+            }
+            if (newY < 0) {
+                newHeight += newY;
+                newY = 0;
+            }
+            if (newX + newWidth > canvas.width) {
+                newWidth = canvas.width - newX;
+            }
+            if (newY + newHeight > canvas.height) {
+                newHeight = canvas.height - newY;
+            }
+
+            setImageOverlays(prev => {
+                const updated = [...prev];
+                updated[resizeImageIndex] = {
+                    ...updated[resizeImageIndex],
+                    x: newX,
+                    y: newY,
+                    width: newWidth,
+                    height: newHeight
+                };
+                return updated;
+            });
+        } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
 
-            // Constrain to canvas bounds
             const constrainedX = Math.max(0, Math.min(canvas.width - textBoxes[dragIndex].width, newX));
             const constrainedY = Math.max(textBoxes[dragIndex].fontSize, Math.min(canvas.height, newY));
 
@@ -203,9 +509,20 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 return updated;
             });
         } else {
-            // Change cursor when hovering over text
-            const textIndex = getTextAtPosition(x, y);
-            canvas.style.cursor = textIndex !== -1 ? 'grab' : 'default';
+            // Update cursor based on what's under the mouse
+            const imageResult = getImageAtPosition(x, y);
+            if (imageResult.index !== -1) {
+                if (imageResult.handle === 'move') {
+                    canvas.style.cursor = 'grab';
+                } else if (imageResult.handle === 'rotate') {
+                    canvas.style.cursor = 'grab';
+                } else {
+                    canvas.style.cursor = `${imageResult.handle}-resize`;
+                }
+            } else {
+                const textIndex = getTextAtPosition(x, y);
+                canvas.style.cursor = textIndex !== -1 ? 'grab' : 'default';
+            }
         }
     };
 
@@ -213,13 +530,23 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsDragging(false);
         setDragIndex(-1);
         setDragOffset({ x: 0, y: 0 });
+        setIsDraggingImage(false);
+        setDragImageIndex(-1);
+        setDragImageOffset({ x: 0, y: 0 });
+        setIsResizingImage(false);
+        setResizeImageIndex(-1);
+        setResizeHandle('');
+        setResizeStartPos({ x: 0, y: 0 });
+        setResizeStartSize({ width: 0, height: 0 });
+        setIsRotatingImage(false);
+        setRotateImageIndex(-1);
+        setRotateStartAngle(0);
         const canvas = canvasRef.current;
         if (canvas) {
             canvas.style.cursor = 'default';
         }
     };
 
-    // Add touch event handlers for mobile support
     const handleTouchStart = (e: any) => {
         e.preventDefault();
         const canvas = canvasRef.current;
@@ -232,6 +559,32 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const touch = e.touches[0];
         const x = (touch.clientX - rect.left) * scaleX;
         const y = (touch.clientY - rect.top) * scaleY;
+
+        // Check for image interaction first
+        const imageResult = getImageAtPosition(x, y);
+        if (imageResult.index !== -1) {
+            setSelectedImageIndex(imageResult.index);
+
+            if (imageResult.handle === 'move') {
+                setIsDraggingImage(true);
+                setDragImageIndex(imageResult.index);
+                setDragImageOffset({
+                    x: x - imageOverlays[imageResult.index].x,
+                    y: y - imageOverlays[imageResult.index].y
+                });
+            } else if (imageResult.handle === 'rotate') {
+                setIsRotatingImage(true);
+                setRotateImageIndex(imageResult.index);
+                const img = imageOverlays[imageResult.index];
+                const centerX = img.x + img.width / 2;
+                const centerY = img.y + img.height / 2;
+                const angle = Math.atan2(y - centerY, x - centerX) * 180 / Math.PI;
+                setRotateStartAngle(angle - img.rotation);
+            }
+            return;
+        } else {
+            setSelectedImageIndex(-1);
+        }
 
         const textIndex = getTextAtPosition(x, y);
         if (textIndex !== -1) {
@@ -247,7 +600,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const handleTouchMove = (e: any) => {
         e.preventDefault();
         const canvas = canvasRef.current;
-        if (!canvas || !isDragging || dragIndex === -1 || e.touches.length !== 1) return;
+        if (!canvas || e.touches.length !== 1) return;
+
+        if (!isDragging && !isDraggingImage && !isRotatingImage) return;
+        if (isDragging && dragIndex === -1) return;
+        if (isDraggingImage && dragImageIndex === -1) return;
+        if (isRotatingImage && rotateImageIndex === -1) return;
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -257,22 +615,55 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const x = (touch.clientX - rect.left) * scaleX;
         const y = (touch.clientY - rect.top) * scaleY;
 
-        const newX = x - dragOffset.x;
-        const newY = y - dragOffset.y;
+        if (isDraggingImage && dragImageIndex !== -1) {
+            const newX = x - dragImageOffset.x;
+            const newY = y - dragImageOffset.y;
 
-        // Constrain to canvas bounds
-        const constrainedX = Math.max(0, Math.min(canvas.width - textBoxes[dragIndex].width, newX));
-        const constrainedY = Math.max(textBoxes[dragIndex].fontSize, Math.min(canvas.height, newY));
+            const constrainedX = Math.max(0, Math.min(canvas.width - imageOverlays[dragImageIndex].width, newX));
+            const constrainedY = Math.max(0, Math.min(canvas.height - imageOverlays[dragImageIndex].height, newY));
 
-        setTextBoxes((prev: Template['textBoxes']) => {
-            const updated = [...prev];
-            updated[dragIndex] = {
-                ...updated[dragIndex],
-                x: constrainedX,
-                y: constrainedY
-            };
-            return updated;
-        });
+            setImageOverlays(prev => {
+                const updated = [...prev];
+                updated[dragImageIndex] = {
+                    ...updated[dragImageIndex],
+                    x: constrainedX,
+                    y: constrainedY
+                };
+                return updated;
+            });
+        } else if (isRotatingImage && rotateImageIndex !== -1) {
+            // Handle rotation
+            const img = imageOverlays[rotateImageIndex];
+            const centerX = img.x + img.width / 2;
+            const centerY = img.y + img.height / 2;
+            const angle = Math.atan2(y - centerY, x - centerX) * 180 / Math.PI;
+            const newRotation = angle - rotateStartAngle;
+
+            setImageOverlays(prev => {
+                const updated = [...prev];
+                updated[rotateImageIndex] = {
+                    ...updated[rotateImageIndex],
+                    rotation: newRotation
+                };
+                return updated;
+            });
+        } else if (isDragging && dragIndex !== -1) {
+            const newX = x - dragOffset.x;
+            const newY = y - dragOffset.y;
+
+            const constrainedX = Math.max(0, Math.min(canvas.width - textBoxes[dragIndex].width, newX));
+            const constrainedY = Math.max(textBoxes[dragIndex].fontSize, Math.min(canvas.height, newY));
+
+            setTextBoxes((prev: Template['textBoxes']) => {
+                const updated = [...prev];
+                updated[dragIndex] = {
+                    ...updated[dragIndex],
+                    x: constrainedX,
+                    y: constrainedY
+                };
+                return updated;
+            });
+        }
     };
 
     const handleTouchEnd = (e: any) => {
@@ -280,6 +671,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsDragging(false);
         setDragIndex(-1);
         setDragOffset({ x: 0, y: 0 });
+        setIsDraggingImage(false);
+        setDragImageIndex(-1);
+        setDragImageOffset({ x: 0, y: 0 });
+        setIsRotatingImage(false);
+        setRotateImageIndex(-1);
+        setRotateStartAngle(0);
     };
 
     const calculateFontSize = (
@@ -295,10 +692,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         let fontSize = maxFontSize;
         let lines: string[] = [];
 
-        // Transform text based on case setting
         const transformedText = transformText(text, textCase);
 
-        // Function to calculate text width with letter spacing
         const getTextWidth = (text: string): number => {
             if (letterSpacing === 0) {
                 return ctx.measureText(text).width;
@@ -308,8 +703,17 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }, 0);
         };
 
+        const fontFallbacks = [
+            fontFamily,
+            fontFamily === 'Impact' ? 'Arial Black' : 'Impact',
+            'Arial Black',
+            'Helvetica Neue',
+            'Arial',
+            'sans-serif'
+        ].join(', ');
+
         while (fontSize > MIN_FONT_SIZE) {
-            ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+            ctx.font = `${fontWeight} ${fontSize}px ${fontFallbacks}`;
             lines = [];
             let currentLine = '';
             const words = transformedText.split(' ');
@@ -320,7 +724,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
                 if (textWidth > box.width) {
                     if (currentLine === '') {
-                        // wrapping the lines
                         lines.push(word);
                         currentLine = '';
                     } else {
@@ -344,7 +747,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         if (fontSize < MIN_FONT_SIZE) {
             fontSize = MIN_FONT_SIZE;
-            ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+            ctx.font = `${fontWeight} ${fontSize}px ${fontFallbacks}`;
             lines = [];
             let currentLine = '';
             const words = transformedText.split(' ');
@@ -374,9 +777,30 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     };
 
     const waitForFont = async (font: string) => {
-        if (document.fonts && document.fonts.load) {
-            await document.fonts.load(`20px ${font}`);
-            await document.fonts.ready;
+        try {
+            if (document.fonts && document.fonts.load) {
+                const fontVariations = [
+                    `bold 20px "${font}"`,
+                    `normal 20px "${font}"`,
+                    `900 20px "${font}"`,
+                    `800 20px "${font}"`,
+                    `700 20px "${font}"`,
+                ];
+
+                await Promise.all(fontVariations.map(async (fontStyle) => {
+                    try {
+                        await document.fonts.load(fontStyle);
+                    } catch (error) {
+                        console.warn(`Failed to load font style: ${fontStyle}`);
+                    }
+                }));
+
+                await document.fonts.ready;
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        } catch (error) {
+            console.warn(`Font loading error for ${font}:`, error);
         }
     };
 
@@ -390,12 +814,21 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const { fontSize, lines } = calculateFontSize(ctx, text, box, settings.fontSize, settings.fontFamily, settings.fontWeight, settings.letterSpacing, settings.textCase);
 
-        ctx.font = `${settings.fontWeight} ${fontSize}px ${settings.fontFamily}, Arial, sans-serif`;
+        const fontFallbacks = [
+            settings.fontFamily,
+            settings.fontFamily === 'Impact' ? 'Arial Black' : 'Impact',
+            'Arial Black',
+            'Helvetica Neue',
+            'Arial',
+            'sans-serif'
+        ].join(', ');
 
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
+
+        const isMobile = isMobileDevice();
 
         if (isMobile) {
-            ctx.font = `${settings.fontWeight} ${fontSize}px ${settings.fontFamily}`;
+            ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
             ctx.shadowBlur = settings.shadow.blur;
             ctx.shadowOffsetX = settings.shadow.offsetX;
             ctx.shadowOffsetY = settings.shadow.offsetY;
@@ -408,12 +841,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const lineHeight = fontSize * 1.2;
             let currentY = box.y;
 
-            // Function to draw text with letter spacing (mobile version)
             const drawTextWithSpacingMobile = (text: string, x: number, y: number) => {
                 const transformedText = transformText(text, settings.textCase);
 
                 if (settings.letterSpacing === 0) {
-                    // No letter spacing, use regular fillText and strokeText
                     if (settings.outline.width > 0) {
                         ctx.strokeText(transformedText, x, y);
                     }
@@ -421,12 +852,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     return;
                 }
 
-                // Draw each character individually with spacing
                 let currentX = x;
                 const originalTextAlign = ctx.textAlign;
                 ctx.textAlign = 'left';
 
-                // Adjust starting position based on alignment
                 if (originalTextAlign === 'center') {
                     const totalWidth = transformedText.split('').reduce((width, char, index) => {
                         return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
@@ -457,70 +886,66 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 currentY += lineHeight;
             });
         } else {
-            ctx.font = `${settings.fontWeight} ${fontSize}px ${settings.fontFamily}`;
+            ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
             ctx.lineWidth = settings.outline.width;
             ctx.shadowBlur = settings.shadow.blur;
             ctx.shadowOffsetX = settings.shadow.offsetX;
             ctx.shadowOffsetY = settings.shadow.offsetY;
             ctx.strokeStyle = settings.outline.color;
+
+            ctx.shadowColor = settings.shadow.color;
+            ctx.fillStyle = settings.color;
+            ctx.textAlign = box.align || 'center';
+
+            const lineHeight = fontSize * 1.2;
+            let currentY = box.y;
+
+            const drawTextWithSpacing = (text: string, x: number, y: number) => {
+                const transformedText = transformText(text, settings.textCase);
+
+                if (settings.letterSpacing === 0) {
+                    if (settings.outline.width > 0) {
+                        ctx.strokeText(transformedText, x, y);
+                    }
+                    ctx.fillText(transformedText, x, y);
+                    return;
+                }
+
+                let currentX = x;
+                const originalTextAlign = ctx.textAlign;
+                ctx.textAlign = 'left';
+
+                if (originalTextAlign === 'center') {
+                    const totalWidth = transformedText.split('').reduce((width, char, index) => {
+                        return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
+                    }, 0);
+                    currentX = x - totalWidth / 2;
+                } else if (originalTextAlign === 'right') {
+                    const totalWidth = transformedText.split('').reduce((width, char, index) => {
+                        return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
+                    }, 0);
+                    currentX = x - totalWidth;
+                }
+
+                for (let i = 0; i < transformedText.length; i++) {
+                    const char = transformedText[i];
+                    if (settings.outline.width > 0) {
+                        ctx.strokeText(char, currentX, y);
+                    }
+                    ctx.fillText(char, currentX, y);
+                    currentX += ctx.measureText(char).width + settings.letterSpacing;
+                }
+
+                ctx.textAlign = originalTextAlign;
+            };
+
+            lines.forEach(line => {
+                const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
+                drawTextWithSpacing(line, x, currentY);
+                currentY += lineHeight;
+            });
         }
-
-        ctx.shadowColor = settings.shadow.color;
-        ctx.fillStyle = settings.color;
-        ctx.textAlign = box.align || 'center';
-
-        const lineHeight = fontSize * 1.2;
-        let currentY = box.y;
-
-        // Function to draw text with letter spacing
-        const drawTextWithSpacing = (text: string, x: number, y: number) => {
-            const transformedText = transformText(text, settings.textCase);
-
-            if (settings.letterSpacing === 0) {
-                // No letter spacing, use regular fillText
-                if (settings.outline.width > 0) {
-                    ctx.strokeText(transformedText, x, y);
-                }
-                ctx.fillText(transformedText, x, y);
-                return;
-            }
-
-            // Draw each character individually with spacing
-            let currentX = x;
-            const originalTextAlign = ctx.textAlign;
-            ctx.textAlign = 'left';
-
-            // Adjust starting position based on alignment
-            if (originalTextAlign === 'center') {
-                const totalWidth = transformedText.split('').reduce((width, char, index) => {
-                    return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
-                }, 0);
-                currentX = x - totalWidth / 2;
-            } else if (originalTextAlign === 'right') {
-                const totalWidth = transformedText.split('').reduce((width, char, index) => {
-                    return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
-                }, 0);
-                currentX = x - totalWidth;
-            }
-
-            for (let i = 0; i < transformedText.length; i++) {
-                const char = transformedText[i];
-                if (settings.outline.width > 0) {
-                    ctx.strokeText(char, currentX, y);
-                }
-                ctx.fillText(char, currentX, y);
-                currentX += ctx.measureText(char).width + settings.letterSpacing;
-            }
-
-            ctx.textAlign = originalTextAlign;
-        };
-
-        lines.forEach(line => {
-            const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
-            drawTextWithSpacing(line, x, currentY);
-            currentY += lineHeight;
-        });
-    }, []);
+    }, [isMobileDevice]);
 
     useEffect(() => {
         const draw = async () => {
@@ -529,18 +954,127 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
-            await waitForFont('Impact');
+            const fontsToLoad = [...new Set(textSettings.map(setting => setting.fontFamily))];
+            await Promise.all(fontsToLoad.map(font => waitForFont(font)));
 
             const img = new window.Image();
             img.src = template.image;
 
-            img.onload = () => {
+            img.onload = async () => {
                 canvas.width = img.width;
                 canvas.height = img.height;
 
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(img, 0, 0);
 
+                // Draw image overlays
+                console.log('Drawing image overlays:', imageOverlays.length);
+                for (const overlay of imageOverlays) {
+                    console.log('Processing overlay:', overlay.id, overlay.src.substring(0, 50) + '...');
+                    try {
+                        const overlayImg = new window.Image();
+                        overlayImg.crossOrigin = 'anonymous';
+
+                        await new Promise<void>((resolve, reject) => {
+                            overlayImg.onload = () => {
+                                try {
+                                    ctx.save();
+                                    ctx.globalAlpha = overlay.opacity;
+
+                                    if (overlay.rotation !== 0) {
+                                        const centerX = overlay.x + overlay.width / 2;
+                                        const centerY = overlay.y + overlay.height / 2;
+                                        ctx.translate(centerX, centerY);
+                                        ctx.rotate((overlay.rotation * Math.PI) / 180);
+                                        ctx.drawImage(overlayImg, -overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
+                                    } else {
+                                        ctx.drawImage(overlayImg, overlay.x, overlay.y, overlay.width, overlay.height);
+                                    }
+
+                                    ctx.restore();
+                                    resolve();
+                                } catch (error) {
+                                    console.error('Error drawing overlay image:', error);
+                                    ctx.restore();
+                                    resolve();
+                                }
+                            };
+
+                            overlayImg.onerror = () => {
+                                console.error('Failed to load overlay image:', overlay.src);
+                                resolve();
+                            };
+
+                            overlayImg.src = overlay.src;
+                        });
+                    } catch (error) {
+                        console.error('Error processing overlay:', error);
+                    }
+                }
+
+                // Draw image handles for selected image
+                if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length) {
+                    const selectedImg = imageOverlays[selectedImageIndex];
+
+                    // Draw resize handles
+                    const handleSize = 12;
+                    const handles = [
+                        { x: selectedImg.x - handleSize / 2, y: selectedImg.y - handleSize / 2 },
+                        { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y - handleSize / 2 },
+                        { x: selectedImg.x - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
+                        { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
+                        { x: selectedImg.x + selectedImg.width / 2 - handleSize / 2, y: selectedImg.y - handleSize / 2 },
+                        { x: selectedImg.x + selectedImg.width / 2 - handleSize / 2, y: selectedImg.y + selectedImg.height - handleSize / 2 },
+                        { x: selectedImg.x - handleSize / 2, y: selectedImg.y + selectedImg.height / 2 - handleSize / 2 },
+                        { x: selectedImg.x + selectedImg.width - handleSize / 2, y: selectedImg.y + selectedImg.height / 2 - handleSize / 2 }
+                    ];
+
+                    // Draw selection border
+                    ctx.save();
+                    ctx.strokeStyle = '#6a7bd1';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(selectedImg.x, selectedImg.y, selectedImg.width, selectedImg.height);
+                    ctx.restore();
+
+                    // Draw resize handles
+                    handles.forEach(handle => {
+                        ctx.save();
+                        ctx.fillStyle = '#6a7bd1';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 2;
+                        ctx.fillRect(handle.x, handle.y, handleSize, handleSize);
+                        ctx.strokeRect(handle.x, handle.y, handleSize, handleSize);
+                        ctx.restore();
+                    });
+
+                    // Draw rotation handle
+                    const rotationHandleX = selectedImg.x + selectedImg.width / 2;
+                    const rotationHandleY = selectedImg.y - 25;
+
+                    // Draw line from image to rotation handle
+                    ctx.save();
+                    ctx.strokeStyle = '#6a7bd1';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(selectedImg.x + selectedImg.width / 2, selectedImg.y);
+                    ctx.lineTo(rotationHandleX, rotationHandleY);
+                    ctx.stroke();
+                    ctx.restore();
+
+                    // Draw rotation handle circle
+                    ctx.save();
+                    ctx.fillStyle = '#6a7bd1';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(rotationHandleX, rotationHandleY, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Draw text on top of images
                 textBoxes.forEach((box, i) => {
                     drawText()(ctx, texts[i], box, textSettings[i]);
                 });
@@ -548,9 +1082,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         };
 
         draw();
-    }, [texts, textBoxes, textSettings, drawText]);
+    }, [texts, textBoxes, textSettings, imageOverlays, selectedImageIndex, drawText]);
 
-    // Add click outside handler to close dropdowns
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
@@ -564,6 +1097,30 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }
     }, [openDropdown]);
+
+    // Add paste event listener
+    useEffect(() => {
+        const pasteHandler = (event: ClipboardEvent) => handlePaste(event);
+        document.addEventListener('paste', pasteHandler);
+        console.log('Paste event listener added');
+        return () => {
+            document.removeEventListener('paste', pasteHandler);
+            console.log('Paste event listener removed');
+        };
+    }, []);
+
+    // Add keyboard event listener for deleting selected image
+    useEffect(() => {
+        const keyHandler = (event: KeyboardEvent) => {
+            if (event.key === 'Delete' && selectedImageIndex !== -1) {
+                removeImageOverlay(selectedImageIndex);
+                setSelectedImageIndex(-1);
+                event.preventDefault();
+            }
+        };
+        document.addEventListener('keydown', keyHandler);
+        return () => document.removeEventListener('keydown', keyHandler);
+    }, [selectedImageIndex]);
 
     const downloadMeme = () => {
         const canvas = canvasRef.current;
@@ -579,7 +1136,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!canvas) return;
 
         try {
-            // Convert canvas to blob
             const blob = await new Promise<Blob>((resolve) => {
                 canvas.toBlob((blob) => {
                     if (blob) resolve(blob);
@@ -656,7 +1212,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                 <Settings className="h-4 w-4" />
                                             </button>
                                         </DropdownMenuTrigger>
-                                        {/* <AnimatePresence> */}
                                         <DropdownMenuContent className='max-w-md z-50'>
                                             <DropdownMenuLabel>Settings</DropdownMenuLabel>
                                             <DropdownMenuSeparator />
@@ -888,172 +1443,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                 </div>
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
-                                        {/* </AnimatePresence> */}
                                     </DropdownMenu>
-                                    {/* <button
-                                        onClick={() => toggleDropdown(i)}
-                                        className="p-2 border rounded-md bg-[#0f0f0f] border-white/20 text-white hover:bg-white/5 transition-colors"
-                                    >
-                                        <Settings className="h-4 w-4" />
-                                    </button>
-                                    <AnimatePresence>
-                                        {openDropdown === i && (
-                                            <motion.div
-                                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                                                transition={{ duration: 0.2 }}
-                                                className="absolute top-full left-0 mt-2 p-4 bg-[#0f0f0f] border border-white/20 rounded-md shadow-lg z-10 min-w-[280px] dropdown-container"
-                                            >
-                                                <div className="space-y-3 max-h-80 overflow-y-auto">
-                                                    <div>
-                                                        <label className="block text-xs text-white/60 mb-1">Font Size</label>
-                                                        <input
-                                                            type="range"
-                                                            min="20"
-                                                            max="80"
-                                                            value={textSettings[i].fontSize}
-                                                            onChange={(e) => handleSettingsChange(i, 'fontSize', parseInt(e.target.value))}
-                                                            className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                                            style={{
-                                                                background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((textSettings[i].fontSize - 20) / 60) * 100}%, rgba(255,255,255,0.2) ${((textSettings[i].fontSize - 20) / 60) * 100}%, rgba(255,255,255,0.2) 100%)`
-                                                            }}
-                                                        />
-                                                        <span className="text-xs text-white/60">{textSettings[i].fontSize}px</span>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-xs text-white/60 mb-1">Font Family</label>
-                                                        <select
-                                                            value={textSettings[i].fontFamily}
-                                                            onChange={(e) => handleSettingsChange(i, 'fontFamily', e.target.value)}
-                                                            className="w-full p-1 text-xs border rounded bg-[#0f0f0f] border-white/20 text-white"
-                                                        >
-                                                            <option value="Impact">Impact</option>
-                                                            <option value="Anton">Anton</option>
-                                                            <option value="Oswald">Oswald</option>
-                                                            <option value="Bebas Neue">Bebas Neue</option>
-                                                            <option value="Arial Black">Arial Black</option>
-                                                            <option value="Helvetica Neue">Helvetica Neue</option>
-                                                            <option value="Roboto Condensed">Roboto Condensed</option>
-                                                            <option value="Montserrat">Montserrat</option>
-                                                            <option value="Open Sans">Open Sans</option>
-                                                            <option value="Lato">Lato</option>
-                                                            <option value="Poppins">Poppins</option>
-                                                            <option value="Source Sans Pro">Source Sans Pro</option>
-                                                            <option value="Nunito">Nunito</option>
-                                                            <option value="Inter">Inter</option>
-                                                            <option value="Work Sans">Work Sans</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-xs text-white/60 mb-1">Font Weight</label>
-                                                        <select
-                                                            value={textSettings[i].fontWeight}
-                                                            onChange={(e) => handleSettingsChange(i, 'fontWeight', e.target.value)}
-                                                            className="w-full p-1 text-xs border rounded bg-[#0f0f0f] border-white/20 text-white"
-                                                        >
-                                                            <option value="100">Thin (100)</option>
-                                                            <option value="200">Extra Light (200)</option>
-                                                            <option value="300">Light (300)</option>
-                                                            <option value="400">Normal (400)</option>
-                                                            <option value="500">Medium (500)</option>
-                                                            <option value="600">Semi Bold (600)</option>
-                                                            <option value="700">Bold (700)</option>
-                                                            <option value="800">Extra Bold (800)</option>
-                                                            <option value="900">Black (900)</option>
-                                                        </select>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-xs text-white/60 mb-1">Text Color</label>
-                                                        <div className="flex items-center space-x-2">
-                                                            <input
-                                                                type="color"
-                                                                value={textSettings[i].color}
-                                                                onChange={(e) => handleSettingsChange(i, 'color', e.target.value)}
-                                                                className="w-8 h-8 rounded border border-white/20 cursor-pointer"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={textSettings[i].color}
-                                                                onChange={(e) => handleSettingsChange(i, 'color', e.target.value)}
-                                                                className="flex-1 p-1 text-xs border rounded bg-[#0f0f0f] border-white/20 text-white"
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-xs text-white/60 mb-2">Text Shadow</label>
-                                                        <div className="space-y-2">
-                                                            <div>
-                                                                <label className="block text-xs text-white/40 mb-1">Blur: {textSettings[i].shadow.blur}px</label>
-                                                                <input
-                                                                    type="range"
-                                                                    min="0"
-                                                                    max="50"
-                                                                    value={textSettings[i].shadow.blur}
-                                                                    onChange={(e) => handleShadowChange(i, 'blur', parseInt(e.target.value))}
-                                                                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                                                    style={{
-                                                                        background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${(textSettings[i].shadow.blur / 50) * 100}%, rgba(255,255,255,0.2) ${(textSettings[i].shadow.blur / 50) * 100}%, rgba(255,255,255,0.2) 100%)`
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                <div>
-                                                                    <label className="block text-xs text-white/40 mb-1">X: {textSettings[i].shadow.offsetX}px</label>
-                                                                    <input
-                                                                        type="range"
-                                                                        min="-20"
-                                                                        max="20"
-                                                                        value={textSettings[i].shadow.offsetX}
-                                                                        onChange={(e) => handleShadowChange(i, 'offsetX', parseInt(e.target.value))}
-                                                                        className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                                                        style={{
-                                                                            background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((textSettings[i].shadow.offsetX + 20) / 40) * 100}%, rgba(255,255,255,0.2) ${((textSettings[i].shadow.offsetX + 20) / 40) * 100}%, rgba(255,255,255,0.2) 100%)`
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="block text-xs text-white/40 mb-1">Y: {textSettings[i].shadow.offsetY}px</label>
-                                                                    <input
-                                                                        type="range"
-                                                                        min="-20"
-                                                                        max="20"
-                                                                        value={textSettings[i].shadow.offsetY}
-                                                                        onChange={(e) => handleShadowChange(i, 'offsetY', parseInt(e.target.value))}
-                                                                        className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                                                        style={{
-                                                                            background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((textSettings[i].shadow.offsetY + 20) / 40) * 100}%, rgba(255,255,255,0.2) ${((textSettings[i].shadow.offsetY + 20) / 40) * 100}%, rgba(255,255,255,0.2) 100%)`
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-xs text-white/40 mb-1">Shadow Color</label>
-                                                                <div className="flex items-center space-x-2">
-                                                                    <input
-                                                                        type="color"
-                                                                        value={textSettings[i].shadow.color}
-                                                                        onChange={(e) => handleShadowChange(i, 'color', e.target.value)}
-                                                                        className="w-6 h-6 rounded border border-white/20 cursor-pointer"
-                                                                    />
-                                                                    <input
-                                                                        type="text"
-                                                                        value={textSettings[i].shadow.color}
-                                                                        onChange={(e) => handleShadowChange(i, 'color', e.target.value)}
-                                                                        className="flex-1 p-1 text-xs border rounded bg-[#0f0f0f] border-white/20 text-white"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence> */}
                                 </div>
                                 <input
                                     className="w-full p-2 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/60"
@@ -1064,6 +1454,57 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             </div>
                         </motion.div>
                     ))}
+
+                    {/* Image Upload Section */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: 0.6 }}
+                        className="space-y-2 mt-4"
+                    >
+                        <div className="flex space-x-2">
+                            <motion.button
+                                whileTap={{ scale: 0.98 }}
+                                className="flex items-center space-x-2 px-3 py-2 bg-[#6a7bd1] hover:bg-[#6975b3] text-white text-xs rounded-md transition-colors"
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <Upload className="h-3 w-3" />
+                                <span>Upload Image</span>
+                            </motion.button>
+                            <motion.div
+                                whileTap={{ scale: 0.98 }}
+                                className="flex items-center space-x-2 px-3 py-2 bg-transparent border border-[#6a7bd1] text-[#6a7bd1] text-xs rounded-md hover:bg-[#6a7bd1]/10 transition-colors cursor-pointer"
+                            >
+                                <ImageIcon className="h-3 w-3" />
+                                <span>Paste Image (Ctrl+V)</span>
+                            </motion.div>
+                        </div>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                        />
+                    </motion.div>
+
+                    {/* Image Status */}
+                    {imageOverlays.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.7 }}
+                            className="mt-4 p-2 bg-white/5 rounded-md"
+                        >
+                            <div className="text-xs text-white/60 mb-1">
+                                📷 {imageOverlays.length} image{imageOverlays.length > 1 ? 's' : ''} added
+                            </div>
+                            <div className="text-xs text-white/40">
+                                Click images to select • Drag corners to resize • Use rotation handle • Press Delete to remove
+                            </div>
+                        </motion.div>
+                    )}
+
                     <div className="flex w-full space-x-2 mt-2">
                         <motion.button
                             initial={{ opacity: 0, y: 10 }}

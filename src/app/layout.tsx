@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque } from "next/font/google";
+import { Bricolage_Grotesque, Anton, Oswald, Bebas_Neue, Montserrat, Open_Sans, Lato, Poppins, Source_Sans_3, Nunito, Inter, Work_Sans } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import PageTransition from "@/components/PageTransition";
 import "./globals.css";
@@ -7,7 +7,7 @@ import Providers from "./Provider";
 import Footer from "@/components/Footer";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
-import Head from "next/head";
+
 import { Toaster } from "sonner";
 import { siteConfig } from "@/data/site-config";
 import OGImage from "./og.png";
@@ -15,6 +15,73 @@ import OGImage from "./og.png";
 const bricolage_grotesque_init = Bricolage_Grotesque({
   subsets: ["latin"],
   display: "swap",
+});
+
+// Load all fonts used in the meme editor
+const anton = Anton({
+  subsets: ["latin"],
+  display: "swap",
+  weight: "400",
+});
+
+const oswald = Oswald({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["200", "300", "400", "500", "600", "700"],
+});
+
+const bebasNeue = Bebas_Neue({
+  subsets: ["latin"],
+  display: "swap",
+  weight: "400",
+});
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+});
+
+const openSans = Open_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["300", "400", "500", "600", "700", "800"],
+});
+
+const lato = Lato({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["100", "300", "400", "700", "900"],
+});
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+});
+
+const sourceSans = Source_Sans_3({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["200", "300", "400", "500", "600", "700", "800", "900"],
+});
+
+const nunito = Nunito({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["200", "300", "400", "500", "600", "700", "800", "900"],
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+});
+
+const workSans = Work_Sans({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
 });
 
 export const metadata: Metadata = {
@@ -26,21 +93,21 @@ export const metadata: Metadata = {
   description: siteConfig.description,
   metadataBase: new URL(siteConfig.url),
   openGraph: {
-		title: siteConfig.name,
-		description: siteConfig.description,
-		url: siteConfig.url,
-		siteName: siteConfig.name,
-		images: [
-			{
-				url: OGImage.src,
-				width: OGImage.width,
-				height: OGImage.height,
-				alt: siteConfig.name,
-			},
-		],
-		locale: "en_US",
-		type: "website",
-	},
+    title: siteConfig.name,
+    description: siteConfig.description,
+    url: siteConfig.url,
+    siteName: siteConfig.name,
+    images: [
+      {
+        url: OGImage.src,
+        width: OGImage.width,
+        height: OGImage.height,
+        alt: siteConfig.name,
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
   twitter: {
     title: siteConfig.name,
     description: siteConfig.description,
@@ -77,11 +144,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <Head>
-        <link href="https://fonts.cdnfonts.com/css/impact" rel="stylesheet" />
-      </Head>
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Impact&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Arial+Black&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Helvetica+Neue&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+      </head>
       <body
-        className={`${bricolage_grotesque_init.className} antialiased min-h-screen bg-white dark:bg-black relative`}
+        className={`${bricolage_grotesque_init.className} ${anton.className} ${oswald.className} ${bebasNeue.className} ${montserrat.className} ${openSans.className} ${lato.className} ${poppins.className} ${sourceSans.className} ${nunito.className} ${inter.className} ${workSans.className} antialiased min-h-screen bg-white dark:bg-black relative`}
+        style={{
+          fontFamily: `var(--font-bricolage-grotesque), var(--font-anton), var(--font-oswald), var(--font-bebas-neue), var(--font-montserrat), var(--font-open-sans), var(--font-lato), var(--font-poppins), var(--font-source-sans-3), var(--font-nunito), var(--font-inter), var(--font-work-sans), Impact, "Arial Black", "Helvetica Neue", "Roboto Condensed", Arial, sans-serif`
+        }}
       >
         <Providers>
           <PageTransition>

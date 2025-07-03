@@ -3,6 +3,31 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Font faces for meme editor fonts */
+@font-face {
+  font-family: 'Impact';
+  font-display: swap;
+  src: local('Impact'), local('Impact-Regular');
+}
+
+@font-face {
+  font-family: 'Arial Black';
+  font-display: swap;
+  src: local('Arial Black'), local('ArialBlack');
+}
+
+@font-face {
+  font-family: 'Helvetica Neue';
+  font-display: swap;
+  src: local('Helvetica Neue'), local('HelveticaNeue');
+}
+
+@font-face {
+  font-family: 'Roboto Condensed';
+  font-display: swap;
+  src: local('Roboto Condensed'), local('RobotoCondensed-Regular');
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -120,4 +145,73 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Improve font rendering for canvas */
+canvas {
+  font-smooth: always;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ensure font families are available globally */
+.font-impact {
+  font-family: 'Impact', 'Arial Black', 'Helvetica Neue', 'Arial', sans-serif !important;
+}
+
+.font-anton {
+  font-family: 'Anton', 'Impact', 'Arial Black', sans-serif !important;
+}
+
+.font-oswald {
+  font-family: 'Oswald', 'Impact', 'Arial Black', sans-serif !important;
+}
+
+.font-bebas {
+  font-family: 'Bebas Neue', 'Impact', 'Arial Black', sans-serif !important;
+}
+
+.font-arial-black {
+  font-family: 'Arial Black', 'Impact', 'Arial', sans-serif !important;
+}
+
+.font-helvetica {
+  font-family: 'Helvetica Neue', 'Arial', sans-serif !important;
+}
+
+.font-roboto-condensed {
+  font-family: 'Roboto Condensed', 'Arial Black', 'Arial', sans-serif !important;
+}
+
+.font-montserrat {
+  font-family: 'Montserrat', 'Arial', sans-serif !important;
+}
+
+.font-open-sans {
+  font-family: 'Open Sans', 'Arial', sans-serif !important;
+}
+
+.font-lato {
+  font-family: 'Lato', 'Arial', sans-serif !important;
+}
+
+.font-poppins {
+  font-family: 'Poppins', 'Arial', sans-serif !important;
+}
+
+.font-source-sans {
+  font-family: 'Source Sans Pro', 'Arial', sans-serif !important;
+}
+
+.font-nunito {
+  font-family: 'Nunito', 'Arial', sans-serif !important;
+}
+
+.font-inter {
+  font-family: 'Inter', 'Arial', sans-serif !important;
+}
+
+.font-work-sans {
+  font-family: 'Work Sans', 'Arial', sans-serif !important;
 }
