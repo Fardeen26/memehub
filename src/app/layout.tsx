@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Anton, Oswald, Bebas_Neue, Montserrat, Open_Sans, Lato, Poppins, Source_Sans_3, Nunito, Inter, Work_Sans } from "next/font/google";
+import { Bricolage_Grotesque, Anton, Oswald, Bebas_Neue, Montserrat, Open_Sans, Lato, Poppins, Source_Sans_3, Nunito, Inter, Work_Sans, Roboto_Condensed } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import PageTransition from "@/components/PageTransition";
 import "./globals.css";
 import Providers from "./Provider";
-import Footer from "@/components/Footer";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 
@@ -84,6 +83,12 @@ const workSans = Work_Sans({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
 });
 
+const robotoCondensed = Roboto_Condensed({
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+});
+
 export const metadata: Metadata = {
   keywords: siteConfig.keywords,
   title: {
@@ -144,23 +149,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link href="https://fonts.googleapis.com/css2?family=Impact&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Arial+Black&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Helvetica+Neue&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-      </head>
       <body
-        className={`${bricolage_grotesque_init.className} ${anton.className} ${oswald.className} ${bebasNeue.className} ${montserrat.className} ${openSans.className} ${lato.className} ${poppins.className} ${sourceSans.className} ${nunito.className} ${inter.className} ${workSans.className} antialiased min-h-screen bg-white dark:bg-black relative`}
+        className={`${bricolage_grotesque_init.className} ${anton.className} ${oswald.className} ${bebasNeue.className} ${montserrat.className} ${openSans.className} ${lato.className} ${poppins.className} ${sourceSans.className} ${nunito.className} ${inter.className} ${workSans.className} ${robotoCondensed.className} antialiased min-h-screen bg-white dark:bg-black relative`}
         style={{
-          fontFamily: `var(--font-bricolage-grotesque), var(--font-anton), var(--font-oswald), var(--font-bebas-neue), var(--font-montserrat), var(--font-open-sans), var(--font-lato), var(--font-poppins), var(--font-source-sans-3), var(--font-nunito), var(--font-inter), var(--font-work-sans), Impact, "Arial Black", "Helvetica Neue", "Roboto Condensed", Arial, sans-serif`
+          fontFamily: `var(--font-bricolage-grotesque), var(--font-anton), var(--font-oswald), var(--font-bebas-neue), var(--font-montserrat), var(--font-open-sans), var(--font-lato), var(--font-poppins), var(--font-source-sans-3), var(--font-nunito), var(--font-inter), var(--font-work-sans), var(--font-roboto-condensed), Impact, "Arial Black", "Helvetica Neue", Arial, sans-serif`
         }}
       >
         <Providers>
           <PageTransition>
             <Navbar />
             <main className="container mx-auto px-4 py-8">{children}</main>
-            {/* <Footer /> */}
           </PageTransition>
           <Toaster />
         </Providers>

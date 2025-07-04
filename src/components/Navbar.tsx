@@ -1,6 +1,6 @@
 "use client"
 
-import { MoonIcon, SunIcon } from "lucide-react"
+import { ExternalLinkIcon, GithubIcon, MoonIcon, SunIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 // import Image from "next/image"
 import Link from "next/link"
@@ -31,12 +31,18 @@ export default function Navbar() {
                             </h1>
                         </Link>
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                            className="p-2 rounded-lg bg-[#6a7bd1] dark:bg-[#6a7bd1] text-white hover:bg-[#6975b3] dark:hover:bg-[#6975b3] transition-colors"
+                            className="p-2 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors"
                         >
                             {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+                        </button>
+                        <button
+                            onClick={() => window.open("https://github.com/Fardeen26/meme-generator", "_blank")}
+                            className="max-[350px]:hidden py-2 px-4 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2"
+                        >
+                            <GithubIcon className="h-4 w-4" /> <span className="text-sm font-semibold"> Give it a star </span>
                         </button>
                     </div>
                 </div>
