@@ -1,8 +1,7 @@
 "use client"
 
-import { ExternalLinkIcon, GithubIcon, MoonIcon, SunIcon } from "lucide-react"
+import { GithubIcon, MoonIcon, SunIcon } from "lucide-react"
 import { useTheme } from "next-themes"
-// import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
