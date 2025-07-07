@@ -15,12 +15,52 @@ export const templates = {
         ]
     },
 
+    "Modi-g-Poster": {
+        image: "/temp27.jpeg",
+        textBoxes: [
+            { x: 100, y: 170, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const },
+            { x: 100, y: 470, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const },
+        ],
+    },
+
+    "Amrit-dawg": {
+        image: "/temp30.jpeg",
+        textBoxes: [
+            { x: 100, y: 170, width: 1800, height: 400, fontSize: 150, minFont: 20, align: "center" as const },
+            { x: 100, y: 970, width: 1800, height: 400, fontSize: 150, minFont: 20, align: "center" as const },
+        ],
+    },
+
+    "Manu-Paji": {
+        image: "/temp31.jpeg",
+        textBoxes: [
+            { x: 0, y: 70, width: 400, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
+            { x: 0, y: 420, width: 400, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
+        ],
+    },
+
     "Kirat-humble-guy": {
         image: "/temp18.jpeg",
         textBoxes: [
             { x: 5, y: 50, width: 470, height: 100, fontSize: 40, minFont: 10, align: "center" as const },
             { x: 5, y: 395, width: 470, height: 90, fontSize: 40, minFont: 10, align: "center" as const },
         ]
+    },
+
+    "Bumrah-Bhai": {
+        image: "/temp26.jpeg",
+        textBoxes: [
+            { x: 100, y: 470, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const },
+            { x: 530, y: 570, width: 400, height: 400, fontSize: 70, minFont: 20, align: "center" as const },
+        ],
+    },
+
+    "Pani-pilo": {
+        image: "/temp33.jpeg",
+        textBoxes: [
+            { x: 10, y: 60, width: 600, height: 100, fontSize: 60, minFont: 20, align: "center" as const },
+            { x: 10, y: 450, width: 600, height: 100, fontSize: 60, minFont: 20, align: "center" as const },
+        ],
     },
 
     "Bhola-Bachcha": {
@@ -38,6 +78,63 @@ export const templates = {
         ]
     },
 
+    "hungery-monkey": {
+        image: "/temp28.jpeg",
+        textBoxes: [
+            { x: 240, y: 450, width: 450, height: 100, fontSize: 60, minFont: 40, align: "center" as const },
+            { x: 20, y: 850, width: 400, height: 100, fontSize: 60, minFont: 40, align: "center" as const },
+        ],
+    },
+
+
+    "Doge Vs. Cheems": {
+        image: "/temp22.png",
+        textBoxes: [
+            { id: "topText", x: 50, y: 400, width: 400, height: 200, fontSize: 60, minFont: 14, align: "center" as const },
+            { id: "handText", x: 600, y: 400, width: 400, height: 200, fontSize: 60, minFont: 14, align: "center" as const },
+        ],
+    },
+
+    "I Bet He's Thinking About Other Women": {
+        image: "/temp23.png",
+        textBoxes: [
+            { x: 100, y: 470, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
+            { x: 800, y: 650, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const }
+        ],
+    },
+
+    "aaja-bhidle": {
+        image: "/temp19.jpeg",
+        textBoxes: [
+            { x: 0, y: 550, width: 480, height: 100, fontSize: 40, minFont: 10, align: "center" as const },
+        ]
+    },
+
+    "flexing-on-baddies": {
+        image: "/temp29.png",
+        textBoxes: [
+            { x: 20, y: 60, width: 650, height: 100, fontSize: 60, minFont: 20, align: "center" as const },
+            { x: 20, y: 450, width: 650, height: 100, fontSize: 60, minFont: 20, align: "center" as const },
+        ],
+    },
+
+
+    "distracted-boyfriend": {
+        image: "/temp8.jpg",
+        textBoxes: [
+            { x: 80, y: 550, width: 520, height: 150, fontSize: 80, minFont: 40, align: "center" as const },
+            { x: 560, y: 400, width: 400, height: 100, fontSize: 70, minFont: 40, align: "center" as const },
+            { x: 800, y: 500, width: 400, height: 200, fontSize: 70, minFont: 40, align: "center" as const }
+        ]
+    },
+
+    "Ch*d gaye guru": {
+        image: "/temp24.png",
+        textBoxes: [
+            { x: 100, y: 470, width: 300, height: 100, fontSize: 40, minFont: 20, align: "center" as const },
+        ],
+    },
+
     "Trojan-Horse": {
         image: "/temp4.png",
         textBoxes: [
@@ -49,21 +146,6 @@ export const templates = {
         ]
     },
 
-    "aaja-bhidle": {
-        image: "/temp19.jpeg",
-        textBoxes: [
-            { x: 0, y: 550, width: 480, height: 100, fontSize: 40, minFont: 10, align: "center" as const },
-        ]
-    },
-
-    "distracted-boyfriend": {
-        image: "/temp8.jpg",
-        textBoxes: [
-            { x: 80, y: 550, width: 520, height: 150, fontSize: 80, minFont: 40, align: "center" as const },
-            { x: 560, y: 400, width: 400, height: 100, fontSize: 70, minFont: 40, align: "center" as const },
-            { x: 800, y: 500, width: 400, height: 200, fontSize: 70, minFont: 40, align: "center" as const }
-        ]
-    },
 
     "Ladies-Gang": {
         image: "/temp15.jpg",
@@ -142,26 +224,29 @@ export const templates = {
         ],
     },
 
-    "Doge Vs. Cheems": {
-        image: "/temp22.png",
+
+
+
+
+
+
+
+
+
+
+
+
+    "Cat-speaker": {
+        image: "/temp32.jpeg",
         textBoxes: [
-            { id: "topText", x: 50, y: 400, width: 400, height: 200, fontSize: 60, minFont: 14, align: "center" as const },
-            { id: "handText", x: 600, y: 400, width: 400, height: 200, fontSize: 60, minFont: 14, align: "center" as const },
+            { x: 10, y: 30, width: 210, height: 100, fontSize: 20, minFont: 0, align: "center" as const },
+            { x: 10, y: 200, width: 210, height: 100, fontSize: 20, minFont: 0, align: "center" as const },
         ],
     },
 
-    "I Bet He's Thinking About Other Women": {
-        image: "/temp23.png",
-        textBoxes: [
-            { x: 100, y: 470, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
-            { x: 800, y: 650, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const }
-        ],
-    },
 
-    "Ch*d gaye guru": {
-        image: "/temp24.png",
-        textBoxes: [
-            { x: 100, y: 470, width: 300, height: 100, fontSize: 40, minFont: 20, align: "center" as const },
-        ],
-    },
+
+
+
+
 };

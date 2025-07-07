@@ -32,6 +32,7 @@ import {
 import { toast } from 'sonner';
 import { MemeEditorProps, TextSettings, ImageOverlay } from '@/types/editor';
 import Image from 'next/image';
+import { useFontLoader, FONT_CONFIGS } from '@/hooks/useFontLoader';
 
 export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -41,6 +42,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragIndex, setDragIndex] = useState<number>(-1);
     const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+    // Font loader hook
+    const { loadFont, preloadFont } = useFontLoader();
 
     const isMobileDevice = useCallback(() => {
         if (typeof window !== 'undefined') {
@@ -117,6 +121,16 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         });
     }, []);
 
+    // Preload commonly used fonts
+    useEffect(() => {
+        const commonFonts = ['Impact', 'Oswald', 'Anton', 'Bebas Neue'];
+        commonFonts.forEach(fontName => {
+            if (FONT_CONFIGS[fontName]) {
+                preloadFont(FONT_CONFIGS[fontName]);
+            }
+        });
+    }, [preloadFont]);
+
     useEffect(() => {
         const defaultFont = getDefaultFont();
         setTextSettings(prev =>
@@ -129,13 +143,15 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         );
     }, [getDefaultFont]);
 
-    const handleChange = (idx: number, value: string) => {
-        const arr = [...texts];
-        arr[idx] = value;
-        setTexts(arr);
-    };
+    const handleChange = useCallback((idx: number, value: string) => {
+        setTexts(prev => {
+            const arr = [...prev];
+            arr[idx] = value;
+            return arr;
+        });
+    }, []);
 
-    const handleSettingsChange = (idx: number, setting: keyof TextSettings, value: string | number) => {
+    const handleSettingsChange = useCallback((idx: number, setting: keyof TextSettings, value: string | number) => {
         setTextSettings(prev => {
             const updated = [...prev];
             updated[idx] = {
@@ -144,9 +160,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             };
             return updated;
         });
-    };
 
-    const handleShadowChange = (idx: number, shadowProperty: keyof TextSettings['shadow'], value: string | number) => {
+        // Load font if it's a font family change
+        if (setting === 'fontFamily' && typeof value === 'string' && FONT_CONFIGS[value]) {
+            loadFont(FONT_CONFIGS[value]);
+        }
+    }, [loadFont]);
+
+    const handleShadowChange = useCallback((idx: number, shadowProperty: keyof TextSettings['shadow'], value: string | number) => {
         setTextSettings(prev => {
             const updated = [...prev];
             updated[idx] = {
@@ -158,9 +179,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             };
             return updated;
         });
-    };
+    }, []);
 
-    const handleOutlineChange = (idx: number, outlineProperty: keyof TextSettings['outline'], value: string | number) => {
+    const handleOutlineChange = useCallback((idx: number, outlineProperty: keyof TextSettings['outline'], value: string | number) => {
         setTextSettings(prev => {
             const updated = [...prev];
             updated[idx] = {
@@ -172,7 +193,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             };
             return updated;
         });
-    };
+    }, []);
 
     const transformText = useCallback((text: string, textCase: TextSettings['textCase']): string => {
         switch (textCase) {
@@ -188,7 +209,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const MIN_FONT_SIZE = template.textBoxes[0].minFont;
 
-    const getTextAtPosition = (x: number, y: number): number => {
+    const getTextAtPosition = useCallback((x: number, y: number): number => {
         for (let i = textBoxes.length - 1; i >= 0; i--) {
             const box = textBoxes[i];
             if (texts[i] && x >= box.x && x <= box.x + box.width && y >= box.y - box.fontSize && y <= box.y + box.height) {
@@ -196,13 +217,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }
         }
         return -1;
-    };
+    }, [textBoxes, texts]);
 
     const generateImageId = (): string => {
         return `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     };
 
-    const getImageAtPosition = (x: number, y: number): { index: number; handle: string } => {
+    const getImageAtPosition = useCallback((x: number, y: number): { index: number; handle: string } => {
         for (let i = imageOverlays.length - 1; i >= 0; i--) {
             const img = imageOverlays[i];
 
@@ -242,7 +263,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }
         }
         return { index: -1, handle: '' };
-    };
+    }, [imageOverlays]);
 
     const addImageOverlay = useCallback(async (file: File | string, isDataUrl: boolean = false) => {
         try {
@@ -1602,7 +1623,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                         onChange={(e) => handleSettingsChange(i, 'fontSize', parseInt(e.target.value))}
                                                         className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
                                                         style={{
-                                                            background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((textSettings[i].fontSize - 20) / 180) * 100}%, rgba(255,255,255,0.2) ${((textSettings[i].fontSize - 20) / 180) * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                            background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((textSettings[i].fontSize - 10) / 190) * 100}%, rgba(255,255,255,0.2) ${((textSettings[i].fontSize - 10) / 190) * 100}%, rgba(255,255,255,0.2) 100%)`
                                                         }}
                                                     />
                                                     <span className="text-xs text-white/60">{textSettings[i].fontSize}px</span>

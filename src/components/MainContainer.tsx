@@ -2,7 +2,7 @@
 
 import React from 'react';
 import TemplateSelector from './TemplateSelector';
-import MemeEditor from './MemeEditor';
+import DynamicMemeEditor from './DynamicMemeEditor';
 import type { Template } from '@/types/template';
 import { motion, AnimatePresence } from 'framer-motion';
 import useSelected from '@/hooks/useSelected';
@@ -54,7 +54,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                         }}
                     >
                         {selected && templates[selected] ? (
-                            <MemeEditor
+                            <DynamicMemeEditor
                                 template={templates[selected]}
                                 onReset={() => setSelected('')}
                             />
