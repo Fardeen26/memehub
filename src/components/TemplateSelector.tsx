@@ -13,6 +13,7 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination";
+import useSelected from '@/hooks/useSelected';
 
 type TemplateSelectorProps = {
     templates: Record<string, Template>;
@@ -23,7 +24,7 @@ const TEMPLATES_PER_PAGE = 12;
 const PRELOAD_NEXT_PAGE = true;
 
 export default function TemplateSelector({ templates, onSelect }: TemplateSelectorProps) {
-    const [currentPage, setCurrentPage] = useState(1);
+    const { currentPage, setCurrentPage } = useSelected();
     const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
     const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
     const imageRefs = useRef<Map<string, HTMLElement>>(new Map());
@@ -44,6 +45,13 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
         const endIndex = startIndex + TEMPLATES_PER_PAGE;
         return templateEntries.slice(startIndex, endIndex);
     }, [templateEntries, currentPage, totalPages]);
+
+    // Reset to page 1 if current page is beyond total pages (when search filters change)
+    useEffect(() => {
+        if (currentPage > totalPages && totalPages > 0) {
+            setCurrentPage(1);
+        }
+    }, [totalPages, currentPage, setCurrentPage]);
 
     // Preload next page images
     useEffect(() => {

@@ -63,18 +63,43 @@ export const templates = {
         ],
     },
 
+    "the-great-khali": {
+        image: "/temp37.jpeg",
+        textBoxes: [
+            { x: 1, y: 60, width: 640, height: 300, fontSize: 50, minFont: 20, align: "center" as const },
+            { x: 10, y: 540, width: 630, height: 140, fontSize: 50, minFont: 20, align: "center" as const },
+        ]
+    },
+
+    "chess-tension": {
+        image: "/temp36.jpeg",
+        textBoxes: [
+            { x: 20, y: 60, width: 640, height: 200, fontSize: 50, minFont: 20, align: "center" as const },
+            { x: 20, y: 450, width: 630, height: 200, fontSize: 50, minFont: 20, align: "center" as const },
+        ]
+    },
+
+    "listen-to-me": {
+        image: "/temp35.jpeg",
+        textBoxes: [
+            { x: 1, y: 260, width: 500, height: 300, fontSize: 80, minFont: 20, align: "center" as const },
+            { x: 450, y: 560, width: 400, height: 300, fontSize: 80, minFont: 20, align: "center" as const },
+        ]
+    },
+
+    "wanna-be": {
+        image: "/temp34.jpeg",
+        textBoxes: [
+            { x: 1, y: 260, width: 300, height: 200, fontSize: 40, minFont: 20, align: "center" as const },
+            { x: 400, y: 260, width: 300, height: 200, fontSize: 40, minFont: 20, align: "center" as const },
+        ]
+    },
+
     "Bhola-Bachcha": {
         image: "/temp16.jpg",
         textBoxes: [
             { x: 50, y: 240, width: 2000, height: 500, fontSize: 180, minFont: 40, align: "center" as const },
             { x: 50, y: 1880, width: 2000, height: 300, fontSize: 180, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "sympathy-girl": {
-        image: "/temp20.jpeg",
-        textBoxes: [
-            { x: 50, y: 1000, width: 1150, height: 200, fontSize: 100, minFont: 50, align: "center" as const },
         ]
     },
 
@@ -86,6 +111,12 @@ export const templates = {
         ],
     },
 
+    "sympathy-girl": {
+        image: "/temp20.jpeg",
+        textBoxes: [
+            { x: 50, y: 1000, width: 1150, height: 200, fontSize: 100, minFont: 50, align: "center" as const },
+        ]
+    },
 
     "Doge Vs. Cheems": {
         image: "/temp22.png",
@@ -118,7 +149,6 @@ export const templates = {
         ],
     },
 
-
     "distracted-boyfriend": {
         image: "/temp8.jpg",
         textBoxes: [
@@ -145,7 +175,6 @@ export const templates = {
             { x: 2100, y: 400, width: 800, height: 200, fontSize: 300, minFont: 40, align: "center" as const }
         ]
     },
-
 
     "Ladies-Gang": {
         image: "/temp15.jpg",
@@ -224,18 +253,6 @@ export const templates = {
         ],
     },
 
-
-
-
-
-
-
-
-
-
-
-
-
     "Cat-speaker": {
         image: "/temp32.jpeg",
         textBoxes: [
@@ -243,10 +260,4 @@ export const templates = {
             { x: 10, y: 200, width: 210, height: 100, fontSize: 20, minFont: 0, align: "center" as const },
         ],
     },
-
-
-
-
-
-
 };
