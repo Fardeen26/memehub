@@ -2,7 +2,7 @@
 // @ts-nocheck
 
 import { Template } from '@/types/template';
-import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -39,6 +39,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [texts, setTexts] = useState<string[]>(Array(template.textBoxes.length).fill(''));
 
     const [textBoxes, setTextBoxes] = useState<Template['textBoxes']>(template.textBoxes);
+    const [originalTextBoxCount] = useState<number>(template.textBoxes.length); // Track original template text boxes
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragIndex, setDragIndex] = useState<number>(-1);
     const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -623,7 +624,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
 
-            const constrainedX = Math.max(0, Math.min(canvas.width - textBoxes[dragIndex].width, newX));
+            // More flexible constraints - allow ALL text to be positioned freely across the template
+            // Allow positioning anywhere on canvas with minimal constraints for ALL text boxes
+            const constrainedX = Math.max(-textBoxes[dragIndex].width * 0.8, Math.min(canvas.width - textBoxes[dragIndex].width * 0.2, newX));
             const constrainedY = Math.max(textBoxes[dragIndex].fontSize, Math.min(canvas.height, newY));
 
             setTextBoxes((prev: Template['textBoxes']) => {
@@ -857,7 +860,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
 
-            const constrainedX = Math.max(0, Math.min(canvas.width - textBoxes[dragIndex].width, newX));
+            // More flexible constraints - allow ALL text to be positioned freely across the template
+            // Allow positioning anywhere on canvas with minimal constraints for ALL text boxes
+            const constrainedX = Math.max(-textBoxes[dragIndex].width * 0.8, Math.min(canvas.width - textBoxes[dragIndex].width * 0.2, newX));
             const constrainedY = Math.max(textBoxes[dragIndex].fontSize, Math.min(canvas.height, newY));
 
             setTextBoxes((prev: Template['textBoxes']) => {
@@ -1421,6 +1426,60 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     }
 
+    const addTextBox = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const textBoxWidth = Math.min(canvas.width * 0.8, 600);
+        const textBoxHeight = Math.min(canvas.height * 0.3, 200);
+
+        const newTextBox = {
+            x: canvas.width / 2 - textBoxWidth / 2,
+            y: canvas.height / 2 - textBoxHeight / 2,
+            width: textBoxWidth,
+            height: textBoxHeight,
+            fontSize: 40,
+            align: 'center' as const,
+            minFont: MIN_FONT_SIZE
+        };
+
+        setTexts(prev => [...prev, 'memehub']);
+        setTextBoxes(prev => [...prev, newTextBox]);
+        setTextSettings(prev => [...prev, {
+            fontSize: Math.max(60, Math.min(canvas.width, canvas.height) * 0.08),
+            color: '#ffffff',
+            fontFamily: getDefaultFont(),
+            fontWeight: '900',
+            letterSpacing: 0,
+            textCase: 'uppercase' as const,
+            outline: {
+                width: 1,
+                color: '#000000'
+            },
+            shadow: {
+                blur: 5,
+                offsetX: 1,
+                offsetY: 1,
+                color: '#000000'
+            }
+        }]);
+
+        toast.success('Text box added! Drag it to position.');
+    }, [getDefaultFont, MIN_FONT_SIZE]);
+
+    const removeTextBox = useCallback((index: number) => {
+        if (index < originalTextBoxCount) {
+            toast.error('Cannot remove template text boxes');
+            return;
+        }
+
+        setTexts(prev => prev.filter((_, i) => i !== index));
+        setTextBoxes(prev => prev.filter((_, i) => i !== index));
+        setTextSettings(prev => prev.filter((_, i) => i !== index));
+
+        toast.success('Text box removed');
+    }, [originalTextBoxCount]);
+
     return (
         <motion.section
             className="space-y-4 min-h-[65vh] max-sm:min-h-[75vh]"
@@ -1462,161 +1521,178 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.2 }}
                 >
-                    <Dialog open={isUploadDialogOpen} onOpenChange={(open) => {
-                        setIsUploadDialogOpen(open);
-                        if (!open) {
-                            resetDialogState();
-                        }
-                    }}>
-                        <DialogTrigger asChild className="w-full text-center">
-                            <motion.button
-                                whileTap={{ scale: 0.98 }}
-                                className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-[#0f0f0f] border border-white/20 text-white text-xs rounded-md transition-colors w-full"
-                                onClick={() => setIsUploadDialogOpen(true)}
-                            >
-                                <Upload className="h-3 w-3" />
-                                <span>Upload Image</span>
-                            </motion.button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-md bg-[#0f0f0f] border-white/20">
-                            <DialogHeader>
-                                <DialogTitle className="text-white">Upload Image</DialogTitle>
-                                <DialogDescription className="text-white/60">
-                                    Choose how you want to add an image to your meme.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                                {/* Upload Method Selection */}
-                                <div className="grid grid-cols-2 gap-2">
-                                    <motion.button
-                                        whileTap={{ scale: 0.98 }}
-                                        className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'file'
-                                            ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
-                                            : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                                            }`}
-                                        onClick={() => setUploadMethod('file')}
-                                    >
-                                        <Upload className="h-6 w-6 mx-auto mb-2" />
-                                        <div className="text-xs font-medium">Upload File</div>
-                                    </motion.button>
-                                    <motion.button
-                                        whileTap={{ scale: 0.98 }}
-                                        className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'paste'
-                                            ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
-                                            : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                                            }`}
-                                        onClick={() => setUploadMethod('paste')}
-                                    >
-                                        <ImageIcon className="h-6 w-6 mx-auto mb-2" />
-                                        <div className="text-xs font-medium">Paste Image</div>
-                                    </motion.button>
-                                </div>
-
-                                {/* File Upload Option */}
-                                {uploadMethod === 'file' && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="space-y-2"
-                                    >
-                                        <label className="block text-sm text-white/80">Select an image file:</label>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleDialogFileUpload}
-                                            className="w-full p-2 text-sm border rounded-md bg-white/5 border-white/20 text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-[#6a7bd1] file:text-white hover:file:bg-[#6975b3] file:cursor-pointer"
-                                        />
-                                        {selectedFile && (
-                                            <div className="text-xs text-green-400 mt-1">
-                                                ✓ Selected: {selectedFile.name}
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                )}
-
-                                {/* Paste Option */}
-                                {uploadMethod === 'paste' && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.2 }}
-                                        className="space-y-2"
-                                    >
-                                        <label className="block text-sm text-white/80">Paste your image here:</label>
-                                        <div
-                                            className="w-full h-32 border-2 border-dashed border-white/20 rounded-md flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                                            onPaste={handleDialogPaste}
-                                            tabIndex={0}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
-                                                    e.preventDefault();
-                                                }
-                                            }}
+                    {/* Action Buttons Row */}
+                    <div className="flex space-x-2">
+                        <Dialog open={isUploadDialogOpen} onOpenChange={(open) => {
+                            setIsUploadDialogOpen(open);
+                            if (!open) {
+                                resetDialogState();
+                            }
+                        }}>
+                            <DialogTrigger asChild>
+                                <motion.button
+                                    whileTap={{ scale: 0.98 }}
+                                    className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full text-center"
+                                    onClick={() => setIsUploadDialogOpen(true)}
+                                >
+                                    <Upload className="h-3 w-3" />
+                                    <span>Upload Image</span>
+                                </motion.button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md bg-[#0f0f0f] border-white/20">
+                                <DialogHeader>
+                                    <DialogTitle className="text-white">Upload Image</DialogTitle>
+                                    <DialogDescription className="text-white/60">
+                                        Choose how you want to add an image to your meme.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                    {/* Upload Method Selection */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <motion.button
+                                            whileTap={{ scale: 0.98 }}
+                                            className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'file'
+                                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                                }`}
+                                            onClick={() => setUploadMethod('file')}
                                         >
-                                            {pastedImageData ? (
-                                                <div className="text-center">
-                                                    <Image
-                                                        src={pastedImageData}
-                                                        alt="Pasted preview"
-                                                        className="max-w-full max-h-24 mx-auto mb-2 rounded"
-                                                        width={100}
-                                                        height={100}
-                                                    />
-                                                    <div className="text-xs text-green-400">✓ Image pasted successfully</div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-center text-white/60">
-                                                    <ImageIcon className="h-8 w-8 mx-auto mb-2" />
-                                                    {isMobileDevice() ? (
-                                                        <>
-                                                            <div className="text-sm mb-3">Copy an image and tap below</div>
-                                                            <motion.button
-                                                                whileTap={{ scale: 0.98 }}
-                                                                onClick={handleMobilePaste}
-                                                                className="px-4 text-xs py-2 bg-white/20 text-white rounded-md transition-colors"
-                                                            >
-                                                                Paste from Clipboard
-                                                            </motion.button>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <div className="text-sm">Press Ctrl+V to paste an image</div>
-                                                            <div className="text-xs">or click here and paste</div>
-                                                        </>
-                                                    )}
+                                            <Upload className="h-6 w-6 mx-auto mb-2" />
+                                            <div className="text-xs font-medium">Upload File</div>
+                                        </motion.button>
+                                        <motion.button
+                                            whileTap={{ scale: 0.98 }}
+                                            className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'paste'
+                                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                                }`}
+                                            onClick={() => setUploadMethod('paste')}
+                                        >
+                                            <ImageIcon className="h-6 w-6 mx-auto mb-2" />
+                                            <div className="text-xs font-medium">Paste Image</div>
+                                        </motion.button>
+                                    </div>
+
+                                    {/* File Upload Option */}
+                                    {uploadMethod === 'file' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="space-y-2"
+                                        >
+                                            <label className="block text-sm text-white/80">Select an image file:</label>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleDialogFileUpload}
+                                                className="w-full p-2 text-sm border rounded-md bg-white/5 border-white/20 text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-[#6a7bd1] file:text-white hover:file:bg-[#6975b3] file:cursor-pointer"
+                                            />
+                                            {selectedFile && (
+                                                <div className="text-xs text-green-400 mt-1">
+                                                    ✓ Selected: {selectedFile.name}
                                                 </div>
                                             )}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </div>
-                            <DialogFooter>
-                                <motion.button
-                                    whileTap={{ scale: 0.98 }}
-                                    className="px-4 py-2 bg-transparent border border-white/20 text-white text-sm rounded-md hover:bg-white/5 transition-colors max-sm:mt-1"
-                                    onClick={() => setIsUploadDialogOpen(false)}
-                                >
-                                    Cancel
-                                </motion.button>
-                                <motion.button
-                                    whileTap={{ scale: 0.98 }}
-                                    className="px-4 py-2 bg-[#6a7bd1] hover:bg-[#6975b3] text-white text-sm rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    onClick={handleUploadConfirm}
-                                    disabled={!selectedFile && !pastedImageData}
-                                >
-                                    Upload Image
-                                </motion.button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Paste Option */}
+                                    {uploadMethod === 'paste' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="space-y-2"
+                                        >
+                                            <label className="block text-sm text-white/80">Paste your image here:</label>
+                                            <div
+                                                className="w-full h-32 border-2 border-dashed border-white/20 rounded-md flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                                                onPaste={handleDialogPaste}
+                                                tabIndex={0}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+                                                        e.preventDefault();
+                                                    }
+                                                }}
+                                            >
+                                                {pastedImageData ? (
+                                                    <div className="text-center">
+                                                        <Image
+                                                            src={pastedImageData}
+                                                            alt="Pasted preview"
+                                                            className="max-w-full max-h-24 mx-auto mb-2 rounded"
+                                                            width={100}
+                                                            height={100}
+                                                        />
+                                                        <div className="text-xs text-green-400">✓ Image pasted successfully</div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center text-white/60">
+                                                        <ImageIcon className="h-8 w-8 mx-auto mb-2" />
+                                                        {isMobileDevice() ? (
+                                                            <>
+                                                                <div className="text-sm mb-3">Copy an image and tap below</div>
+                                                                <motion.button
+                                                                    whileTap={{ scale: 0.98 }}
+                                                                    onClick={handleMobilePaste}
+                                                                    className="px-4 text-xs py-2 bg-white/20 text-white rounded-md transition-colors"
+                                                                >
+                                                                    Paste from Clipboard
+                                                                </motion.button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="text-sm">Press Ctrl+V to paste an image</div>
+                                                                <div className="text-xs">or click here and paste</div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <motion.button
+                                        whileTap={{ scale: 0.98 }}
+                                        className="px-4 py-2 bg-transparent border border-white/20 text-white text-sm rounded-md hover:bg-white/5 transition-colors max-sm:mt-1"
+                                        onClick={() => setIsUploadDialogOpen(false)}
+                                    >
+                                        Cancel
+                                    </motion.button>
+                                    <motion.button
+                                        whileTap={{ scale: 0.98 }}
+                                        className="px-4 py-2 bg-[#6a7bd1] hover:bg-[#6975b3] text-white text-sm rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        onClick={handleUploadConfirm}
+                                        disabled={!selectedFile && !pastedImageData}
+                                    >
+                                        Upload Image
+                                    </motion.button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        {/* Add Text Button */}
+                        <motion.button
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.1 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-white/15 border border-white/20 text-xs rounded-md transition-colors w-full"
+                            onClick={addTextBox}
+                        >
+                            <Plus className="h-3 w-3" />
+                            <span>Add Text</span>
+                        </motion.button>
+                    </div>
+
                     {texts.map((txt, i) => (
                         <motion.div
                             key={i}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3, delay: 0.3 + (i * 0.1) }}
+                            // initial={{ opacity: 0, y: 10 }}
+                            // animate={{ opacity: 1, y: 0 }}
+                            // transition={{ duration: 0.3, delay: 0.3 + (i * 0.1) }}
                             className="relative"
                         >
                             <div className="flex items-center space-x-2">
@@ -1864,23 +1940,24 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                 </div>
                                 <input
                                     className="w-full p-2 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/60"
-                                    placeholder={`Text position ${i + 1}`}
+                                    placeholder={i < originalTextBoxCount ? `Text position ${i + 1}` : `Custom text ${i - originalTextBoxCount + 1}`}
                                     value={txt}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
                                 />
+                                {/* Add remove button for custom text boxes */}
+                                {i >= originalTextBoxCount && (
+                                    <motion.button
+                                        whileTap={{ scale: 0.9 }}
+                                        className="p-2 border rounded-md bg-[#0f0f0f] border-white/20 text-white transition-colors"
+                                        onClick={() => removeTextBox(i)}
+                                        title="Remove text box"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </motion.button>
+                                )}
                             </div>
                         </motion.div>
                     ))}
-
-                    {/* Image Upload Section */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, delay: 0.6 }}
-                        className="space-y-2 mt-4"
-                    >
-
-                    </motion.div>
 
                     {/* Images List */}
                     {imageOverlays.length > 0 && (
