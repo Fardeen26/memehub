@@ -260,4 +260,45 @@ export const templates = {
             { x: 10, y: 200, width: 210, height: 100, fontSize: 20, minFont: 0, align: "center" as const },
         ],
     },
+
+        "IQ-Curve": {
+        image: "/temp38.jpg",
+        textBoxes: [
+            { x: 50, y: 850, width: 850, height: 480, fontSize: 180, minFont: 40, align: "center" as const },
+            { x: 700, y: 200, width: 1300, height: 270, fontSize: 150, minFont: 0, align: "center" as const },
+            { x: 1900, y: 700, width: 850, height: 480, fontSize: 180, minFont: 40, align: "center" as const },
+        ],
+    },
+
+    "Megamind": {
+        image: "/temp39.png",
+        textBoxes: [
+            { x: 30, y: 50, width: 500, height: 100, fontSize: 40, minFont: 10, align: "center" as const },
+            { x: 30, y: 500, width: 500, height: 90, fontSize: 40, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    "Red-pill-Blue-pill": {
+        image: "/temp40.jpg",
+        textBoxes: [
+            { x: 20, y: 365, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
+            { x: 280, y: 365, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    "Rocky-superstar": {
+        image: "/temp41.png",
+        textBoxes: [
+            { x: 0, y: 50, width: 365, height: 100, fontSize: 30, minFont: 10, align: "center" as const },
+            { x: 0, y: 330, width: 365, height: 90, fontSize: 30, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    "Trade-offer": {
+        image: "/temp42.jpg",
+        textBoxes: [
+            { x: 20, y: 220, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
+            { x: 330, y: 220, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
+    ],
+    },
 };
