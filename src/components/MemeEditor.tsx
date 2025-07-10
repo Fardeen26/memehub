@@ -1187,6 +1187,26 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0);
 
+            // Add watermark
+            const watermarkText = "memehub";
+            const watermarkFontSize = Math.max(12, Math.min(canvas.width, canvas.height) * 0.02);
+            ctx.save();
+            ctx.font = `${watermarkFontSize}px Arial, sans-serif`;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+
+            const padding = 10;
+            const watermarkX = padding;
+            const watermarkY = canvas.height - padding;
+
+            // Draw watermark with outline for better visibility
+            ctx.strokeText(watermarkText, watermarkX, watermarkY);
+            ctx.fillText(watermarkText, watermarkX, watermarkY);
+            ctx.restore();
+
             const imagePromises = imageOverlays.map(overlay => loadAndCacheImage(overlay.src));
 
             try {
