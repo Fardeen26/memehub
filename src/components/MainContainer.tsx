@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import React from 'react';
 import TemplateSelector from './TemplateSelector';
@@ -14,13 +14,28 @@ type MainContainerProps = {
 };
 
 export default function MainContainer({ templates }: MainContainerProps) {
-    // const [selected, setSelected] = useState<TemplateKey | null>(null);
-    const { selected, setSelected } = useSelected()
+    const {
+        selected,
+        setSelected,
+        customTemplate,
+        setCustomTemplate,
+        isCustomTemplate,
+        setIsCustomTemplate,
+        handleCustomTemplateSelect
+    } = useSelected();
 
     const handleSelect = (key: string) => {
         if (key in templates) {
             setSelected(key as TemplateKey);
+            setIsCustomTemplate(false);
+            setCustomTemplate(null);
         }
+    };
+
+    const handleReset = () => {
+        setSelected('');
+        setIsCustomTemplate(false);
+        setCustomTemplate(null);
     };
 
     return (
@@ -40,6 +55,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                         <TemplateSelector
                             templates={templates}
                             onSelect={handleSelect}
+                            onCustomTemplateSelect={handleCustomTemplateSelect}
                         />
                     </motion.div>
                 ) : (
@@ -53,10 +69,15 @@ export default function MainContainer({ templates }: MainContainerProps) {
                             ease: [0.22, 1, 0.36, 1]
                         }}
                     >
-                        {selected && templates[selected] ? (
+                        {isCustomTemplate && customTemplate ? (
+                            <DynamicMemeEditor
+                                template={customTemplate}
+                                onReset={handleReset}
+                            />
+                        ) : selected && templates[selected] ? (
                             <DynamicMemeEditor
                                 template={templates[selected]}
-                                onReset={() => setSelected('')}
+                                onReset={handleReset}
                             />
                         ) : (
                             <motion.div

@@ -1532,7 +1532,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             <DialogTrigger asChild>
                                 <motion.button
                                     whileTap={{ scale: 0.98 }}
-                                    className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full text-center"
+                                    className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-black/70 dark:bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full text-center"
                                     onClick={() => setIsUploadDialogOpen(true)}
                                 >
                                     <Upload className="h-3 w-3" />
@@ -1581,7 +1581,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             transition={{ duration: 0.2 }}
                                             className="space-y-2"
                                         >
-                                            <label className="block text-sm text-white/80">Select an image file:</label>
+                                            <label className="block text-sm dark:text-white/80">Select an image file:</label>
                                             <input
                                                 ref={fileInputRef}
                                                 type="file"
@@ -1679,7 +1679,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.1 }}
                             whileTap={{ scale: 0.98 }}
-                            className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-white/15 border border-white/20 text-xs rounded-md transition-colors w-full"
+                            className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-black/70 dark:bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full"
                             onClick={addTextBox}
                         >
                             <Plus className="h-3 w-3" />
@@ -1690,9 +1690,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     {texts.map((txt, i) => (
                         <motion.div
                             key={i}
-                            // initial={{ opacity: 0, y: 10 }}
-                            // animate={{ opacity: 1, y: 0 }}
-                            // transition={{ duration: 0.3, delay: 0.3 + (i * 0.1) }}
                             className="relative"
                         >
                             <div className="flex items-center space-x-2">
@@ -1700,7 +1697,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <button
-                                                className="p-2 border rounded-md bg-[#0f0f0f] border-white/20 text-white hover:bg-white/5 transition-colors"
+                                                className="p-2 border rounded-md bg-[#0f0f0f] border-white/20 text-white dark:hover:bg-white/5 hover:bg-black/80 transition-colors"
                                             >
                                                 <Settings className="h-4 w-4" />
                                             </button>
@@ -1710,7 +1707,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
-                                                    <label className="block text-xs text-white/60 mb-1">Font Size</label>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Font Size</label>
                                                     <input
                                                         type="range"
                                                         min="10"
@@ -1728,7 +1725,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
 
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
-                                                    <label className="block text-xs text-white/60 mb-1">Font Family</label>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Font Family</label>
 
                                                     <Select value={textSettings[i].fontFamily}
                                                         onValueChange={(value) => handleSettingsChange(i, 'fontFamily', value)}>
@@ -1757,7 +1754,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
-                                                    <label className="block text-xs text-white/60 mb-1">Font Weight</label>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Font Weight</label>
                                                     <Select value={textSettings[i].fontWeight}
                                                         onValueChange={(value) => handleSettingsChange(i, 'fontWeight', value)}>
                                                         <SelectTrigger className="w-full text-xs !h-8">
@@ -1779,7 +1776,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
-                                                    <label className="block text-xs text-white/60 mb-1">Text Color</label>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Text Color</label>
                                                     <div className="flex items-center space-x-2">
                                                         <input
                                                             type="color"
@@ -1798,7 +1795,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
-                                                    <label className="block text-xs text-white/60 mb-1">Letter Spacing</label>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Letter Spacing</label>
                                                     <input
                                                         type="range"
                                                         min="-5"
@@ -1810,12 +1807,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                             background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((textSettings[i].letterSpacing + 5) / 25) * 100}%, rgba(255,255,255,0.2) ${((textSettings[i].letterSpacing + 5) / 25) * 100}%, rgba(255,255,255,0.2) 100%)`
                                                         }}
                                                     />
-                                                    <span className="text-xs text-white/60">{textSettings[i].letterSpacing}px</span>
+                                                    <span className="text-xs dark:text-white/60">{textSettings[i].letterSpacing}px</span>
                                                 </div>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
-                                                    <label className="block text-xs text-white/60 mb-1">Text Case</label>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Text Case</label>
                                                     <Select value={textSettings[i].textCase}
                                                         onValueChange={(value) => handleSettingsChange(i, 'textCase', value as TextSettings['textCase'])}>
                                                         <SelectTrigger className="w-full text-xs !h-8">
@@ -1831,10 +1828,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className='flex flex-col space-y-2'>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
-                                                    <label className="block text-xs text-white/60 mb-2">Text Outline</label>
+                                                    <label className="block text-xs dark:text-white/60 mb-2">Text Outline</label>
                                                     <div className="space-y-2">
                                                         <div>
-                                                            <label className="block text-xs text-white/40 mb-1">Outline Width: {textSettings[i].outline.width}px</label>
+                                                            <label className="block text-xs dark:text-white/40 mb-1">Outline Width: {textSettings[i].outline.width}px</label>
                                                             <input
                                                                 type="range"
                                                                 min="0"
@@ -1848,7 +1845,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="block text-xs text-white/40 mb-1">Outline Color</label>
+                                                            <label className="block text-xs dark:text-white/40 mb-1">Outline Color</label>
                                                             <div className="flex items-center space-x-2">
                                                                 <input
                                                                     type="color"
@@ -1869,10 +1866,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className='flex flex-col space-y-2'>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
-                                                    <label className="block text-xs text-white/60 mb-2">Text Shadow</label>
+                                                    <label className="block text-xs dark:text-white/60 mb-2">Text Shadow</label>
                                                     <div className="space-y-2">
                                                         <div>
-                                                            <label className="block text-xs text-white/40 mb-1">Blur: {textSettings[i].shadow.blur}px</label>
+                                                            <label className="block text-xs dark:text-white/40 mb-1">Blur: {textSettings[i].shadow.blur}px</label>
                                                             <input
                                                                 type="range"
                                                                 min="0"
@@ -1887,7 +1884,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                         </div>
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div>
-                                                                <label className="block text-xs text-white/40 mb-1">X: {textSettings[i].shadow.offsetX}px</label>
+                                                                <label className="block text-xs dark:text-white/40 mb-1">X: {textSettings[i].shadow.offsetX}px</label>
                                                                 <input
                                                                     type="range"
                                                                     min="-20"
@@ -1939,8 +1936,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                     </DropdownMenu>
                                 </div>
                                 <input
-                                    className="w-full p-2 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/60"
-                                    placeholder={i < originalTextBoxCount ? `Text position ${i + 1}` : `Custom text ${i - originalTextBoxCount + 1}`}
+                                    className="w-full p-2 pl-3 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/70"
+                                    placeholder={i < originalTextBoxCount ? `text position ${i + 1}` : `Custom text ${i - originalTextBoxCount + 1}`}
                                     value={txt}
                                     onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
                                 />

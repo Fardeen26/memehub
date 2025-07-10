@@ -14,16 +14,19 @@ import {
     PaginationPrevious,
 } from "@/components/ui/pagination";
 import useSelected from '@/hooks/useSelected';
+import CustomTemplateUpload from './CustomTemplateUpload';
+import { Upload } from 'lucide-react';
 
 type TemplateSelectorProps = {
     templates: Record<string, Template>;
     onSelect: (key: string) => void;
+    onCustomTemplateSelect?: (template: Template) => void;
 };
 
 const TEMPLATES_PER_PAGE = 12;
 const PRELOAD_NEXT_PAGE = true;
 
-export default function TemplateSelector({ templates, onSelect }: TemplateSelectorProps) {
+export default function TemplateSelector({ templates, onSelect, onCustomTemplateSelect }: TemplateSelectorProps) {
     const { currentPage, setCurrentPage } = useSelected();
     const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
     const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
@@ -38,7 +41,6 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
         return templateEntries.slice(startIndex, endIndex);
     }, [templateEntries, currentPage]);
 
-    // Get next page templates for preloading
     const nextPageTemplates = useMemo(() => {
         if (!PRELOAD_NEXT_PAGE || currentPage >= totalPages) return [];
         const startIndex = currentPage * TEMPLATES_PER_PAGE;
@@ -46,18 +48,15 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
         return templateEntries.slice(startIndex, endIndex);
     }, [templateEntries, currentPage, totalPages]);
 
-    // Reset to page 1 if current page is beyond total pages (when search filters change)
     useEffect(() => {
         if (currentPage > totalPages && totalPages > 0) {
             setCurrentPage(1);
         }
     }, [totalPages, currentPage, setCurrentPage]);
 
-    // Preload next page images
     useEffect(() => {
         if (nextPageTemplates.length > 0) {
             nextPageTemplates.forEach(([, template]) => {
-                // Create a hidden link element to preload the image
                 const link = document.createElement('link');
                 link.rel = 'preload';
                 link.as = 'image';
@@ -65,7 +64,6 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
                 link.crossOrigin = 'anonymous';
                 document.head.appendChild(link);
 
-                // Clean up after 30 seconds to avoid memory issues
                 setTimeout(() => {
                     if (document.head.contains(link)) {
                         document.head.removeChild(link);
@@ -75,7 +73,6 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
         }
     }, [nextPageTemplates]);
 
-    // Intersection Observer for advanced lazy loading
     useEffect(() => {
         intersectionObserverRef.current = new IntersectionObserver(
             (entries) => {
@@ -90,7 +87,7 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
                 });
             },
             {
-                rootMargin: '50px', // Start loading 50px before the image enters viewport
+                rootMargin: '50px',
                 threshold: 0.1,
             }
         );
@@ -100,12 +97,10 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
         };
     }, [loadedImages]);
 
-    // Observe image elements
     useEffect(() => {
         const observer = intersectionObserverRef.current;
         if (!observer) return;
 
-        // Capture current ref value to use in cleanup
         const currentImageRefs = imageRefs.current;
 
         currentImageRefs.forEach((element) => {
@@ -121,7 +116,6 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
-        // Smooth scroll to top of templates when page changes
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -137,7 +131,6 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
     const renderPaginationItems = () => {
         const items = [];
 
-        // Always show first page
         if (currentPage > 3) {
             items.push(
                 <PaginationItem key={1}>
@@ -159,7 +152,6 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
             }
         }
 
-        // Show pages around current page
         const startPage = Math.max(1, currentPage - 2);
         const endPage = Math.min(totalPages, currentPage + 2);
 
@@ -176,7 +168,6 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
             );
         }
 
-        // Always show last page
         if (currentPage < totalPages - 2) {
             if (currentPage < totalPages - 3) {
                 items.push(
@@ -203,11 +194,29 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
 
     return (
         <div className="space-y-6">
+            {/* Custom Template Upload Section */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex"
+            >
+
+
+                <CustomTemplateUpload
+                    onTemplateCreate={onCustomTemplateSelect || (() => { })}
+                    buttonText="Use Custom Template"
+                    buttonIcon={<Upload className="h-4 w-4" />}
+                    buttonClassName="py-2 px-3 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2 text-sm font-semibold"
+                    title="Upload Custom Template"
+                    description="Upload your own image to create a custom meme template."
+                />
+            </motion.div>
+
             {/* Templates Grid */}
-            <section className="grid grid-cols-3 max-sm:grid-cols-1 gap-6 grid-flow-dense">
+            <section className="grid grid-cols-3 max-sm:grid-cols-1 gap-6 grid-flow-dense max-sm:-mt-3">
                 <AnimatePresence mode="popLayout">
                     {paginatedTemplates.map(([key, tpl], index) => {
-                        // First 6 images get priority loading (above the fold)
                         const isPriority = index < 6 && currentPage === 1;
 
                         return (
@@ -236,7 +245,7 @@ export default function TemplateSelector({ templates, onSelect }: TemplateSelect
                                         className="object-cover rounded-2xl shadow transition-opacity duration-300"
                                         loading={isPriority ? 'eager' : 'lazy'}
                                         priority={isPriority}
-                                        quality={85} // Slightly reduce quality for faster loading
+                                        quality={85}
                                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                                         placeholder="blur"
                                         blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
