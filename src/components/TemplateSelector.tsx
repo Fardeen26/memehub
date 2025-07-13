@@ -23,7 +23,7 @@ type TemplateSelectorProps = {
     onCustomTemplateSelect?: (template: Template) => void;
 };
 
-const TEMPLATES_PER_PAGE = 12;
+const TEMPLATES_PER_PAGE = 42;
 const PRELOAD_NEXT_PAGE = true;
 
 export default function TemplateSelector({ templates, onSelect, onCustomTemplateSelect }: TemplateSelectorProps) {
@@ -193,7 +193,7 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 w-full">
             {/* Custom Template Upload Section */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -201,8 +201,6 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                 transition={{ duration: 0.3 }}
                 className="flex"
             >
-
-
                 <CustomTemplateUpload
                     onTemplateCreate={onCustomTemplateSelect || (() => { })}
                     buttonText="Use Custom Template"
@@ -214,11 +212,10 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
             </motion.div>
 
             {/* Templates Grid */}
-            <section className="grid grid-cols-3 max-sm:grid-cols-1 gap-6 grid-flow-dense max-sm:-mt-3">
+            <section className="grid grid-cols-6 max-sm:grid-cols-2 max-md:grid-cols-3 max-lg:grid-cols-4 gap-6 grid-flow-dense w-full max-sm:-mt-3">
                 <AnimatePresence mode="popLayout">
                     {paginatedTemplates.map(([key, tpl], index) => {
                         const isPriority = index < 6 && currentPage === 1;
-
                         return (
                             <motion.div
                                 key={key}
@@ -245,8 +242,8 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                                         className="object-cover rounded-2xl shadow transition-opacity duration-300"
                                         loading={isPriority ? 'eager' : 'lazy'}
                                         priority={isPriority}
-                                        quality={85}
-                                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                        quality={100}
+                                        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 16.67vw"
                                         placeholder="blur"
                                         blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
                                         onLoad={() => {
@@ -255,7 +252,7 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                                     />
                                 </motion.div>
                                 <motion.p
-                                    className="text-center text-lg font-medium mt-2 capitalize"
+                                    className="text-center text-base font-medium mt-2 capitalize"
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     transition={{ delay: 0.1 }}

@@ -2,10 +2,8 @@ import React, { lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { MemeEditorProps } from '@/types/editor';
 
-// Dynamically import MemeEditor to enable code splitting
 const MemeEditor = lazy(() => import('./MemeEditor'));
 
-// Error boundary component
 const MemeEditorError = ({ error, resetError }: { error: Error; resetError: () => void }) => (
     <motion.div
         className="space-y-4 min-h-[65vh] max-sm:min-h-[75vh] flex items-center justify-center"
@@ -30,7 +28,6 @@ const MemeEditorError = ({ error, resetError }: { error: Error; resetError: () =
     </motion.div>
 );
 
-// Enhanced Suspense wrapper with error boundary
 interface ErrorBoundaryProps {
     children: React.ReactNode;
     fallback: React.ComponentType<{ error: Error; resetError: () => void }>;

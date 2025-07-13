@@ -39,7 +39,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
     };
 
     return (
-        <div className="max-w-5xl max-sm:w-full mx-auto p-4 max-sm:p-1">
+        <div className="w-full max-sm:w-full mx-auto p-4 max-sm:p-1 flex flex-col flex-wrap items-center">
             <AnimatePresence mode="wait">
                 {!selected ? (
                     <motion.div
@@ -51,6 +51,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                             duration: 0.4,
                             ease: [0.22, 1, 0.36, 1]
                         }}
+                        className="w-full max-w-6xl"
                     >
                         <TemplateSelector
                             templates={templates}
@@ -68,6 +69,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                             duration: 0.4,
                             ease: [0.22, 1, 0.36, 1]
                         }}
+                        className="w-5xl"
                     >
                         {isCustomTemplate && customTemplate ? (
                             <DynamicMemeEditor
