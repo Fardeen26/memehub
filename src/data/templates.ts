@@ -71,6 +71,15 @@ export const templates = {
         ]
     },
 
+    "space-shooting": {
+        image: "/temp45.jpg",
+        textBoxes: [
+            { x: 200, y: 370, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const },
+            { x: 700, y: 790, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const },
+            { x: 1300, y: 750, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const }
+        ]
+    },
+
     "chess-tension": {
         image: "/temp36.jpeg",
         textBoxes: [
@@ -92,6 +101,25 @@ export const templates = {
         textBoxes: [
             { x: 1, y: 260, width: 300, height: 200, fontSize: 40, minFont: 20, align: "center" as const },
             { x: 400, y: 260, width: 300, height: 200, fontSize: 40, minFont: 20, align: "center" as const },
+        ]
+    },
+
+    "you-vs-him": {
+        image: "/temp44.jpg",
+        textBoxes: [
+            { x: 80, y: 450, width: 1000, height: 500, fontSize: 140, minFont: 10, align: "center" as const },
+            { x: 40, y: 1500, width: 500, height: 400, fontSize: 140, minFont: 10, align: "center" as const },
+            { x: 480, y: 1500, width: 500, height: 400, fontSize: 140, minFont: 10, align: "center" as const },
+        ]
+    },
+
+    "developer-stage": {
+        image: "/temp47.jpg",
+        textBoxes: [
+            { x: 900, y: 150, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
+            { x: 900, y: 610, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
+            { x: 900, y: 1050, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
+            { x: 900, y: 1500, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const }
         ]
     },
 
@@ -261,7 +289,7 @@ export const templates = {
         ],
     },
 
-        "IQ-Curve": {
+    "IQ-Curve": {
         image: "/temp38.jpg",
         textBoxes: [
             { x: 50, y: 850, width: 850, height: 480, fontSize: 180, minFont: 40, align: "center" as const },
@@ -299,6 +327,21 @@ export const templates = {
         textBoxes: [
             { x: 20, y: 220, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
             { x: 330, y: 220, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
-    ],
+        ],
+    },
+
+    "black-&-white-woolfs": {
+        image: "/temp43.jpg",
+        textBoxes: [
+            { x: 100, y: 1850, width: 2600, height: 1600, fontSize: 400, minFont: 40, align: "center" as const },
+            { x: 3000, y: 1850, width: 2600, height: 1600, fontSize: 400, minFont: 40, align: "center" as const }
+        ]
+    },
+
+    "empty-image": {
+        image: "/temp46.jpg",
+        textBoxes: [
+            { x: 150, y: 270, width: 300, height: 200, fontSize: 60, minFont: 40, align: "center" as const }
+        ]
     },
 };
