@@ -69,7 +69,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                             duration: 0.4,
                             ease: [0.22, 1, 0.36, 1]
                         }}
-                        className="w-5xl"
+                        className="w-full max-w-5xl"
                     >
                         {isCustomTemplate && customTemplate ? (
                             <DynamicMemeEditor
