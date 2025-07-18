@@ -1,4 +1,91 @@
 export const templates = {
+
+    "understand-it": {
+        image: "/temp65.jpg",
+        textBoxes: [
+            { x: 150, y: 200, width: 2700, height: 1500, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 150, y: 2000, width: 2700, height: 400, fontSize: 200, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "natures-beauty": {
+        image: "/temp64.png",
+        textBoxes: [
+            { x: 1000, y: 1700, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "two-spiders": {
+        image: "/temp61.jpg",
+        textBoxes: [
+            { x: 100, y: 600, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 1100, y: 600, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "secret-revealed": {
+        image: "/temp59.png",
+        textBoxes: [
+            { x: 100, y: 450, width: 2000, height: 1200, fontSize: 300, minFont: 40, align: "center" as const },
+            { x: 100, y: 3325, width: 2000, height: 1200, fontSize: 300, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "sun-be": {
+        image: "/temp56.png",
+        textBoxes: [
+            { x: 200, y: 250, width: 3000, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
+            { x: 200, y: 2325, width: 3000, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "i-fear-no-man": {
+        image: "/temp53.png",
+        textBoxes: [
+            { x: 40, y: 1400, width: 1000, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "two-bros-handshake": {
+        image: "/temp52.png",
+        textBoxes: [
+            { x: 10, y: 800, width: 1500, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
+            { x: 1700, y: 800, width: 1500, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
+            { x: 640, y: 2100, width: 2000, height: 800, fontSize: 250, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "two-paths": {
+        image: "/temp51.png",
+        textBoxes: [
+            { x: 10, y: 200, width: 1000, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 1000, y: 200, width: 1000, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "sleeping-on-cash": {
+        image: "/temp50.png",
+        textBoxes: [
+            { x: 50, y: 200, width: 1800, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 0, y: 1025, width: 1900, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "Eh-i-step-on-shit": {
+        image: "/temp48.jpg",
+        textBoxes: [
+            { x: 800, y: 2370, width: 600, height: 500, fontSize: 200, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "wait-a-minute": {
+        image: "/temp49.jpg",
+        textBoxes: [
+            { x: 1, y: 450, width: 1200, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 50, y: 1450, width: 1200, height: 600, fontSize: 200, minFont: 40, align: "center" as const }
+        ]
+    },
+
     "Scared-Lady": {
         image: "/temp1.jpg",
         textBoxes: [

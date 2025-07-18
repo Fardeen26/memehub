@@ -287,7 +287,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const canvas = canvasRef.current;
             if (!canvas) return;
 
-            const maxSize = 200;
+            const maxSize = 300;
             let width = img.width;
             let height = img.height;
 
@@ -1711,7 +1711,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                     <input
                                                         type="range"
                                                         min="10"
-                                                        max="200"
+                                                        max="300"
                                                         value={textSettings[i].fontSize}
                                                         onChange={(e) => handleSettingsChange(i, 'fontSize', parseInt(e.target.value))}
                                                         className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
