@@ -1,5 +1,52 @@
 export const templates = {
 
+    "only-aim": {
+        image: "/temp54.png",
+        textBoxes: [
+            { x: 350, y: 950, width: 2400, height: 1000, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 1050, y: 2750, width: 800, height: 1000, fontSize: 250, minFont: 40, align: "center" as const }
+        ]
+    },
+
+    "no-way-dawg": {
+        image: "/temp57.png",
+        textBoxes: [
+            { x: 150, y: 1350, width: 1400, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 2000, y: 1250, width: 1100, height: 800, fontSize: 200, minFont: 40, align: "center" as const }
+        ]
+    },
+
+    "haha-im-death": {
+        image: "/temp60.jpg",
+        textBoxes: [
+            { x: 750, y: 850, width: 900, height: 600, fontSize: 160, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "he-dont-know-yet": {
+        image: "/temp66.jpeg",
+        textBoxes: [
+            { x: 50, y: 500, width: 600, height: 600, fontSize: 100, minFont: 40, align: "center" as const },
+            { x: 710, y: 600, width: 600, height: 600, fontSize: 100, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "they-dont-know": {
+        image: "/temp67.jpg",
+        textBoxes: [
+            { x: 460, y: 300, width: 600, height: 400, fontSize: 70, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "three-dragons": {
+        image: "/temp69.jpg",
+        textBoxes: [
+            { x: 100, y: 300, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 800, y: 400, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 1500, y: 500, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const }
+        ]
+    },
+
     "understand-it": {
         image: "/temp65.jpg",
         textBoxes: [
