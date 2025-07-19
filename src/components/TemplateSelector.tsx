@@ -23,7 +23,7 @@ type TemplateSelectorProps = {
     onCustomTemplateSelect?: (template: Template) => void;
 };
 
-const TEMPLATES_PER_PAGE = 42;
+const TEMPLATES_PER_PAGE = 60;
 const PRELOAD_NEXT_PAGE = true;
 
 export default function TemplateSelector({ templates, onSelect, onCustomTemplateSelect }: TemplateSelectorProps) {

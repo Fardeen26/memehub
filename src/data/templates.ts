@@ -1,137 +1,6 @@
 export const templates = {
 
-    "only-aim": {
-        image: "/temp54.png",
-        textBoxes: [
-            { x: 350, y: 950, width: 2400, height: 1000, fontSize: 200, minFont: 40, align: "center" as const },
-            { x: 1050, y: 2750, width: 800, height: 1000, fontSize: 250, minFont: 40, align: "center" as const }
-        ]
-    },
 
-    "no-way-dawg": {
-        image: "/temp57.png",
-        textBoxes: [
-            { x: 150, y: 1350, width: 1400, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
-            { x: 2000, y: 1250, width: 1100, height: 800, fontSize: 200, minFont: 40, align: "center" as const }
-        ]
-    },
-
-    "haha-im-death": {
-        image: "/temp60.jpg",
-        textBoxes: [
-            { x: 750, y: 850, width: 900, height: 600, fontSize: 160, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "he-dont-know-yet": {
-        image: "/temp66.jpeg",
-        textBoxes: [
-            { x: 50, y: 500, width: 600, height: 600, fontSize: 100, minFont: 40, align: "center" as const },
-            { x: 710, y: 600, width: 600, height: 600, fontSize: 100, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "they-dont-know": {
-        image: "/temp67.jpg",
-        textBoxes: [
-            { x: 460, y: 300, width: 600, height: 400, fontSize: 70, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "three-dragons": {
-        image: "/temp69.jpg",
-        textBoxes: [
-            { x: 100, y: 300, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
-            { x: 800, y: 400, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
-            { x: 1500, y: 500, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const }
-        ]
-    },
-
-    "understand-it": {
-        image: "/temp65.jpg",
-        textBoxes: [
-            { x: 150, y: 200, width: 2700, height: 1500, fontSize: 200, minFont: 40, align: "center" as const },
-            { x: 150, y: 2000, width: 2700, height: 400, fontSize: 200, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "natures-beauty": {
-        image: "/temp64.png",
-        textBoxes: [
-            { x: 1000, y: 1700, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "two-spiders": {
-        image: "/temp61.jpg",
-        textBoxes: [
-            { x: 100, y: 600, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
-            { x: 1100, y: 600, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "secret-revealed": {
-        image: "/temp59.png",
-        textBoxes: [
-            { x: 100, y: 450, width: 2000, height: 1200, fontSize: 300, minFont: 40, align: "center" as const },
-            { x: 100, y: 3325, width: 2000, height: 1200, fontSize: 300, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "sun-be": {
-        image: "/temp56.png",
-        textBoxes: [
-            { x: 200, y: 250, width: 3000, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
-            { x: 200, y: 2325, width: 3000, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "i-fear-no-man": {
-        image: "/temp53.png",
-        textBoxes: [
-            { x: 40, y: 1400, width: 1000, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "two-bros-handshake": {
-        image: "/temp52.png",
-        textBoxes: [
-            { x: 10, y: 800, width: 1500, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
-            { x: 1700, y: 800, width: 1500, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
-            { x: 640, y: 2100, width: 2000, height: 800, fontSize: 250, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "two-paths": {
-        image: "/temp51.png",
-        textBoxes: [
-            { x: 10, y: 200, width: 1000, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
-            { x: 1000, y: 200, width: 1000, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "sleeping-on-cash": {
-        image: "/temp50.png",
-        textBoxes: [
-            { x: 50, y: 200, width: 1800, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
-            { x: 0, y: 1025, width: 1900, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "Eh-i-step-on-shit": {
-        image: "/temp48.jpg",
-        textBoxes: [
-            { x: 800, y: 2370, width: 600, height: 500, fontSize: 200, minFont: 40, align: "center" as const },
-        ]
-    },
-
-    "wait-a-minute": {
-        image: "/temp49.jpg",
-        textBoxes: [
-            { x: 1, y: 450, width: 1200, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
-            { x: 50, y: 1450, width: 1200, height: 600, fontSize: 200, minFont: 40, align: "center" as const }
-        ]
-    },
 
     "Scared-Lady": {
         image: "/temp1.jpg",
@@ -165,12 +34,20 @@ export const templates = {
         ],
     },
 
-    "Manu-Paji": {
-        image: "/temp31.jpeg",
+    "only-aim": {
+        image: "/temp54.png",
         textBoxes: [
-            { x: 0, y: 70, width: 400, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
-            { x: 0, y: 420, width: 400, height: 100, fontSize: 50, minFont: 20, align: "center" as const },
-        ],
+            { x: 350, y: 950, width: 2400, height: 1000, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 1050, y: 2750, width: 800, height: 1000, fontSize: 250, minFont: 40, align: "center" as const }
+        ]
+    },
+
+    "no-way-dawg": {
+        image: "/temp57.png",
+        textBoxes: [
+            { x: 150, y: 1350, width: 1400, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 2000, y: 1250, width: 1100, height: 800, fontSize: 200, minFont: 40, align: "center" as const }
+        ]
     },
 
     "Kirat-humble-guy": {
@@ -205,14 +82,44 @@ export const templates = {
         ]
     },
 
-    "space-shooting": {
-        image: "/temp45.jpg",
+    "wait-a-minute": {
+        image: "/temp49.jpg",
         textBoxes: [
-            { x: 200, y: 370, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const },
-            { x: 700, y: 790, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const },
-            { x: 1300, y: 750, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const }
+            { x: 1, y: 450, width: 1200, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 50, y: 1450, width: 1200, height: 600, fontSize: 200, minFont: 40, align: "center" as const }
         ]
     },
+
+    "two-spiders": {
+        image: "/temp61.jpg",
+        textBoxes: [
+            { x: 100, y: 600, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 1100, y: 600, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "two-paths": {
+        image: "/temp51.png",
+        textBoxes: [
+            { x: 10, y: 200, width: 1000, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 1000, y: 200, width: 1000, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "secret-revealed": {
+        image: "/temp59.png",
+        textBoxes: [
+            { x: 100, y: 450, width: 2000, height: 1200, fontSize: 300, minFont: 40, align: "center" as const },
+            { x: 100, y: 3325, width: 2000, height: 1200, fontSize: 300, minFont: 40, align: "center" as const },
+        ]
+    },
+
+
+
+
+
+
+
 
     "chess-tension": {
         image: "/temp36.jpeg",
@@ -327,6 +234,198 @@ export const templates = {
         ],
     },
 
+
+
+    "Buzz-And-Woody": {
+        image: "/temp11.png",
+        textBoxes: [
+            { id: "topText", x: 25, y: 60, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+            { id: "handText", x: 25, y: 445, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    "Grim-Reaper-Doors": {
+        image: "/temp7.png",
+        textBoxes: [
+            { id: 'door-1', x: 58, y: 1050, width: 508, height: 300, fontSize: 100, minFont: 40, align: 'center' as const },
+            { id: 'door-2', x: 708, y: 1300, width: 630, height: 400, fontSize: 150, minFont: 40, align: 'center' as const },
+            { id: 'door-3', x: 1758, y: 1244, width: 658, height: 300, fontSize: 200, minFont: 40, align: 'center' as const },
+            { id: 'door-4', x: 3290, y: 1320, width: 958, height: 400, fontSize: 250, minFont: 40, align: 'center' as const },
+            { id: 'reaper-body', x: 2600, y: 1880, width: 710, height: 400, fontSize: 300, minFont: 40, align: 'center' as const },
+        ],
+    },
+
+
+
+
+
+    "Disaster-Girl": {
+        image: "/temp21.png",
+        textBoxes: [
+            { id: "topText", x: 10, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+            { id: "handText", x: 200, y: 350, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
+        ],
+    },
+
+
+
+    "IQ-Curve": {
+        image: "/temp38.jpg",
+        textBoxes: [
+            { x: 50, y: 850, width: 850, height: 480, fontSize: 180, minFont: 40, align: "center" as const },
+            { x: 700, y: 200, width: 1300, height: 270, fontSize: 150, minFont: 0, align: "center" as const },
+            { x: 1900, y: 700, width: 850, height: 480, fontSize: 180, minFont: 40, align: "center" as const },
+        ],
+    },
+
+
+
+
+
+    "black-&-white-woolfs": {
+        image: "/temp43.jpg",
+        textBoxes: [
+            { x: 100, y: 1850, width: 2600, height: 1600, fontSize: 400, minFont: 40, align: "center" as const },
+            { x: 3000, y: 1850, width: 2600, height: 1600, fontSize: 400, minFont: 40, align: "center" as const }
+        ]
+    },
+
+
+
+
+
+    "haha-im-death": {
+        image: "/temp60.jpg",
+        textBoxes: [
+            { x: 750, y: 850, width: 900, height: 600, fontSize: 160, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "he-dont-know-yet": {
+        image: "/temp66.jpeg",
+        textBoxes: [
+            { x: 50, y: 500, width: 600, height: 600, fontSize: 100, minFont: 40, align: "center" as const },
+            { x: 710, y: 600, width: 600, height: 600, fontSize: 100, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "they-dont-know": {
+        image: "/temp67.jpg",
+        textBoxes: [
+            { x: 460, y: 300, width: 600, height: 400, fontSize: 70, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "three-dragons": {
+        image: "/temp69.jpg",
+        textBoxes: [
+            { x: 100, y: 300, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 800, y: 400, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 1500, y: 500, width: 600, height: 600, fontSize: 150, minFont: 40, align: "center" as const }
+        ]
+    },
+
+    "understand-it": {
+        image: "/temp65.jpg",
+        textBoxes: [
+            { x: 150, y: 200, width: 2700, height: 1500, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 150, y: 2000, width: 2700, height: 400, fontSize: 200, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "natures-beauty": {
+        image: "/temp64.png",
+        textBoxes: [
+            { x: 1000, y: 1700, width: 800, height: 600, fontSize: 150, minFont: 40, align: "center" as const },
+        ]
+    },
+
+
+
+
+
+    "sun-be": {
+        image: "/temp56.png",
+        textBoxes: [
+            { x: 200, y: 250, width: 3000, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
+            { x: 200, y: 2325, width: 3000, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "i-fear-no-man": {
+        image: "/temp53.png",
+        textBoxes: [
+            { x: 40, y: 1400, width: 1000, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "two-bros-handshake": {
+        image: "/temp52.png",
+        textBoxes: [
+            { x: 10, y: 800, width: 1500, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
+            { x: 1700, y: 800, width: 1500, height: 600, fontSize: 250, minFont: 40, align: "center" as const },
+            { x: 640, y: 2100, width: 2000, height: 800, fontSize: 250, minFont: 40, align: "center" as const },
+        ]
+    },
+
+
+
+    "sleeping-on-cash": {
+        image: "/temp50.png",
+        textBoxes: [
+            { x: 50, y: 200, width: 1800, height: 400, fontSize: 150, minFont: 40, align: "center" as const },
+            { x: 0, y: 1025, width: 1900, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "Eh-i-step-on-shit": {
+        image: "/temp48.jpg",
+        textBoxes: [
+            { x: 800, y: 2370, width: 600, height: 500, fontSize: 200, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "space-shooting": {
+        image: "/temp45.jpg",
+        textBoxes: [
+            { x: 200, y: 370, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const },
+            { x: 700, y: 790, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const },
+            { x: 1300, y: 750, width: 600, height: 500, fontSize: 140, minFont: 40, align: "center" as const }
+        ]
+    },
+
+    "Rocky-superstar": {
+        image: "/temp41.png",
+        textBoxes: [
+            { x: 0, y: 50, width: 365, height: 100, fontSize: 30, minFont: 10, align: "center" as const },
+            { x: 0, y: 330, width: 365, height: 90, fontSize: 30, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    "Trade-offer": {
+        image: "/temp42.jpg",
+        textBoxes: [
+            { x: 20, y: 220, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
+            { x: 330, y: 220, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    "Water-UNO-Reverse": {
+        image: "/temp3.png",
+        textBoxes: [
+            { x: 100, y: 200, width: 2000, height: 400, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 100, y: 2200, width: 2000, height: 300, fontSize: 200, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "Puzzle-Head": {
+        image: "/temp6.png",
+        textBoxes: [
+            { id: "topText", x: 150, y: 400, width: 1100, height: 100, fontSize: 200, minFont: 60, align: "center" as const },
+            { id: "handText", x: 910, y: 1000, width: 600, height: 100, fontSize: 200, minFont: 30, align: "center" as const },
+        ],
+    },
+
     "Trojan-Horse": {
         image: "/temp4.png",
         textBoxes: [
@@ -348,38 +447,34 @@ export const templates = {
         ],
     },
 
-    "Buzz-And-Woody": {
-        image: "/temp11.png",
+    "empty-image": {
+        image: "/temp46.jpg",
         textBoxes: [
-            { id: "topText", x: 25, y: 60, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
-            { id: "handText", x: 25, y: 445, width: 700, height: 100, fontSize: 56, minFont: 10, align: "center" as const },
-        ],
-    },
-
-    "Grim-Reaper-Doors": {
-        image: "/temp7.png",
-        textBoxes: [
-            { id: 'door-1', x: 58, y: 1050, width: 508, height: 300, fontSize: 100, minFont: 40, align: 'center' as const },
-            { id: 'door-2', x: 708, y: 1300, width: 630, height: 400, fontSize: 150, minFont: 40, align: 'center' as const },
-            { id: 'door-3', x: 1758, y: 1244, width: 658, height: 300, fontSize: 200, minFont: 40, align: 'center' as const },
-            { id: 'door-4', x: 3290, y: 1320, width: 958, height: 400, fontSize: 250, minFont: 40, align: 'center' as const },
-            { id: 'reaper-body', x: 2600, y: 1880, width: 710, height: 400, fontSize: 300, minFont: 40, align: 'center' as const },
-        ],
-    },
-
-    "Water-UNO-Reverse": {
-        image: "/temp3.png",
-        textBoxes: [
-            { x: 100, y: 200, width: 2000, height: 400, fontSize: 200, minFont: 40, align: "center" as const },
-            { x: 100, y: 2200, width: 2000, height: 300, fontSize: 200, minFont: 40, align: "center" as const },
+            { x: 150, y: 270, width: 300, height: 200, fontSize: 60, minFont: 40, align: "center" as const }
         ]
     },
 
-    "Puzzle-Head": {
-        image: "/temp6.png",
+    "Cat-speaker": {
+        image: "/temp32.jpeg",
         textBoxes: [
-            { id: "topText", x: 150, y: 400, width: 1100, height: 100, fontSize: 200, minFont: 60, align: "center" as const },
-            { id: "handText", x: 910, y: 1000, width: 600, height: 100, fontSize: 200, minFont: 30, align: "center" as const },
+            { x: 10, y: 30, width: 210, height: 100, fontSize: 20, minFont: 0, align: "center" as const },
+            { x: 10, y: 200, width: 210, height: 100, fontSize: 20, minFont: 0, align: "center" as const },
+        ],
+    },
+
+    "Megamind": {
+        image: "/temp39.png",
+        textBoxes: [
+            { x: 30, y: 50, width: 500, height: 100, fontSize: 40, minFont: 10, align: "center" as const },
+            { x: 30, y: 500, width: 500, height: 90, fontSize: 40, minFont: 10, align: "center" as const },
+        ],
+    },
+
+    "Red-pill-Blue-pill": {
+        image: "/temp40.jpg",
+        textBoxes: [
+            { x: 20, y: 365, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
+            { x: 280, y: 365, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
         ],
     },
 
@@ -404,78 +499,6 @@ export const templates = {
         image: "/temp17.png",
         textBoxes: [
             { x: 2, y: 147, width: 130, height: 200, fontSize: 12, minFont: 10, align: "center" as const },
-        ]
-    },
-
-    "Disaster-Girl": {
-        image: "/temp21.png",
-        textBoxes: [
-            { id: "topText", x: 10, y: 140, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
-            { id: "handText", x: 200, y: 350, width: 180, height: 200, fontSize: 40, minFont: 14, align: "center" as const },
-        ],
-    },
-
-    "Cat-speaker": {
-        image: "/temp32.jpeg",
-        textBoxes: [
-            { x: 10, y: 30, width: 210, height: 100, fontSize: 20, minFont: 0, align: "center" as const },
-            { x: 10, y: 200, width: 210, height: 100, fontSize: 20, minFont: 0, align: "center" as const },
-        ],
-    },
-
-    "IQ-Curve": {
-        image: "/temp38.jpg",
-        textBoxes: [
-            { x: 50, y: 850, width: 850, height: 480, fontSize: 180, minFont: 40, align: "center" as const },
-            { x: 700, y: 200, width: 1300, height: 270, fontSize: 150, minFont: 0, align: "center" as const },
-            { x: 1900, y: 700, width: 850, height: 480, fontSize: 180, minFont: 40, align: "center" as const },
-        ],
-    },
-
-    "Megamind": {
-        image: "/temp39.png",
-        textBoxes: [
-            { x: 30, y: 50, width: 500, height: 100, fontSize: 40, minFont: 10, align: "center" as const },
-            { x: 30, y: 500, width: 500, height: 90, fontSize: 40, minFont: 10, align: "center" as const },
-        ],
-    },
-
-    "Red-pill-Blue-pill": {
-        image: "/temp40.jpg",
-        textBoxes: [
-            { x: 20, y: 365, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
-            { x: 280, y: 365, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
-        ],
-    },
-
-    "Rocky-superstar": {
-        image: "/temp41.png",
-        textBoxes: [
-            { x: 0, y: 50, width: 365, height: 100, fontSize: 30, minFont: 10, align: "center" as const },
-            { x: 0, y: 330, width: 365, height: 90, fontSize: 30, minFont: 10, align: "center" as const },
-        ],
-    },
-
-    "Trade-offer": {
-        image: "/temp42.jpg",
-        textBoxes: [
-            { x: 20, y: 220, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
-            { x: 330, y: 220, width: 250, height: 200, fontSize: 30, minFont: 10, align: "center" as const },
-        ],
-    },
-
-    "black-&-white-woolfs": {
-        image: "/temp43.jpg",
-        textBoxes: [
-            { x: 100, y: 1850, width: 2600, height: 1600, fontSize: 400, minFont: 40, align: "center" as const },
-            { x: 3000, y: 1850, width: 2600, height: 1600, fontSize: 400, minFont: 40, align: "center" as const }
-        ]
-    },
-
-    "empty-image": {
-        image: "/temp46.jpg",
-        textBoxes: [
-            { x: 150, y: 270, width: 300, height: 200, fontSize: 60, minFont: 40, align: "center" as const }
         ]
     },
 };
