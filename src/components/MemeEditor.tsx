@@ -1759,7 +1759,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 </motion.div>
 
                 <motion.div
-                    className="space-y-2 w-full"
+                    className="space-y-2 max-sm:-mt-4 w-full"
                     initial={{ opacity: 0, x: 0 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.2 }}
