@@ -2,7 +2,7 @@
 // @ts-nocheck
 
 import { Template } from '@/types/template';
-import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X } from 'lucide-react';
+import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -104,6 +104,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const lastDrawTime = useRef<number>(0);
     const isOptimizedDrawing = useRef<boolean>(false);
+
+    // Drawing feature state
+    type Point = { x: number; y: number };
+    type Stroke = { points: Point[]; color: string; size: number; eraser: boolean };
+    const [isDrawingMode, setIsDrawingMode] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const [isEraser, setIsEraser] = useState(false);
+    const [drawColor, setDrawColor] = useState('#ff0000');
+    const [drawSize, setDrawSize] = useState(6);
+    const [strokes, setStrokes] = useState<Stroke[]>([]);
+    const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
+    const [isDrawing, setIsDrawing] = useState(false);
 
     const loadAndCacheImage = useCallback(async (src: string): Promise<HTMLImageElement> => {
         if (imageCache.current.has(src)) {
@@ -1480,6 +1492,184 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         toast.success('Text box removed');
     }, [originalTextBoxCount]);
 
+    // Drawing helpers
+    const getPointerPos = (e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement): Point => {
+        const rect = canvas.getBoundingClientRect();
+        let x: number, y: number;
+        if ('touches' in e && e.touches.length > 0) {
+            x = (e.touches[0].clientX - rect.left) * (canvas.width / rect.width);
+            y = (e.touches[0].clientY - rect.top) * (canvas.height / rect.height);
+        } else if ('clientX' in e) {
+            x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        } else {
+            x = 0; y = 0;
+        }
+        return { x, y };
+    };
+
+    // Drawing event handlers
+    const handleDrawStart = (e: MouseEvent | TouchEvent) => {
+        if (!isDrawingMode) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const pos = getPointerPos(e, canvas);
+        setIsDrawing(true);
+        setCurrentStroke({
+            points: [pos],
+            color: drawColor, // Always use drawColor, eraser is handled by composite mode
+            size: drawSize,
+            eraser: isEraser
+        });
+        if (e.cancelable) e.preventDefault();
+    };
+    const handleDrawMove = (e: MouseEvent | TouchEvent) => {
+        if (!isDrawingMode || !isDrawing || !currentStroke) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const pos = getPointerPos(e, canvas);
+        setCurrentStroke((prev) => prev ? { ...prev, points: [...prev.points, pos] } : null);
+        if (e.cancelable) e.preventDefault();
+    };
+    const handleDrawEnd = (e?: MouseEvent | TouchEvent) => {
+        if (!isDrawingMode || !isDrawing || !currentStroke) return;
+        setStrokes((prev) => [...prev, currentStroke]);
+        setCurrentStroke(null);
+        setIsDrawing(false);
+        if (e && 'preventDefault' in e && e.cancelable) e.preventDefault();
+    };
+    // Undo
+    const handleUndo = () => {
+        setStrokes((prev) => prev.slice(0, -1));
+    };
+    // Erase all
+    const handleEraseAll = () => {
+        setStrokes([]);
+    };
+    // Drawing render
+    const drawStrokes = (ctx: CanvasRenderingContext2D) => {
+        for (const stroke of strokes.concat(currentStroke ? [currentStroke] : [])) {
+            if (!stroke || !stroke.points.length) continue;
+            ctx.save();
+            ctx.strokeStyle = stroke.color;
+            ctx.lineWidth = stroke.size;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.globalCompositeOperation = stroke.eraser ? 'destination-out' : 'source-over';
+            ctx.beginPath();
+            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            for (let i = 1; i < stroke.points.length; i++) {
+                ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+    };
+    // Patch draw() to render strokes above overlays
+    const drawWithStrokes = useCallback(async () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Draw meme and overlays (synchronously, not in image.onload)
+        const img = new window.Image();
+        img.src = template.image;
+        await new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+        });
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
+
+        // Watermark
+        const watermarkText = "memehub";
+        const watermarkFontSize = Math.max(12, Math.min(canvas.width, canvas.height) * 0.02);
+        ctx.save();
+        ctx.font = `${watermarkFontSize}px Arial, sans-serif`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        const padding = 10;
+        const watermarkX = padding;
+        const watermarkY = canvas.height - padding;
+        ctx.strokeText(watermarkText, watermarkX, watermarkY);
+        ctx.fillText(watermarkText, watermarkX, watermarkY);
+        ctx.restore();
+
+        // Overlays
+        const imagePromises = imageOverlays.map(overlay => loadAndCacheImage(overlay.src));
+        try {
+            await Promise.all(imagePromises);
+        } catch (error) {
+            console.warn('Some images failed to load:', error);
+        }
+        for (const overlay of imageOverlays) {
+            try {
+                const overlayImg = imageCache.current.get(overlay.src);
+                if (!overlayImg) continue;
+                ctx.save();
+                ctx.globalAlpha = overlay.opacity;
+                if (overlay.rotation !== 0) {
+                    const centerX = overlay.x + overlay.width / 2;
+                    const centerY = overlay.y + overlay.height / 2;
+                    ctx.translate(centerX, centerY);
+                    ctx.rotate((overlay.rotation * Math.PI) / 180);
+                    ctx.drawImage(overlayImg, -overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
+                } else {
+                    ctx.drawImage(overlayImg, overlay.x, overlay.y, overlay.width, overlay.height);
+                }
+                ctx.restore();
+            } catch (error) {
+                console.error('Error drawing overlay image:', error);
+            }
+        }
+
+        // Draw text
+        textBoxes.forEach((box, i) => {
+            drawText()(ctx, texts[i], box, textSettings[i]);
+        });
+
+        // Draw strokes LAST so they are always visible
+        drawStrokes(ctx);
+    }, [template.image, imageOverlays, imageCache, textBoxes, texts, textSettings, loadAndCacheImage, drawText, strokes, currentStroke]);
+
+    useEffect(() => {
+        drawWithStrokes();
+    }, [drawWithStrokes]);
+
+    // Mouse/touch events for drawing
+    useEffect(() => {
+        if (!isDrawingMode) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        // Mouse
+        const mouseDown = (e: MouseEvent) => handleDrawStart(e);
+        const mouseMove = (e: MouseEvent) => handleDrawMove(e);
+        const mouseUp = (e: MouseEvent) => handleDrawEnd(e);
+        const touchStart = (e: TouchEvent) => handleDrawStart(e);
+        const touchMove = (e: TouchEvent) => handleDrawMove(e);
+        const touchEnd = (e: TouchEvent) => handleDrawEnd(e);
+        canvas.addEventListener('mousedown', mouseDown);
+        canvas.addEventListener('mousemove', mouseMove);
+        window.addEventListener('mouseup', mouseUp);
+        canvas.addEventListener('touchstart', touchStart, { passive: false });
+        canvas.addEventListener('touchmove', touchMove, { passive: false });
+        window.addEventListener('touchend', touchEnd, { passive: false });
+        return () => {
+            canvas.removeEventListener('mousedown', mouseDown);
+            canvas.removeEventListener('mousemove', mouseMove);
+            window.removeEventListener('mouseup', mouseUp);
+            canvas.removeEventListener('touchstart', touchStart);
+            canvas.removeEventListener('touchmove', touchMove);
+            window.removeEventListener('touchend', touchEnd);
+        };
+    }, [isDrawingMode, isEraser, drawColor, drawSize, currentStroke, isDrawing]);
+    // Toolbar UI
+    // ... existing code ...
     return (
         <motion.section
             className="space-y-4 min-h-[65vh] max-sm:min-h-[75vh]"
@@ -1487,6 +1677,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
         >
+            {/* Drawing Toolbar */}
+
+            {/* End Drawing Toolbar */}
             <motion.button
                 className="bg-transparent cursor-pointer flex items-center"
                 onClick={onReset}
@@ -1514,7 +1707,57 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         onTouchEnd={handleTouchEnd}
                         style={{ touchAction: 'none' }}
                     />
+
+                    <div className={`flex items-center space-x-2 mt-3 ${isDrawingMode ? '' : 'hidden'}`}>
+                        <input
+                            type="color"
+                            value={drawColor}
+                            onChange={e => setDrawColor(e.target.value)}
+                            disabled={!isDrawingMode || isEraser}
+                            className="w-8 h-8 rounded border border-white/20 cursor-pointer"
+                            title="Stroke Color"
+                        />
+                        <input
+                            type="range"
+                            min="2"
+                            max="80"
+                            value={drawSize}
+                            onChange={e => setDrawSize(Number(e.target.value))}
+                            disabled={!isDrawingMode}
+                            className="w-24 mx-2"
+                            title="Stroke Size"
+                        />
+                        <span className="text-xs text-white/60">{drawSize}px</span>
+                        {/* <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            className={`p-2 rounded-md border text-xs flex items-center space-x-1 ${isEraser && isDrawingMode ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]' : 'bg-[#0f0f0f] text-white/70 border-white/20'}`}
+                            onClick={() => { if (isDrawingMode) setIsEraser(v => !v); }}
+                            disabled={!isDrawingMode}
+                            title="Eraser"
+                        >
+                            <Eraser className="h-4 w-4" /> <span>Eraser</span>
+                        </motion.button> */}
+                        <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            className="p-2 rounded-md border text-xs flex items-center space-x-1 bg-[#0f0f0f] text-white/70 border-white/20"
+                            onClick={handleUndo}
+                            disabled={!isDrawingMode || strokes.length === 0}
+                            title="Undo"
+                        >
+                            <Undo2 className="h-4 w-4" /> <span>Undo</span>
+                        </motion.button>
+                        <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            className="p-2 rounded-md border text-xs flex items-center space-x-1 bg-[#0f0f0f] text-white/70 border-white/20"
+                            onClick={handleEraseAll}
+                            disabled={!isDrawingMode || strokes.length === 0}
+                            title="Erase All"
+                        >
+                            <Trash className="h-4 w-4" /> <span>Erase All</span>
+                        </motion.button>
+                    </div>
                 </motion.div>
+
                 <motion.div
                     className="space-y-2 w-full"
                     initial={{ opacity: 0, x: 0 }}
@@ -1684,6 +1927,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         >
                             <Plus className="h-3 w-3" />
                             <span>Add Text</span>
+                        </motion.button>
+                        <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            className={`p-2 rounded-md border text-xs flex items-center space-x-1 ${isDrawingMode ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]' : ' bg-black/70 dark:bg-white/15 border border-white/20 text-white'}`}
+                            onClick={() => setIsDrawingMode((v) => !v)}
+                            title="Draw Mode"
+                        >
+                            <Pencil className="h-4 w-4" /> <span>Draw</span>
                         </motion.button>
                     </div>
 
