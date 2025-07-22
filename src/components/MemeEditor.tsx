@@ -1727,7 +1727,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             className="w-24 mx-2"
                             title="Stroke Size"
                         />
-                        <span className="text-xs text-white/60">{drawSize}px</span>
+                        <span className="text-xs dark:text-white/60">{drawSize}px</span>
                         {/* <motion.button
                             whileTap={{ scale: 0.98 }}
                             className={`p-2 rounded-md border text-xs flex items-center space-x-1 ${isEraser && isDrawingMode ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]' : 'bg-[#0f0f0f] text-white/70 border-white/20'}`}
