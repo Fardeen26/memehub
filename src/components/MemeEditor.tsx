@@ -1533,7 +1533,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     };
     const handleDrawEnd = (e?: MouseEvent | TouchEvent) => {
         if (!isDrawingMode || !isDrawing || !currentStroke) return;
-        setStrokes((prev) => [...prev, currentStroke]);
+        setStrokes((prev) => {
+            const updated = [...prev, currentStroke];
+            setTimeout(() => drawWithStrokes(), 0);
+            return updated;
+        });
         setCurrentStroke(null);
         setIsDrawing(false);
         if (e && 'preventDefault' in e && e.cancelable) e.preventDefault();
@@ -1638,8 +1642,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, [template.image, imageOverlays, imageCache, textBoxes, texts, textSettings, loadAndCacheImage, drawText, strokes, currentStroke]);
 
     useEffect(() => {
-        drawWithStrokes();
-    }, [drawWithStrokes]);
+        if (isDrawingMode || strokes.length > 0) {
+            drawWithStrokes();
+        } else {
+            draw();
+        }
+    }, [draw, drawWithStrokes, isDrawingMode, strokes, texts, textBoxes, textSettings, imageOverlays, selectedImageIndex]);
 
     // Mouse/touch events for drawing
     useEffect(() => {
@@ -1698,13 +1706,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     <canvas
                         ref={canvasRef}
                         className="border border-gray-300 dark:border-gray-700 w-[400px] max-sm:w-full h-fit bg-white select-none"
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
+                        onMouseDown={isDrawingMode ? (e) => handleDrawStart(e.nativeEvent) : handleMouseDown}
+                        onMouseMove={isDrawingMode ? (e) => handleDrawMove(e.nativeEvent) : handleMouseMove}
+                        onMouseUp={isDrawingMode ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
+                        onMouseLeave={isDrawingMode ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
+                        onTouchStart={isDrawingMode ? (e) => handleDrawStart(e.nativeEvent) : handleTouchStart}
+                        onTouchMove={isDrawingMode ? (e) => handleDrawMove(e.nativeEvent) : handleTouchMove}
+                        onTouchEnd={isDrawingMode ? (e) => handleDrawEnd(e.nativeEvent) : handleTouchEnd}
                         style={{ touchAction: 'none' }}
                     />
 
