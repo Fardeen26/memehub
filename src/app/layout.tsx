@@ -78,7 +78,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-
+      <head>
+        <meta name="google-adsense-account" content="ca-pub-1916939586711533" />
+      </head>
       <body
         className={`${bricolage_grotesque_init.className} antialiased min-h-screen bg-white dark:bg-black relative`}
         style={{
@@ -97,6 +99,10 @@ export default function RootLayout({
           defer
           data-domain="memehub.fardeen.tech"
           src="https://analytics-code.vercel.app/tracking-script.js"
+        />
+        <Script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1916939586711533"
+          strategy="beforeInteractive"
+          crossOrigin="anonymous"
         />
       </body>
     </html>
