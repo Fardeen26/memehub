@@ -162,7 +162,7 @@ export const templates = {
         ]
     },
 
-    "hungery-monkey": {
+    "hungry-monkey": {
         image: "/temp28.jpeg",
         textBoxes: [
             { x: 240, y: 450, width: 450, height: 100, fontSize: 60, minFont: 40, align: "center" as const },
