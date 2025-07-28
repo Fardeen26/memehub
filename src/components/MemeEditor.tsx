@@ -1224,6 +1224,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.fillText(watermarkText, watermarkX, watermarkY);
             ctx.restore();
 
+            // Draw strokes FIRST (bottom layer) - always render if there are any strokes
+            if (strokes.length > 0 || currentStroke) {
+                drawStrokes(ctx);
+            }
+
             const imagePromises = imageOverlays.map(overlay => loadAndCacheImage(overlay.src));
 
             try {
@@ -1334,15 +1339,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 ctx.restore();
             }
 
+            // Draw text LAST (top layer)
             textBoxes.forEach((box, i) => {
                 drawText()(ctx, texts[i], box, textSettings[i]);
             });
         };
-    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, textBoxes, texts, loadAndCacheImage]);
+    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, textBoxes, texts, loadAndCacheImage, strokes, currentStroke]);
+
+
 
     useEffect(() => {
         draw();
-    }, [draw, texts, textBoxes, textSettings, imageOverlays, selectedImageIndex]);
+    }, [draw, texts, textBoxes, textSettings, imageOverlays, selectedImageIndex, strokes, currentStroke]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -1535,7 +1543,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!isDrawingMode || !isDrawing || !currentStroke) return;
         setStrokes((prev) => {
             const updated = [...prev, currentStroke];
-            setTimeout(() => drawWithStrokes(), 0);
+            setTimeout(() => draw(), 0);
             return updated;
         });
         setCurrentStroke(null);
@@ -1569,86 +1577,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.restore();
         }
     };
-    // Patch draw() to render strokes above overlays
-    const drawWithStrokes = useCallback(async () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        // Draw meme and overlays (synchronously, not in image.onload)
-        const img = new window.Image();
-        img.src = template.image;
-        await new Promise<void>((resolve) => {
-            img.onload = () => resolve();
-        });
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-
-        // Watermark
-        const watermarkText = "memehub";
-        const watermarkFontSize = Math.max(12, Math.min(canvas.width, canvas.height) * 0.02);
-        ctx.save();
-        ctx.font = `${watermarkFontSize}px Arial, sans-serif`;
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        const padding = 10;
-        const watermarkX = padding;
-        const watermarkY = canvas.height - padding;
-        ctx.strokeText(watermarkText, watermarkX, watermarkY);
-        ctx.fillText(watermarkText, watermarkX, watermarkY);
-        ctx.restore();
-
-        // Overlays
-        const imagePromises = imageOverlays.map(overlay => loadAndCacheImage(overlay.src));
-        try {
-            await Promise.all(imagePromises);
-        } catch (error) {
-            console.warn('Some images failed to load:', error);
-        }
-        for (const overlay of imageOverlays) {
-            try {
-                const overlayImg = imageCache.current.get(overlay.src);
-                if (!overlayImg) continue;
-                ctx.save();
-                ctx.globalAlpha = overlay.opacity;
-                if (overlay.rotation !== 0) {
-                    const centerX = overlay.x + overlay.width / 2;
-                    const centerY = overlay.y + overlay.height / 2;
-                    ctx.translate(centerX, centerY);
-                    ctx.rotate((overlay.rotation * Math.PI) / 180);
-                    ctx.drawImage(overlayImg, -overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
-                } else {
-                    ctx.drawImage(overlayImg, overlay.x, overlay.y, overlay.width, overlay.height);
-                }
-                ctx.restore();
-            } catch (error) {
-                console.error('Error drawing overlay image:', error);
-            }
-        }
-
-        // Draw text
-        textBoxes.forEach((box, i) => {
-            drawText()(ctx, texts[i], box, textSettings[i]);
-        });
-
-        // Draw strokes LAST so they are always visible
-        drawStrokes(ctx);
-    }, [template.image, imageOverlays, imageCache, textBoxes, texts, textSettings, loadAndCacheImage, drawText, strokes, currentStroke]);
-
-    useEffect(() => {
-        if (isDrawingMode || strokes.length > 0) {
-            drawWithStrokes();
-        } else {
-            draw();
-        }
-    }, [draw, drawWithStrokes, isDrawingMode, strokes, texts, textBoxes, textSettings, imageOverlays, selectedImageIndex]);
-
     // Mouse/touch events for drawing
     useEffect(() => {
         if (!isDrawingMode) return;
