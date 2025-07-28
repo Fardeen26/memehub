@@ -39,12 +39,15 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [texts, setTexts] = useState<string[]>(Array(template.textBoxes.length).fill(''));
 
     const [textBoxes, setTextBoxes] = useState<Template['textBoxes']>(template.textBoxes);
-    const [originalTextBoxCount] = useState<number>(template.textBoxes.length); // Track original template text boxes
+    const [originalTextBoxCount] = useState<number>(template.textBoxes.length);
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragIndex, setDragIndex] = useState<number>(-1);
     const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [selectedTextIndex, setSelectedTextIndex] = useState<number>(-1);
+    const [isResizingTextWidth, setIsResizingTextWidth] = useState<boolean>(false);
+    const [resizeTextIndex, setResizeTextIndex] = useState<number>(-1);
+    const [isResizingFromLeft, setIsResizingFromLeft] = useState<boolean>(false);
 
-    // Font loader hook
     const { loadFont, preloadFont } = useFontLoader();
 
     const isMobileDevice = useCallback(() => {
@@ -105,7 +108,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const lastDrawTime = useRef<number>(0);
     const isOptimizedDrawing = useRef<boolean>(false);
 
-    // Drawing feature state
     type Point = { x: number; y: number };
     type Stroke = { points: Point[]; color: string; size: number; eraser: boolean };
     const [isDrawingMode, setIsDrawingMode] = useState(false);
@@ -134,7 +136,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         });
     }, []);
 
-    // Preload commonly used fonts
     useEffect(() => {
         const commonFonts = ['Impact', 'Oswald', 'Anton', 'Bebas Neue'];
         commonFonts.forEach(fontName => {
@@ -174,7 +175,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             return updated;
         });
 
-        // Load font if it's a font family change
         if (setting === 'fontFamily' && typeof value === 'string' && FONT_CONFIGS[value]) {
             loadFont(FONT_CONFIGS[value]);
         }
@@ -208,6 +208,17 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         });
     }, []);
 
+    const handleTextBoxChange = useCallback((idx: number, property: keyof Template['textBoxes'][number], value: number) => {
+        setTextBoxes(prev => {
+            const updated = [...prev];
+            updated[idx] = {
+                ...updated[idx],
+                [property]: value
+            };
+            return updated;
+        });
+    }, []);
+
     const transformText = useCallback((text: string, textCase: TextSettings['textCase']): string => {
         switch (textCase) {
             case 'uppercase':
@@ -231,6 +242,35 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
         return -1;
     }, [textBoxes, texts]);
+
+    const getTextResizeHandleAtPosition = useCallback((x: number, y: number): { index: number; handle: string } => {
+        if (selectedTextIndex === -1 || !texts[selectedTextIndex]) return { index: -1, handle: '' };
+
+        const box = textBoxes[selectedTextIndex];
+        const isMobile = isMobileDevice();
+        const canvas = canvasRef.current;
+        if (!canvas) return { index: -1, handle: '' };
+        const baseHandleSize = Math.max(30, Math.min(canvas.width, canvas.height) * 0.04);
+        const handleSize = isMobile ? Math.max(baseHandleSize, 45) : Math.max(baseHandleSize, 35);
+
+        const textBoxCenterY = box.y + box.height / 2;
+
+        const leftHandleX = box.x - handleSize / 2;
+        const leftHandleY = textBoxCenterY - handleSize / 2;
+        if (x >= leftHandleX && x <= leftHandleX + handleSize &&
+            y >= leftHandleY && y <= leftHandleY + handleSize) {
+            return { index: selectedTextIndex, handle: 'width-left' };
+        }
+
+        const rightHandleX = box.x + box.width - handleSize / 2;
+        const rightHandleY = textBoxCenterY - handleSize / 2;
+        if (x >= rightHandleX && x <= rightHandleX + handleSize &&
+            y >= rightHandleY && y <= rightHandleY + handleSize) {
+            return { index: selectedTextIndex, handle: 'width-right' };
+        }
+
+        return { index: -1, handle: '' };
+    }, [selectedTextIndex, textBoxes, texts, isMobileDevice]);
 
     const generateImageId = (): string => {
         return `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -506,8 +546,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             setSelectedImageIndex(-1);
         }
 
+        const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
+        if (resizeHandleResult.index !== -1) {
+            setIsResizingTextWidth(true);
+            setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
+            setResizeTextIndex(resizeHandleResult.index);
+            canvas.style.cursor = 'ew-resize';
+            return;
+        }
+
         const textIndex = getTextAtPosition(x, y);
         if (textIndex !== -1) {
+            setSelectedTextIndex(textIndex);
             setIsDragging(true);
             setDragIndex(textIndex);
             setDragOffset({
@@ -515,6 +565,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 y: y - textBoxes[textIndex].y
             });
             canvas.style.cursor = 'grabbing';
+        } else {
+            setSelectedTextIndex(-1);
         }
     };
 
@@ -529,6 +581,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
 
+        // Mouse move handler logic
         if (isDraggingImage && dragImageIndex !== -1) {
             const newX = x - dragImageOffset.x;
             const newY = y - dragImageOffset.y;
@@ -632,14 +685,36 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 };
                 return updated;
             });
+        } else if (isResizingTextWidth && resizeTextIndex !== -1) {
+            const box = textBoxes[resizeTextIndex];
+            let newWidth = box.width;
+            let newX = box.x;
+
+            if (isResizingFromLeft) {
+                const deltaX = x - box.x;
+                newWidth = Math.max(50, box.width - deltaX);
+                newX = box.x + (box.width - newWidth);
+            } else {
+                newWidth = Math.max(50, x - box.x);
+            }
+
+            newWidth = Math.min(newWidth, canvas.width - newX);
+
+            setTextBoxes((prev: Template['textBoxes']) => {
+                const updated = [...prev];
+                updated[resizeTextIndex] = {
+                    ...updated[resizeTextIndex],
+                    width: newWidth,
+                    x: newX
+                };
+                return updated;
+            });
         } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
 
-            // More flexible constraints - allow ALL text to be positioned freely across the template
-            // Allow positioning anywhere on canvas with minimal constraints for ALL text boxes
             const constrainedX = Math.max(-textBoxes[dragIndex].width * 0.8, Math.min(canvas.width - textBoxes[dragIndex].width * 0.2, newX));
-            const constrainedY = Math.max(textBoxes[dragIndex].fontSize, Math.min(canvas.height, newY));
+            const constrainedY = Math.max(0, Math.min(canvas.height, newY));
 
             setTextBoxes((prev: Template['textBoxes']) => {
                 const updated = [...prev];
@@ -651,18 +726,24 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 return updated;
             });
         } else {
-            const imageResult = getImageAtPosition(x, y);
-            if (imageResult.index !== -1) {
-                if (imageResult.handle === 'move') {
-                    canvas.style.cursor = 'grab';
-                } else if (imageResult.handle === 'rotate') {
-                    canvas.style.cursor = 'grab';
-                } else {
-                    canvas.style.cursor = `${imageResult.handle}-resize`;
-                }
+            // Check for text resize handles first
+            const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
+            if (resizeHandleResult.index !== -1) {
+                canvas.style.cursor = 'ew-resize';
             } else {
-                const textIndex = getTextAtPosition(x, y);
-                canvas.style.cursor = textIndex !== -1 ? 'grab' : 'default';
+                const imageResult = getImageAtPosition(x, y);
+                if (imageResult.index !== -1) {
+                    if (imageResult.handle === 'move') {
+                        canvas.style.cursor = 'grab';
+                    } else if (imageResult.handle === 'rotate') {
+                        canvas.style.cursor = 'grab';
+                    } else {
+                        canvas.style.cursor = `${imageResult.handle}-resize`;
+                    }
+                } else {
+                    const textIndex = getTextAtPosition(x, y);
+                    canvas.style.cursor = textIndex !== -1 ? 'grab' : 'default';
+                }
             }
         }
     };
@@ -682,6 +763,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsRotatingImage(false);
         setRotateImageIndex(-1);
         setRotateStartAngle(0);
+        setIsResizingTextWidth(false);
+        setResizeTextIndex(-1);
+        setIsResizingFromLeft(false);
         const canvas = canvasRef.current;
         if (canvas) {
             canvas.style.cursor = 'default';
@@ -735,14 +819,25 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             setSelectedImageIndex(-1);
         }
 
+        const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
+        if (resizeHandleResult.index !== -1) {
+            setIsResizingTextWidth(true);
+            setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
+            setResizeTextIndex(resizeHandleResult.index);
+            return;
+        }
+
         const textIndex = getTextAtPosition(x, y);
         if (textIndex !== -1) {
+            setSelectedTextIndex(textIndex);
             setIsDragging(true);
             setDragIndex(textIndex);
             setDragOffset({
                 x: x - textBoxes[textIndex].x,
                 y: y - textBoxes[textIndex].y
             });
+        } else {
+            setSelectedTextIndex(-1);
         }
     };
 
@@ -751,11 +846,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const canvas = canvasRef.current;
         if (!canvas || e.touches.length !== 1) return;
 
-        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage) return;
+        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage && !isResizingTextWidth) return;
         if (isDragging && dragIndex === -1) return;
         if (isDraggingImage && dragImageIndex === -1) return;
         if (isRotatingImage && rotateImageIndex === -1) return;
         if (isResizingImage && resizeImageIndex === -1) return;
+        if (isResizingTextWidth && resizeTextIndex === -1) return;
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -868,14 +964,36 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 };
                 return updated;
             });
+        } else if (isResizingTextWidth && resizeTextIndex !== -1) {
+            const box = textBoxes[resizeTextIndex];
+            let newWidth = box.width;
+            let newX = box.x;
+
+            if (isResizingFromLeft) {
+                const deltaX = x - box.x;
+                newWidth = Math.max(50, box.width - deltaX);
+                newX = box.x + (box.width - newWidth);
+            } else {
+                newWidth = Math.max(50, x - box.x);
+            }
+
+            newWidth = Math.min(newWidth, canvas.width - newX);
+
+            setTextBoxes((prev: Template['textBoxes']) => {
+                const updated = [...prev];
+                updated[resizeTextIndex] = {
+                    ...updated[resizeTextIndex],
+                    width: newWidth,
+                    x: newX
+                };
+                return updated;
+            });
         } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
 
-            // More flexible constraints - allow ALL text to be positioned freely across the template
-            // Allow positioning anywhere on canvas with minimal constraints for ALL text boxes
             const constrainedX = Math.max(-textBoxes[dragIndex].width * 0.8, Math.min(canvas.width - textBoxes[dragIndex].width * 0.2, newX));
-            const constrainedY = Math.max(textBoxes[dragIndex].fontSize, Math.min(canvas.height, newY));
+            const constrainedY = Math.max(0, Math.min(canvas.height, newY));
 
             setTextBoxes((prev: Template['textBoxes']) => {
                 const updated = [...prev];
@@ -905,6 +1023,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsRotatingImage(false);
         setRotateImageIndex(-1);
         setRotateStartAngle(0);
+        setIsResizingTextWidth(false);
+        setResizeTextIndex(-1);
+        setIsResizingFromLeft(false);
     };
 
     const calculateFontSize = useCallback((
@@ -940,31 +1061,46 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             'sans-serif'
         ].join(', ');
 
-        while (fontSize > MIN_FONT_SIZE) {
-            ctx.font = `${fontWeight} ${fontSize}px ${fontFallbacks}`;
-            lines = [];
-            let currentLine = '';
-            const words = transformedText.split(' ');
+        const processTextWithLineBreaks = (text: string): string[] => {
+            const manualLines = text.split('\n');
+            const processedLines: string[] = [];
 
-            for (const word of words) {
-                const testLine = currentLine + word + ' ';
-                const textWidth = getTextWidth(testLine);
+            for (const manualLine of manualLines) {
+                if (manualLine.trim() === '') {
+                    processedLines.push('');
+                    continue;
+                }
 
-                if (textWidth > box.width) {
-                    if (currentLine === '') {
-                        lines.push(word);
-                        currentLine = '';
+                let currentLine = '';
+                const words = manualLine.split(' ');
+
+                for (const word of words) {
+                    const testLine = currentLine + word + ' ';
+                    const textWidth = getTextWidth(testLine);
+
+                    if (textWidth > box.width) {
+                        if (currentLine === '') {
+                            processedLines.push(word);
+                            currentLine = '';
+                        } else {
+                            processedLines.push(currentLine.trim());
+                            currentLine = word + ' ';
+                        }
                     } else {
-                        lines.push(currentLine);
-                        currentLine = word + ' ';
+                        currentLine = testLine;
                     }
-                } else {
-                    currentLine = testLine;
+                }
+                if (currentLine.trim()) {
+                    processedLines.push(currentLine.trim());
                 }
             }
-            if (currentLine) {
-                lines.push(currentLine);
-            }
+
+            return processedLines;
+        };
+
+        while (fontSize > MIN_FONT_SIZE) {
+            ctx.font = `${fontWeight} ${fontSize}px ${fontFallbacks}`;
+            lines = processTextWithLineBreaks(transformedText);
 
             const totalHeight = lines.length * (fontSize * 1.2);
             if (totalHeight <= box.height) {
@@ -976,29 +1112,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (fontSize < MIN_FONT_SIZE) {
             fontSize = MIN_FONT_SIZE;
             ctx.font = `${fontWeight} ${fontSize}px ${fontFallbacks}`;
-            lines = [];
-            let currentLine = '';
-            const words = transformedText.split(' ');
-
-            for (const word of words) {
-                const testLine = currentLine + word + ' ';
-                const textWidth = getTextWidth(testLine);
-
-                if (textWidth > box.width) {
-                    if (currentLine === '') {
-                        lines.push(word);
-                        currentLine = '';
-                    } else {
-                        lines.push(currentLine);
-                        currentLine = word + ' ';
-                    }
-                } else {
-                    currentLine = testLine;
-                }
-            }
-            if (currentLine) {
-                lines.push(currentLine);
-            }
+            lines = processTextWithLineBreaks(transformedText);
         }
 
         return { fontSize, lines };
@@ -1067,7 +1181,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.textAlign = box.align || 'center';
 
             const lineHeight = fontSize * 1.2;
-            let currentY = box.y;
+            let currentY = box.y + fontSize;
 
             const drawTextWithSpacingMobile = (text: string, x: number, y: number) => {
                 const transformedText = transformText(text, settings.textCase);
@@ -1110,7 +1224,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             lines.forEach(line => {
                 const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
-                drawTextWithSpacingMobile(line, x, currentY);
+                const adjustedY = Math.max(currentY, box.y + fontSize);
+                const maxY = box.y + box.height - 5;
+                if (adjustedY <= maxY) {
+                    drawTextWithSpacingMobile(line, x, adjustedY);
+                }
                 currentY += lineHeight;
             });
         } else {
@@ -1126,7 +1244,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.textAlign = box.align || 'center';
 
             const lineHeight = fontSize * 1.2;
-            let currentY = box.y;
+            let currentY = box.y + fontSize;
 
             const drawTextWithSpacing = (text: string, x: number, y: number) => {
                 const transformedText = transformText(text, settings.textCase);
@@ -1169,7 +1287,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             lines.forEach(line => {
                 const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
-                drawTextWithSpacing(line, x, currentY);
+                const adjustedY = Math.max(currentY, box.y + fontSize);
+                const maxY = box.y + box.height - 5;
+                if (adjustedY <= maxY) {
+                    drawTextWithSpacing(line, x, adjustedY);
+                }
                 currentY += lineHeight;
             });
         }
@@ -1204,27 +1326,26 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(img, 0, 0);
 
-            // Add watermark
-            const watermarkText = "memehub";
+            const watermarkText = "memehub.mom";
             const watermarkFontSize = Math.max(12, Math.min(canvas.width, canvas.height) * 0.02);
             ctx.save();
             ctx.font = `${watermarkFontSize}px Arial, sans-serif`;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
             ctx.lineWidth = 1;
             ctx.textAlign = 'left';
             ctx.textBaseline = 'bottom';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+            ctx.shadowBlur = 5;
 
             const padding = 10;
             const watermarkX = padding;
             const watermarkY = canvas.height - padding;
 
-            // Draw watermark with outline for better visibility
             ctx.strokeText(watermarkText, watermarkX, watermarkY);
             ctx.fillText(watermarkText, watermarkX, watermarkY);
             ctx.restore();
 
-            // Draw strokes FIRST (bottom layer) - always render if there are any strokes
             if (strokes.length > 0 || currentStroke) {
                 drawStrokes(ctx);
             }
@@ -1339,18 +1460,111 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 ctx.restore();
             }
 
-            // Draw text LAST (top layer)
             textBoxes.forEach((box, i) => {
                 drawText()(ctx, texts[i], box, textSettings[i]);
             });
+
+            if (selectedTextIndex !== -1 && selectedTextIndex < textBoxes.length && texts[selectedTextIndex]) {
+                const selectedBox = textBoxes[selectedTextIndex];
+                const isMobile = isMobileDevice();
+                const baseHandleSize = Math.max(30, Math.min(canvas.width, canvas.height) * 0.04);
+                const handleSize = isMobile ? Math.max(baseHandleSize, 45) : Math.max(baseHandleSize, 35);
+
+                ctx.save();
+
+                const textBoxCenterY = selectedBox.y + selectedBox.height / 2;
+
+                ctx.strokeStyle = '#6a7bd1';
+                ctx.lineWidth = Math.max(2, Math.min(canvas.width, canvas.height) * 0.004);
+                ctx.setLineDash([8, 4]);
+                ctx.strokeRect(selectedBox.x, selectedBox.y, selectedBox.width, selectedBox.height);
+
+                ctx.fillStyle = 'rgba(106, 123, 209, 0.15)';
+                ctx.fillRect(selectedBox.x, selectedBox.y, selectedBox.width, selectedBox.height);
+
+                const drawRoundedRect = (x: number, y: number, width: number, height: number, radius: number) => {
+                    ctx.beginPath();
+                    ctx.moveTo(x + radius, y);
+                    ctx.lineTo(x + width - radius, y);
+                    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+                    ctx.lineTo(x + width, y + height - radius);
+                    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                    ctx.lineTo(x + radius, y + height);
+                    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+                    ctx.lineTo(x, y + radius);
+                    ctx.quadraticCurveTo(x, y, x + radius, y);
+                    ctx.closePath();
+                };
+
+                const leftHandleX = selectedBox.x - handleSize / 2;
+                const leftHandleY = textBoxCenterY - handleSize / 2;
+                const rightHandleX = selectedBox.x + selectedBox.width - handleSize / 2;
+                const rightHandleY = textBoxCenterY - handleSize / 2;
+
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#6a7bd1';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = isMobile ? 4 : 3;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                ctx.shadowBlur = 6;
+                ctx.shadowOffsetX = 3;
+                ctx.shadowOffsetY = 3;
+
+                drawRoundedRect(leftHandleX, leftHandleY, handleSize, handleSize, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                drawRoundedRect(rightHandleX, rightHandleY, handleSize, handleSize, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+
+                ctx.fillStyle = '#ffffff';
+                const arrowSize = Math.max(14, handleSize * 0.45);
+                ctx.font = `bold ${arrowSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                ctx.fillText('◀', leftHandleX + handleSize / 2, leftHandleY + handleSize / 2);
+                ctx.fillText('▶', rightHandleX + handleSize / 2, rightHandleY + handleSize / 2);
+
+                ctx.strokeStyle = '#6a7bd1';
+                ctx.lineWidth = Math.max(1.5, Math.min(canvas.width, canvas.height) * 0.003);
+                ctx.setLineDash([4, 4]);
+
+                ctx.beginPath();
+                ctx.moveTo(selectedBox.x, textBoxCenterY);
+                ctx.lineTo(leftHandleX + handleSize, textBoxCenterY);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(selectedBox.x + selectedBox.width, textBoxCenterY);
+                ctx.lineTo(rightHandleX, textBoxCenterY);
+                ctx.stroke();
+
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#6a7bd1';
+                const indicatorFontSize = Math.max(10, Math.min(canvas.width, canvas.height) * 0.015);
+                ctx.font = `bold ${indicatorFontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                const textOffset = Math.max(15, indicatorFontSize * 1.5);
+                ctx.fillText(`${Math.round(selectedBox.width)}px`, selectedBox.x + selectedBox.width / 2, selectedBox.y - textOffset);
+
+                ctx.restore();
+            }
         };
-    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, textBoxes, texts, loadAndCacheImage, strokes, currentStroke]);
+    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, loadAndCacheImage, strokes, currentStroke]);
 
 
 
     useEffect(() => {
         draw();
-    }, [draw, texts, textBoxes, textSettings, imageOverlays, selectedImageIndex, strokes, currentStroke]);
+    }, [draw, texts, textBoxes, textSettings, imageOverlays, selectedImageIndex, selectedTextIndex, strokes, currentStroke]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -1500,7 +1714,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         toast.success('Text box removed');
     }, [originalTextBoxCount]);
 
-    // Drawing helpers
     const getPointerPos = (e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement): Point => {
         const rect = canvas.getBoundingClientRect();
         let x: number, y: number;
@@ -1525,7 +1738,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsDrawing(true);
         setCurrentStroke({
             points: [pos],
-            color: drawColor, // Always use drawColor, eraser is handled by composite mode
+            color: drawColor,
             size: drawSize,
             eraser: isEraser
         });
@@ -1550,15 +1763,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsDrawing(false);
         if (e && 'preventDefault' in e && e.cancelable) e.preventDefault();
     };
-    // Undo
     const handleUndo = () => {
         setStrokes((prev) => prev.slice(0, -1));
     };
-    // Erase all
     const handleEraseAll = () => {
         setStrokes([]);
     };
-    // Drawing render
     const drawStrokes = (ctx: CanvasRenderingContext2D) => {
         for (const stroke of strokes.concat(currentStroke ? [currentStroke] : [])) {
             if (!stroke || !stroke.points.length) continue;
@@ -1577,12 +1787,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.restore();
         }
     };
-    // Mouse/touch events for drawing
     useEffect(() => {
         if (!isDrawingMode) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
-        // Mouse
         const mouseDown = (e: MouseEvent) => handleDrawStart(e);
         const mouseMove = (e: MouseEvent) => handleDrawMove(e);
         const mouseUp = (e: MouseEvent) => handleDrawEnd(e);
@@ -1604,8 +1812,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             window.removeEventListener('touchend', touchEnd);
         };
     }, [isDrawingMode, isEraser, drawColor, drawSize, currentStroke, isDrawing]);
-    // Toolbar UI
-    // ... existing code ...
+
     return (
         <motion.section
             className="space-y-4 min-h-[65vh] max-sm:min-h-[75vh]"
@@ -1613,9 +1820,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
         >
-            {/* Drawing Toolbar */}
-
-            {/* End Drawing Toolbar */}
             <motion.button
                 className="bg-transparent cursor-pointer flex items-center"
                 onClick={onReset}
@@ -2013,6 +2217,24 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                     </Select>
                                                 </div>
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                                <div className='w-full' onClick={(e) => e.stopPropagation()}>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Text Box Width</label>
+                                                    <input
+                                                        type="range"
+                                                        min="50"
+                                                        max="800"
+                                                        value={textBoxes[i].width}
+                                                        onChange={(e) => handleTextBoxChange(i, 'width', parseInt(e.target.value))}
+                                                        className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                                        style={{
+                                                            background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((textBoxes[i].width - 50) / 750) * 100}%, rgba(255,255,255,0.2) ${((textBoxes[i].width - 50) / 750) * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                        }}
+                                                    />
+                                                    <span className="text-xs text-white/60">{textBoxes[i].width}px</span>
+                                                </div>
+                                            </DropdownMenuItem>
+
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()} className='flex flex-col space-y-2'>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
                                                     <label className="block text-xs dark:text-white/60 mb-2">Text Outline</label>
@@ -2122,11 +2344,17 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
-                                <input
-                                    className="w-full p-2 pl-3 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/70"
+                                <textarea
+                                    className="w-full p-2 pl-3 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/70 resize-none min-h-[40px] max-h-[120px]"
                                     placeholder={i < originalTextBoxCount ? `text position ${i + 1}` : `Custom text ${i - originalTextBoxCount + 1}`}
                                     value={txt}
-                                    onChange={(e: ChangeEvent<HTMLInputElement>) => handleChange(i, e.target.value)}
+                                    onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleChange(i, e.target.value)}
+                                    rows={txt.split('\n').length || 1}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.stopPropagation();
+                                        }
+                                    }}
                                 />
                                 {/* Add remove button for custom text boxes */}
                                 {i >= originalTextBoxCount && (
