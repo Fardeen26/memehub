@@ -92,6 +92,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [resizeHandle, setResizeHandle] = useState<string>('');
     const [resizeStartPos, setResizeStartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [resizeStartSize, setResizeStartSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    const [resizeStartImagePos, setResizeStartImagePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [isRotatingImage, setIsRotatingImage] = useState<boolean>(false);
     const [rotateImageIndex, setRotateImageIndex] = useState<number>(-1);
     const [rotateStartAngle, setRotateStartAngle] = useState<number>(0);
@@ -539,6 +540,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     width: imageOverlays[imageResult.index].width,
                     height: imageOverlays[imageResult.index].height
                 });
+                setResizeStartImagePos({
+                    x: imageOverlays[imageResult.index].x,
+                    y: imageOverlays[imageResult.index].y
+                });
                 canvas.style.cursor = `${imageResult.handle}-resize`;
             }
             return;
@@ -619,8 +624,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             let newWidth = resizeStartSize.width;
             let newHeight = resizeStartSize.height;
-            let newX = imageOverlays[resizeImageIndex].x;
-            let newY = imageOverlays[resizeImageIndex].y;
+            let newX = resizeStartImagePos.x;
+            let newY = resizeStartImagePos.y;
 
             switch (resizeHandle) {
                 case 'se':
@@ -630,29 +635,29 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 case 'sw':
                     newWidth = Math.max(20, resizeStartSize.width - deltaX);
                     newHeight = Math.max(20, resizeStartSize.height + deltaY);
-                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    newX = resizeStartImagePos.x + deltaX;
                     break;
                 case 'ne':
                     newWidth = Math.max(20, resizeStartSize.width + deltaX);
                     newHeight = Math.max(20, resizeStartSize.height - deltaY);
-                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    newY = resizeStartImagePos.y + deltaY;
                     break;
                 case 'nw':
                     newWidth = Math.max(20, resizeStartSize.width - deltaX);
                     newHeight = Math.max(20, resizeStartSize.height - deltaY);
-                    newX = imageOverlays[resizeImageIndex].x + deltaX;
-                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    newX = resizeStartImagePos.x + deltaX;
+                    newY = resizeStartImagePos.y + deltaY;
                     break;
                 case 'n':
                     newHeight = Math.max(20, resizeStartSize.height - deltaY);
-                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    newY = resizeStartImagePos.y + deltaY;
                     break;
                 case 's':
                     newHeight = Math.max(20, resizeStartSize.height + deltaY);
                     break;
                 case 'w':
                     newWidth = Math.max(20, resizeStartSize.width - deltaX);
-                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    newX = resizeStartImagePos.x + deltaX;
                     break;
                 case 'e':
                     newWidth = Math.max(20, resizeStartSize.width + deltaX);
@@ -760,6 +765,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setResizeHandle('');
         setResizeStartPos({ x: 0, y: 0 });
         setResizeStartSize({ width: 0, height: 0 });
+        setResizeStartImagePos({ x: 0, y: 0 });
         setIsRotatingImage(false);
         setRotateImageIndex(-1);
         setRotateStartAngle(0);
@@ -812,6 +818,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 setResizeStartSize({
                     width: imageOverlays[imageResult.index].width,
                     height: imageOverlays[imageResult.index].height
+                });
+                setResizeStartImagePos({
+                    x: imageOverlays[imageResult.index].x,
+                    y: imageOverlays[imageResult.index].y
                 });
             }
             return;
@@ -898,8 +908,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             let newWidth = resizeStartSize.width;
             let newHeight = resizeStartSize.height;
-            let newX = imageOverlays[resizeImageIndex].x;
-            let newY = imageOverlays[resizeImageIndex].y;
+            let newX = resizeStartImagePos.x;
+            let newY = resizeStartImagePos.y;
 
             switch (resizeHandle) {
                 case 'se':
@@ -909,29 +919,29 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 case 'sw':
                     newWidth = Math.max(20, resizeStartSize.width - deltaX);
                     newHeight = Math.max(20, resizeStartSize.height + deltaY);
-                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    newX = resizeStartImagePos.x + deltaX;
                     break;
                 case 'ne':
                     newWidth = Math.max(20, resizeStartSize.width + deltaX);
                     newHeight = Math.max(20, resizeStartSize.height - deltaY);
-                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    newY = resizeStartImagePos.y + deltaY;
                     break;
                 case 'nw':
                     newWidth = Math.max(20, resizeStartSize.width - deltaX);
                     newHeight = Math.max(20, resizeStartSize.height - deltaY);
-                    newX = imageOverlays[resizeImageIndex].x + deltaX;
-                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    newX = resizeStartImagePos.x + deltaX;
+                    newY = resizeStartImagePos.y + deltaY;
                     break;
                 case 'n':
                     newHeight = Math.max(20, resizeStartSize.height - deltaY);
-                    newY = imageOverlays[resizeImageIndex].y + deltaY;
+                    newY = resizeStartImagePos.y + deltaY;
                     break;
                 case 's':
                     newHeight = Math.max(20, resizeStartSize.height + deltaY);
                     break;
                 case 'w':
                     newWidth = Math.max(20, resizeStartSize.width - deltaX);
-                    newX = imageOverlays[resizeImageIndex].x + deltaX;
+                    newX = resizeStartImagePos.x + deltaX;
                     break;
                 case 'e':
                     newWidth = Math.max(20, resizeStartSize.width + deltaX);
@@ -1020,6 +1030,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setResizeHandle('');
         setResizeStartPos({ x: 0, y: 0 });
         setResizeStartSize({ width: 0, height: 0 });
+        setResizeStartImagePos({ x: 0, y: 0 });
         setIsRotatingImage(false);
         setRotateImageIndex(-1);
         setRotateStartAngle(0);
