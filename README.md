@@ -1,4 +1,4 @@
-# Memehun dot mom
+# Memehub dot mom
 
 A modern, web-based meme generator built with Next.js and TypeScript. Create hilarious memes using pre-built templates or upload your own images with an intuitive drag-and-drop editor.
 
