@@ -1,4 +1,6 @@
 export const templates = {
+
+
     "Scared-Lady": {
         image: "/temp1.jpg",
         textBoxes: [
@@ -44,6 +46,14 @@ export const templates = {
         textBoxes: [
             { x: 150, y: 1350, width: 1400, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
             { x: 2000, y: 1250, width: 1100, height: 800, fontSize: 200, minFont: 40, align: "center" as const }
+        ]
+    },
+
+    "amrit's-offer": {
+        image: "/temp70.jpg",
+        textBoxes: [
+            { x: 0, y: 290, width: 200, height: 200, fontSize: 10, minFont: 40, align: "center" as const },
+            { x: 300, y: 290, width: 200, height: 200, fontSize: 10, minFont: 40, align: "center" as const }
         ]
     },
 
@@ -108,6 +118,28 @@ export const templates = {
         textBoxes: [
             { x: 100, y: 450, width: 2000, height: 1200, fontSize: 300, minFont: 40, align: "center" as const },
             { x: 100, y: 3325, width: 2000, height: 1200, fontSize: 300, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "miss-you": {
+        image: "/temp73.png",
+        textBoxes: [
+            { x: 240, y: 630, width: 300, height: 200, fontSize: 80, minFont: 40, align: "center" as const },
+        ]
+    },
+    "medison-ji": {
+        image: "/temp72.jpeg",
+        textBoxes: [
+            { x: 200, y: 130, width: 350, height: 200, fontSize: 100, minFont: 40, align: "center" as const },
+            { x: 570, y: 250, width: 350, height: 200, fontSize: 80, minFont: 40, align: "center" as const },
+            { x: 950, y: 150, width: 350, height: 200, fontSize: 100, minFont: 40, align: "center" as const },
+        ]
+    },
+
+    "pakda-gaya": {
+        image: "/temp71.jpeg",
+        textBoxes: [
+            { x: 250, y: 350, width: 900, height: 400, fontSize: 100, minFont: 40, align: "center" as const },
         ]
     },
 
