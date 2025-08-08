@@ -1,6 +1,4 @@
 export const templates = {
-
-
     "Scared-Lady": {
         image: "/temp1.jpg",
         textBoxes: [
@@ -33,21 +31,21 @@ export const templates = {
         ],
     },
 
-    "only-aim": {
-        image: "/temp54.png",
-        textBoxes: [
-            { x: 350, y: 950, width: 2400, height: 1000, fontSize: 200, minFont: 40, align: "center" as const },
-            { x: 1050, y: 2750, width: 800, height: 1000, fontSize: 250, minFont: 40, align: "center" as const }
-        ]
-    },
+    // "only-aim": {
+    //     image: "/temp54.png",
+    //     textBoxes: [
+    //         { x: 350, y: 950, width: 2400, height: 1000, fontSize: 200, minFont: 40, align: "center" as const },
+    //         { x: 1050, y: 2750, width: 800, height: 1000, fontSize: 250, minFont: 40, align: "center" as const }
+    //     ]
+    // },
 
-    "no-way-dawg": {
-        image: "/temp57.png",
-        textBoxes: [
-            { x: 150, y: 1350, width: 1400, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
-            { x: 2000, y: 1250, width: 1100, height: 800, fontSize: 200, minFont: 40, align: "center" as const }
-        ]
-    },
+    // "no-way-dawg": {
+    //     image: "/temp57.png",
+    //     textBoxes: [
+    //         { x: 150, y: 1350, width: 1400, height: 600, fontSize: 200, minFont: 40, align: "center" as const },
+    //         { x: 2000, y: 1250, width: 1100, height: 800, fontSize: 200, minFont: 40, align: "center" as const }
+    //     ]
+    // },
 
     "amrit's-offer": {
         image: "/temp70.jpg",
@@ -501,4 +499,5 @@ export const templates = {
             { x: 2, y: 147, width: 130, height: 200, fontSize: 12, minFont: 10, align: "center" as const },
         ]
     },
+
 };
