@@ -1328,6 +1328,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         await Promise.all(fontsToLoad.map(font => waitForFont(font)));
 
         const img = new window.Image();
+        img.crossOrigin = "anonymous";
         img.src = template.image;
 
         img.onload = async () => {
@@ -1668,6 +1669,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             toast.success("meme copied to clipboard")
         } catch (err) {
             console.error('Failed to copy meme:', err);
+            toast.error("Failed to copy meme :(")
         }
     }
 

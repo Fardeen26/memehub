@@ -1,5 +1,264 @@
 export const templates = {
+    "A Train Hitting A School Bus": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015476/memes/A%20Train%20Hitting%20A%20School%20Bus.png",
+        "width": 610,
+        "height": 720,
+        "textBoxes": [
+            {
+                "x": 270,
+                "y": 120,
+                "width": 300,
+                "height": 120,
+                "fontSize": 40,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "middle"
+            },
+            {
+                "x": 20,
+                "y": 400,
+                "width": 351,
+                "height": 200,
+                "fontSize": 50,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
+        "status": "ready"
+    },
 
+    "doge beater": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015478/memes/doge%20beater.png",
+        "width": 1000,
+        "height": 632,
+        "textBoxes": [
+            {
+                "x": 30,
+                "y": 250,
+                "width": 500,
+                "height": 250,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 570,
+                "y": 385,
+                "width": 350,
+                "height": 200,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
+        "status": "ready"
+    },
+
+    "Jim Halpert Explains": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015479/memes/Jim%20Halpert%20Explains.png",
+        "width": 633,
+        "height": 720,
+        "textBoxes": [
+            {
+                "x": 10,
+                "y": 40,
+                "width": 390,
+                "height": 210,
+                "fontSize": 50,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 10,
+                "y": 399,
+                "width": 345,
+                "height": 260,
+                "fontSize": 50,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
+        "status": "ready"
+    },
+
+    "Types Of Headaches": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015482/memes/Types%20Of%20Headaches.png",
+        "width": 966,
+        "height": 994,
+        "textBoxes": [
+            {
+                "x": 490,
+                "y": 610,
+                "width": 440,
+                "height": 100,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "bottom"
+            }
+        ],
+        "status": "ready"
+    },
+
+    "world-if": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015484/memes/world-if.png",
+        "width": 1000,
+        "height": 562,
+        "textBoxes": [
+            {
+                "x": 20,
+                "y": 10,
+                "width": 960,
+                "height": 120,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 20,
+                "y": 432,
+                "width": 960,
+                "height": 120,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "middle"
+            }
+        ],
+        "status": "ready"
+    },
+
+    "how-joker-madeup": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755013451/memes/Screenshot%202025-07-13%20211445.png",
+        "width": 751,
+        "height": 751,
+        "textBoxes": [
+            {
+                "x": 10,
+                "y": 5,
+                "width": 500,
+                "height": 173,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 10,
+                "y": 570,
+                "width": 500,
+                "height": 175,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 10,
+                "y": 195,
+                "width": 500,
+                "height": 170,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 10,
+                "y": 380,
+                "width": 500,
+                "height": 175,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
+        "status": "ready"
+    },
+
+    "yes-youre-right": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755012709/memes/meme.png",
+        "width": 1269,
+        "height": 752,
+        "textBoxes": [
+            {
+                "x": 110,
+                "y": 100,
+                "width": 500,
+                "height": 400,
+                "fontSize": 70,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 750,
+                "y": 150,
+                "width": 400,
+                "height": 200,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
+        "status": "ready"
+    },
+
+    "arjun-kapoor": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1754999475/memes/arjun-kapoor.png",
+        "width": 743,
+        "height": 699,
+        "textBoxes": [
+            {
+                "x": 20,
+                "y": 10,
+                "width": 703,
+                "height": 200,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 20,
+                "y": 530,
+                "width": 703,
+                "height": 160,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
+        "status": "ready"
+    },
+
+    "change-my-mind": {
+        "image": "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755001254/memes/Screenshot%202025-07-13%20210644.png",
+        "width": 1005,
+        "height": 745,
+        "textBoxes": [
+            {
+                "x": 366,
+                "y": 450,
+                "width": 460,
+                "height": 190,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
+        "status": "ready"
+    },
 
     "Scared-Lady": {
         image: "/temp1.jpg",
