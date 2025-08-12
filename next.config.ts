@@ -1,19 +1,20 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Image optimization
   images: {
     formats: ["image/webp", "image/avif"],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 31536000, // 1 year
-    domains: ["res.cloudinary.com"],
+    minimumCacheTTL: 31536000,
+    domains: ["res.cloudinary.com", "cloudinary.com"],
   },
 
-  // Compression
   compress: true,
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ["lucide-react", "framer-motion"],
+  },
 
-  // Headers for better caching and security
   async headers() {
     return [
       {
@@ -34,7 +35,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Cache static assets
         source: "/(.*)\\.(js|css|png|jpg|jpeg|webp|avif|svg|ico|woff|woff2|ttf|eot)$",
         headers: [
           {
@@ -44,7 +44,6 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Cache template images specifically
         source: "/temp(.*)\\.(jpg|jpeg|png|webp|avif)$",
         headers: [
           {
@@ -56,16 +55,8 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // Experimental features for better performance
-  experimental: {
-    optimizePackageImports: ["lucide-react", "framer-motion"],
-  },
-
-  // Webpack optimizations
   webpack: (config, { dev, isServer }) => {
-    // Only run optimizations in production
     if (!dev && !isServer) {
-      // Optimize chunks
       config.optimization = {
         ...config.optimization,
         splitChunks: {
@@ -92,13 +83,10 @@ const nextConfig: NextConfig = {
     return config;
   },
 
-  // Enable standalone output for better deployment
   output: "standalone",
 
-  // Reduce build output
   productionBrowserSourceMaps: false,
 
-  // Power optimizations
   poweredByHeader: false,
 };
 

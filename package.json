@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "migrate-cloudinary": "tsx scripts/migrate-to-cloudinary.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
@@ -14,7 +15,9 @@
     "@radix-ui/react-select": "^2.2.5",
     "@vercel/analytics": "^1.5.0",
     "class-variance-authority": "^0.7.1",
+    "cloudinary": "^2.7.0",
     "clsx": "^2.1.1",
+    "critters": "^0.0.25",
     "framer-motion": "^12.12.1",
     "lucide-react": "^0.511.0",
     "next": "15.3.2",
@@ -22,7 +25,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sonner": "^2.0.3",
-    "tailwind-merge": "^3.3.0"
+    "tailwind-merge": "^3.3.0",
+    "tsx": "^4.20.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

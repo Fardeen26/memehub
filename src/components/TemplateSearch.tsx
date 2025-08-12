@@ -6,6 +6,7 @@ import { templates } from "@/data/templates";
 import MainContainer from "./MainContainer";
 import { motion } from "framer-motion";
 import useSelected from "@/hooks/useSelected";
+import type { Template } from "@/types/template";
 
 export default function TemplateSearch() {
     const [searchQuery, setSearchQuery] = useState("");
@@ -13,6 +14,16 @@ export default function TemplateSearch() {
 
     const filteredTemplates = Object.entries(templates).filter(([key]) =>
         key.toLowerCase().replace(/-/g, ' ').includes(searchQuery.toLowerCase())
+    );
+
+    const convertedTemplates: Record<string, Template> = Object.fromEntries(
+        filteredTemplates.map(([key, template]) => [
+            key,
+            {
+                image: template.image || template.originalUrl,
+                textBoxes: template.textBoxes
+            }
+        ])
     );
 
     return (
@@ -50,7 +61,7 @@ export default function TemplateSearch() {
                 </motion.div>
             </div>
             {
-                filteredTemplates.length < 1 ? <div className="min-h-[30vh] max-sm:min-h-[50vh]"><p className="text-center">No templates found</p></div> : <MainContainer templates={Object.fromEntries(filteredTemplates)} />
+                filteredTemplates.length < 1 ? <div className="min-h-[30vh] max-sm:min-h-[50vh]"><p className="text-center">No templates found</p></div> : <MainContainer templates={convertedTemplates} />
             }
         </motion.div>
     );
