@@ -87,7 +87,7 @@ export default function CustomTemplateUpload({
                                 x: Math.max(20, img.width * 0.05),
                                 y: Math.max(50, img.height * 0.1),
                                 width: Math.min(img.width * 0.9, img.width - 40),
-                                height: Math.min(img.height * 0.2, 150),
+                                height: Math.max(img.height * 0.2, 150),
                                 fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
                                 minFont: 20,
                                 align: 'center' as const
@@ -96,7 +96,7 @@ export default function CustomTemplateUpload({
                                 x: Math.max(20, img.width * 0.05),
                                 y: Math.max(img.height * 0.7, img.height - 200),
                                 width: Math.min(img.width * 0.9, img.width - 40),
-                                height: Math.min(img.height * 0.2, 150),
+                                height: Math.max(img.height * 0.2, 150),
                                 fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
                                 minFont: 20,
                                 align: 'center' as const
@@ -119,7 +119,7 @@ export default function CustomTemplateUpload({
                                     x: Math.max(20, img.width * 0.05),
                                     y: Math.max(50, img.height * 0.1),
                                     width: Math.min(img.width * 0.9, img.width - 40),
-                                    height: Math.min(img.height * 0.2, 150),
+                                    height: Math.max(img.height * 0.2, 150),
                                     fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
                                     minFont: 20,
                                     align: 'center' as const
@@ -128,7 +128,7 @@ export default function CustomTemplateUpload({
                                     x: Math.max(20, img.width * 0.05),
                                     y: Math.max(img.height * 0.7, img.height - 200),
                                     width: Math.min(img.width * 0.9, img.width - 40),
-                                    height: Math.min(img.height * 0.2, 150),
+                                    height: Math.max(img.height * 0.2, 150),
                                     fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
                                     minFont: 20,
                                     align: 'center' as const
