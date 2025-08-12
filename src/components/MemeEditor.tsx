@@ -47,6 +47,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [isResizingTextWidth, setIsResizingTextWidth] = useState<boolean>(false);
     const [resizeTextIndex, setResizeTextIndex] = useState<number>(-1);
     const [isResizingFromLeft, setIsResizingFromLeft] = useState<boolean>(false);
+    // New: height-resize flags
+    const [isResizingTextHeight, setIsResizingTextHeight] = useState<boolean>(false);
+    const [isResizingFromTop, setIsResizingFromTop] = useState<boolean>(false);
 
     const { loadFont, preloadFont } = useFontLoader();
 
@@ -256,22 +259,36 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const textBoxCenterY = box.y + box.height / 2;
 
+        // left
         const leftHandleX = box.x - handleSize / 2;
         const leftHandleY = textBoxCenterY - handleSize / 2;
-        if (x >= leftHandleX && x <= leftHandleX + handleSize &&
-            y >= leftHandleY && y <= leftHandleY + handleSize) {
+        if (x >= leftHandleX && x <= leftHandleX + handleSize && y >= leftHandleY && y <= leftHandleY + handleSize) {
             return { index: selectedTextIndex, handle: 'width-left' };
         }
 
+        // right
         const rightHandleX = box.x + box.width - handleSize / 2;
         const rightHandleY = textBoxCenterY - handleSize / 2;
-        if (x >= rightHandleX && x <= rightHandleX + handleSize &&
-            y >= rightHandleY && y <= rightHandleY + handleSize) {
+        if (x >= rightHandleX && x <= rightHandleX + handleSize && y >= rightHandleY && y <= rightHandleY + handleSize) {
             return { index: selectedTextIndex, handle: 'width-right' };
         }
 
+        // NEW: top / bottom
+        const textBoxCenterX = box.x + box.width / 2;
+        const topHandleX = textBoxCenterX - handleSize / 2;
+        const topHandleY = box.y - handleSize / 2;
+        if (x >= topHandleX && x <= topHandleX + handleSize && y >= topHandleY && y <= topHandleY + handleSize) {
+            return { index: selectedTextIndex, handle: 'height-top' };
+        }
+
+        const bottomHandleX = textBoxCenterX - handleSize / 2;
+        const bottomHandleY = box.y + box.height - handleSize / 2;
+        if (x >= bottomHandleX && x <= bottomHandleX + handleSize && y >= bottomHandleY && y <= bottomHandleY + handleSize) {
+            return { index: selectedTextIndex, handle: 'height-bottom' };
+        }
+
         return { index: -1, handle: '' };
-    }, [selectedTextIndex, textBoxes, texts, isMobileDevice]);
+    }, [selectedTextIndex, textBoxes, texts, isMobileDevice, canvasRef]);
 
     const generateImageId = (): string => {
         return `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -553,10 +570,16 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
         if (resizeHandleResult.index !== -1) {
-            setIsResizingTextWidth(true);
-            setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
+            if (resizeHandleResult.handle.startsWith('width-')) {
+                setIsResizingTextWidth(true);
+                setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
+                canvas.style.cursor = 'ew-resize';
+            } else {
+                setIsResizingTextHeight(true);
+                setIsResizingFromTop(resizeHandleResult.handle === 'height-top');
+                canvas.style.cursor = 'ns-resize';
+            }
             setResizeTextIndex(resizeHandleResult.index);
-            canvas.style.cursor = 'ew-resize';
             return;
         }
 
@@ -714,6 +737,26 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 };
                 return updated;
             });
+        } else if (isResizingTextHeight && resizeTextIndex !== -1) {
+            const box = textBoxes[resizeTextIndex];
+            let newHeight = box.height;
+            let newY = box.y;
+
+            if (isResizingFromTop) {
+                const deltaY = y - box.y;
+                newHeight = Math.max(50, box.height - deltaY);
+                newY = box.y + (box.height - newHeight);
+            } else {
+                newHeight = Math.max(50, y - box.y);
+            }
+
+            newHeight = Math.min(newHeight, canvas.height - newY);
+
+            setTextBoxes((prev: Template['textBoxes']) => {
+                const updated = [...prev];
+                updated[resizeTextIndex] = { ...updated[resizeTextIndex], height: newHeight, y: newY };
+                return updated;
+            });
         } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
@@ -734,7 +777,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             // Check for text resize handles first
             const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
             if (resizeHandleResult.index !== -1) {
-                canvas.style.cursor = 'ew-resize';
+                canvas.style.cursor = resizeHandleResult.handle.startsWith('width-') ? 'ew-resize' : 'ns-resize';
             } else {
                 const imageResult = getImageAtPosition(x, y);
                 if (imageResult.index !== -1) {
@@ -772,6 +815,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsResizingTextWidth(false);
         setResizeTextIndex(-1);
         setIsResizingFromLeft(false);
+        // NEW: reset height-resize
+        setIsResizingTextHeight(false);
+        setIsResizingFromTop(false);
         const canvas = canvasRef.current;
         if (canvas) {
             canvas.style.cursor = 'default';
@@ -831,8 +877,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
         if (resizeHandleResult.index !== -1) {
-            setIsResizingTextWidth(true);
-            setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
+            if (resizeHandleResult.handle.startsWith('width-')) {
+                setIsResizingTextWidth(true);
+                setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
+            } else {
+                setIsResizingTextHeight(true);
+                setIsResizingFromTop(resizeHandleResult.handle === 'height-top');
+            }
             setResizeTextIndex(resizeHandleResult.index);
             return;
         }
@@ -991,11 +1042,27 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             setTextBoxes((prev: Template['textBoxes']) => {
                 const updated = [...prev];
-                updated[resizeTextIndex] = {
-                    ...updated[resizeTextIndex],
-                    width: newWidth,
-                    x: newX
-                };
+                updated[resizeTextIndex] = { ...updated[resizeTextIndex], width: newWidth, x: newX };
+                return updated;
+            });
+        } else if (isResizingTextHeight && resizeTextIndex !== -1) {
+            const box = textBoxes[resizeTextIndex];
+            let newHeight = box.height;
+            let newY = box.y;
+
+            if (isResizingFromTop) {
+                const deltaY = y - box.y;
+                newHeight = Math.max(50, box.height - deltaY);
+                newY = box.y + (box.height - newHeight);
+            } else {
+                newHeight = Math.max(50, y - box.y);
+            }
+
+            newHeight = Math.min(newHeight, canvas.height - newY);
+
+            setTextBoxes((prev: Template['textBoxes']) => {
+                const updated = [...prev];
+                updated[resizeTextIndex] = { ...updated[resizeTextIndex], height: newHeight, y: newY };
                 return updated;
             });
         } else if (isDragging && dragIndex !== -1) {
@@ -1565,6 +1632,65 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 ctx.textBaseline = 'top';
                 const textOffset = Math.max(15, indicatorFontSize * 1.5);
                 ctx.fillText(`${Math.round(selectedBox.width)}px`, selectedBox.x + selectedBox.width / 2, selectedBox.y - textOffset);
+
+                // Draw top/bottom handles and connectors
+                const textBoxCenterX = selectedBox.x + selectedBox.width / 2;
+                const topHandleX = textBoxCenterX - handleSize / 2;
+                const topHandleY = selectedBox.y - handleSize / 2;
+                const bottomHandleX = textBoxCenterX - handleSize / 2;
+                const bottomHandleY = selectedBox.y + selectedBox.height - handleSize / 2;
+
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#6a7bd1';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = isMobile ? 4 : 3;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                ctx.shadowBlur = 6;
+                ctx.shadowOffsetX = 3;
+                ctx.shadowOffsetY = 3;
+
+                drawRoundedRect(topHandleX, topHandleY, handleSize, handleSize, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                drawRoundedRect(bottomHandleX, bottomHandleY, handleSize, handleSize, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillStyle = '#ffffff';
+                const vArrowSize = Math.max(14, handleSize * 0.45);
+                ctx.font = `bold ${vArrowSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('▲', topHandleX + handleSize / 2, topHandleY + handleSize / 2);
+                ctx.fillText('▼', bottomHandleX + handleSize / 2, bottomHandleY + handleSize / 2);
+
+                ctx.strokeStyle = '#6a7bd1';
+                ctx.lineWidth = Math.max(1.5, Math.min(canvas.width, canvas.height) * 0.003);
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(textBoxCenterX, selectedBox.y);
+                ctx.lineTo(textBoxCenterX, topHandleY + handleSize);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(textBoxCenterX, selectedBox.y + selectedBox.height);
+                ctx.lineTo(textBoxCenterX, bottomHandleY);
+                ctx.stroke();
+
+                // Height indicator label next to box
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#6a7bd1';
+                const heightIndicatorFont = Math.max(10, Math.min(canvas.width, canvas.height) * 0.015);
+                ctx.font = `bold ${heightIndicatorFont}px Arial`;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                const labelX = selectedBox.x + selectedBox.width + 10;
+                const labelY = selectedBox.y + selectedBox.height / 2;
+                ctx.fillText(`${Math.round(selectedBox.height)}px`, labelX, labelY);
 
                 ctx.restore();
             }
