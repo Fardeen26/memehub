@@ -1,6 +1,6 @@
 "use client"
 
-import { GithubIcon, MoonIcon, SunIcon } from "lucide-react"
+import { Heart, MoonIcon, SunIcon, Laugh } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { useEffect, useState } from "react"
@@ -38,10 +38,16 @@ export default function Navbar() {
                             {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
                         </button>
                         <button
-                            onClick={() => window.open("https://github.com/Fardeen26/meme-generator", "_blank")}
+                            onClick={() => window.open("https://github.com/sponsors/Fardeen26", "_blank")}
                             className="max-[350px]:hidden py-2 px-4 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2"
                         >
-                            <GithubIcon className="h-4 w-4" /> <span className="text-sm font-semibold"> Give it a star </span>
+                            <div><Heart className="h-4 w-4 text-red-400" /></div> <div className="text-sm mb-[1px] font-semibold"> Sponsor </div>
+                        </button>
+                        <button
+                            onClick={() => window.open("https://x.com/fardeentwt", "_blank")}
+                            className="max-[510px]:hidden py-2 px-4 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2"
+                        >
+                            <div><Laugh className="h-4 w-4 text-yellow-400" /></div> <div className="text-sm mb-[1px] font-semibold"> built by fardeentwt </div>
                         </button>
                     </div>
                 </div>

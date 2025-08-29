@@ -58,14 +58,13 @@ export const optimizeTemplates = (
 };
 
 export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
-    "A-Train-Hitting-A-School-Bus": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015476/memes/A%20Train%20Hitting%20A%20School%20Bus.png",
+    "Modi-g-Poster": {
+        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020770/meme-templates/Modi-g-Poster.jpg",
         textBoxes: [
-            { x: 270, y: 120, width: 300, height: 120, fontSize: 40, minFont: 20, align: "center", verticalAlign: "middle" },
-            { x: 20, y: 400, width: 351, height: 200, fontSize: 50, minFont: 20, align: "center", verticalAlign: "top" }
+            { x: 100, y: 170, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const },
+            { x: 100, y: 470, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const }
         ]
     },
-
     "arjun-kapoor": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1754999475/memes/arjun-kapoor.png",
         textBoxes: [
@@ -73,7 +72,6 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 20, y: 530, width: 703, height: 160, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
         ]
     },
-
     "doge beater": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015478/memes/doge%20beater.png",
         textBoxes: [
@@ -82,27 +80,38 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
         ]
     },
 
-    "Jim Halpert Explains": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015479/memes/Jim%20Halpert%20Explains.png",
-        textBoxes: [
-            { x: 10, y: 40, width: 390, height: 210, fontSize: 50, minFont: 20, align: "center", verticalAlign: "top" },
-            { x: 10, y: 399, width: 345, height: 260, fontSize: 50, minFont: 20, align: "center", verticalAlign: "top" }
-        ]
-    },
+    // "yes-youre-right": {
+    //     originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755012709/memes/meme.png",
+    //     textBoxes: [
+    //         { x: 110, y: 100, width: 500, height: 400, fontSize: 70, minFont: 20, align: "center", verticalAlign: "top" },
+    //         { x: 750, y: 150, width: 400, height: 200, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
+    //     ]
+    // },
 
-    "Types Of Headaches": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015482/memes/Types%20Of%20Headaches.png",
+    "The world if": {
+        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1756466090/meme-templates/The%20future%20world%20if.png",
         textBoxes: [
-            { x: 490, y: 610, width: 440, height: 100, fontSize: 60, minFont: 20, align: "center", verticalAlign: "bottom" }
-        ]
-    },
-
-    "world-if": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015484/memes/world-if.png",
-        textBoxes: [
-            { x: 20, y: 10, width: 960, height: 120, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
-            { x: 20, y: 432, width: 960, height: 120, fontSize: 60, minFont: 20, align: "center", verticalAlign: "middle" }
-        ]
+            {
+                "x": 20,
+                "y": 10,
+                "width": 760,
+                "height": 100,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 20,
+                "y": 340,
+                "width": 760,
+                "height": 100,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
     },
 
     "how-joker-madeup": {
@@ -114,15 +123,6 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 10, y: 380, width: 500, height: 175, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
         ]
     },
-
-    "yes-youre-right": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755012709/memes/meme.png",
-        textBoxes: [
-            { x: 110, y: 100, width: 500, height: 400, fontSize: 70, minFont: 20, align: "center", verticalAlign: "top" },
-            { x: 750, y: 150, width: 400, height: 200, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
-        ]
-    },
-
     "Scared-Lady": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020763/meme-templates/Scared-Lady.jpg",
         textBoxes: [
@@ -130,22 +130,44 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 700, y: 750, width: 600, height: 400, fontSize: 100, minFont: 40, align: "center" as const }
         ]
     },
-
     "Harkirat-brah": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020769/meme-templates/Harkirat-brah.png",
         textBoxes: [
             { x: 20, y: 850, width: 400, height: 100, fontSize: 60, minFont: 40, align: "center" as const }
         ]
     },
-
-    "Modi-g-Poster": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020770/meme-templates/Modi-g-Poster.jpg",
+    "jim-halpert-explains": {
+        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1756465135/meme-templates/jim-halpert-explains-meme-template-full-11cbf97b.webp",
         textBoxes: [
-            { x: 100, y: 170, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const },
-            { x: 100, y: 470, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const }
+            {
+                "x": 10,
+                "y": 38,
+                "width": 435,
+                "height": 180,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            },
+            {
+                "x": 10,
+                "y": 450,
+                "width": 390,
+                "height": 300,
+                "fontSize": 60,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
+    },
+    "A-Train-Hitting-A-School-Bus": {
+        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015476/memes/A%20Train%20Hitting%20A%20School%20Bus.png",
+        textBoxes: [
+            { x: 270, y: 120, width: 300, height: 120, fontSize: 40, minFont: 20, align: "center", verticalAlign: "middle" },
+            { x: 20, y: 400, width: 351, height: 200, fontSize: 50, minFont: 20, align: "center", verticalAlign: "top" }
         ]
     },
-
     "Amrit-dawg": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020772/meme-templates/Amrit-dawg.jpg",
         textBoxes: [
@@ -153,7 +175,6 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 100, y: 970, width: 1800, height: 400, fontSize: 150, minFont: 20, align: "center" as const }
         ]
     },
-
     "only-aim": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755022728/temp54_sy9pkc.png",
         textBoxes: [
@@ -161,7 +182,6 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 1050, y: 2750, width: 800, height: 1000, fontSize: 250, minFont: 40, align: "center" as const }
         ]
     },
-
     "no-way-dawg": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755022692/temp57_kbkrqy.png",
         textBoxes: [
@@ -169,13 +189,27 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 2000, y: 1250, width: 1100, height: 800, fontSize: 200, minFont: 40, align: "center" as const }
         ]
     },
-
     "amrit's-offer": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020790/meme-templates/amrit%27s-offer.jpg",
         textBoxes: [
             { x: 0, y: 290, width: 200, height: 200, fontSize: 10, minFont: 40, align: "center" as const },
             { x: 300, y: 290, width: 200, height: 200, fontSize: 10, minFont: 40, align: "center" as const }
         ]
+    },
+    "Types of Headaches": {
+        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1756465720/meme-templates/Types%20of%20Headaches%20meme.png",
+        textBoxes: [
+            {
+                "x": 217,
+                "y": 285,
+                "width": 260,
+                "height": 65,
+                "fontSize": 35,
+                "minFont": 20,
+                "align": "center",
+                "verticalAlign": "top"
+            }
+        ],
     },
     "Kirat-humble-guy": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020791/meme-templates/Kirat-humble-guy.jpg",
