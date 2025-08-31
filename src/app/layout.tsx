@@ -6,7 +6,6 @@ import "./globals.css";
 import Providers from "./Provider";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
-
 import { Toaster } from "sonner";
 import { siteConfig } from "@/data/site-config";
 import OGImage from "./og.png";
@@ -80,6 +79,17 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="google-adsense-account" content="ca-pub-1916939586711533" />
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1916939586711533"
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
+        <Script 
+          async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1916939586711533"
+          strategy="beforeInteractive"
+          crossOrigin="anonymous"
+        />
       </head>
       <body
         className={`${bricolage_grotesque_init.className} antialiased min-h-screen bg-white dark:bg-black relative`}
