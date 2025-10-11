@@ -65,20 +65,20 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 100, y: 470, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const }
         ]
     },
-    "arjun-kapoor": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1754999475/memes/arjun-kapoor.png",
-        textBoxes: [
-            { x: 20, y: 10, width: 703, height: 200, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
-            { x: 20, y: 530, width: 703, height: 160, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
-        ]
-    },
-    "doge beater": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015478/memes/doge%20beater.png",
-        textBoxes: [
-            { x: 30, y: 250, width: 500, height: 250, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
-            { x: 570, y: 385, width: 350, height: 200, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
-        ]
-    },
+    // "arjun-kapoor": {
+    //     originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1754999475/memes/arjun-kapoor.png",
+    //     textBoxes: [
+    //         { x: 20, y: 10, width: 703, height: 200, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
+    //         { x: 20, y: 530, width: 703, height: 160, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
+    //     ]
+    // },
+    // "doge beater": {
+    //     originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015478/memes/doge%20beater.png",
+    //     textBoxes: [
+    //         { x: 30, y: 250, width: 500, height: 250, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
+    //         { x: 570, y: 385, width: 350, height: 200, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
+    //     ]
+    // },
 
     // "yes-youre-right": {
     //     originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755012709/memes/meme.png",
@@ -114,15 +114,15 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
         ],
     },
 
-    "how-joker-madeup": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755013451/memes/Screenshot%202025-07-13%20211445.png",
-        textBoxes: [
-            { x: 10, y: 5, width: 500, height: 173, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
-            { x: 10, y: 570, width: 500, height: 175, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
-            { x: 10, y: 195, width: 500, height: 170, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
-            { x: 10, y: 380, width: 500, height: 175, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
-        ]
-    },
+    // "how-joker-madeup": {
+    //     originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755013451/memes/Screenshot%202025-07-13%20211445.png",
+    //     textBoxes: [
+    //         { x: 10, y: 5, width: 500, height: 173, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
+    //         { x: 10, y: 570, width: 500, height: 175, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
+    //         { x: 10, y: 195, width: 500, height: 170, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" },
+    //         { x: 10, y: 380, width: 500, height: 175, fontSize: 60, minFont: 20, align: "center", verticalAlign: "top" }
+    //     ]
+    // },
     "Scared-Lady": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020763/meme-templates/Scared-Lady.jpg",
         textBoxes: [
@@ -161,13 +161,13 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             }
         ],
     },
-    "A-Train-Hitting-A-School-Bus": {
-        originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015476/memes/A%20Train%20Hitting%20A%20School%20Bus.png",
-        textBoxes: [
-            { x: 270, y: 120, width: 300, height: 120, fontSize: 40, minFont: 20, align: "center", verticalAlign: "middle" },
-            { x: 20, y: 400, width: 351, height: 200, fontSize: 50, minFont: 20, align: "center", verticalAlign: "top" }
-        ]
-    },
+    // "A-Train-Hitting-A-School-Bus": {
+    //     originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755015476/memes/A%20Train%20Hitting%20A%20School%20Bus.png",
+    //     textBoxes: [
+    //         { x: 270, y: 120, width: 300, height: 120, fontSize: 40, minFont: 20, align: "center", verticalAlign: "middle" },
+    //         { x: 20, y: 400, width: 351, height: 200, fontSize: 50, minFont: 20, align: "center", verticalAlign: "top" }
+    //     ]
+    // },
     "Amrit-dawg": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020772/meme-templates/Amrit-dawg.jpg",
         textBoxes: [

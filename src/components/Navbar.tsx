@@ -33,19 +33,19 @@ export default function Navbar() {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                            className="p-2 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors"
+                            className="p-2 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors cursor-pointer"
                         >
                             {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
                         </button>
                         <button
                             onClick={() => window.open("https://github.com/sponsors/Fardeen26", "_blank")}
-                            className="max-[350px]:hidden py-2 px-4 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2"
+                            className="max-[350px]:hidden py-2 px-4 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2 cursor-pointer"
                         >
                             <div><Heart className="h-4 w-4 text-red-400" /></div> <div className="text-sm mb-[1px] font-semibold"> Sponsor </div>
                         </button>
                         <button
                             onClick={() => window.open("https://x.com/fardeentwt", "_blank")}
-                            className="max-[510px]:hidden py-2 px-4 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2"
+                            className="max-[510px]:hidden py-2 px-4 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2 cursor-pointer"
                         >
                             <div><Laugh className="h-4 w-4 text-yellow-400" /></div> <div className="text-sm mb-[1px] font-semibold"> built by fardeentwt </div>
                         </button>
