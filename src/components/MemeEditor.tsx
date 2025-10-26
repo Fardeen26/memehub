@@ -51,6 +51,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     // New: height-resize flags
     const [isResizingTextHeight, setIsResizingTextHeight] = useState<boolean>(false);
     const [isResizingFromTop, setIsResizingFromTop] = useState<boolean>(false);
+    // Corner resize flags
+    const [isResizingTextCorner, setIsResizingTextCorner] = useState<boolean>(false);
+    const [resizeTextCornerHandle, setResizeTextCornerHandle] = useState<string>('');
+    const [resizeTextStartPos, setResizeTextStartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [resizeTextStartSize, setResizeTextStartSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    const [resizeTextStartBoxPos, setResizeTextStartBoxPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const { loadFont, preloadFont } = useFontLoader();
 
@@ -257,6 +263,20 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!canvas) return { index: -1, handle: '' };
         const baseHandleSize = Math.max(30, Math.min(canvas.width, canvas.height) * 0.04);
         const handleSize = isMobile ? Math.max(baseHandleSize, 45) : Math.max(baseHandleSize, 35);
+
+        // Corner handles (nw, ne, sw, se)
+        const cornerHandles = [
+            { name: 'nw', x: box.x - handleSize / 2, y: box.y - handleSize / 2 },
+            { name: 'ne', x: box.x + box.width - handleSize / 2, y: box.y - handleSize / 2 },
+            { name: 'sw', x: box.x - handleSize / 2, y: box.y + box.height - handleSize / 2 },
+            { name: 'se', x: box.x + box.width - handleSize / 2, y: box.y + box.height - handleSize / 2 }
+        ];
+
+        for (const handle of cornerHandles) {
+            if (x >= handle.x && x <= handle.x + handleSize && y >= handle.y && y <= handle.y + handleSize) {
+                return { index: selectedTextIndex, handle: handle.name };
+            }
+        }
 
         const textBoxCenterY = box.y + box.height / 2;
 
@@ -575,10 +595,23 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 setIsResizingTextWidth(true);
                 setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
                 canvas.style.cursor = 'ew-resize';
-            } else {
+            } else if (resizeHandleResult.handle.startsWith('height-')) {
                 setIsResizingTextHeight(true);
                 setIsResizingFromTop(resizeHandleResult.handle === 'height-top');
                 canvas.style.cursor = 'ns-resize';
+            } else if (['nw', 'ne', 'sw', 'se'].includes(resizeHandleResult.handle)) {
+                setIsResizingTextCorner(true);
+                setResizeTextCornerHandle(resizeHandleResult.handle);
+                setResizeTextStartPos({ x, y });
+                setResizeTextStartSize({
+                    width: textBoxes[resizeHandleResult.index].width,
+                    height: textBoxes[resizeHandleResult.index].height
+                });
+                setResizeTextStartBoxPos({
+                    x: textBoxes[resizeHandleResult.index].x,
+                    y: textBoxes[resizeHandleResult.index].y
+                });
+                canvas.style.cursor = `${resizeHandleResult.handle}-resize`;
             }
             setResizeTextIndex(resizeHandleResult.index);
             return;
@@ -758,6 +791,65 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 updated[resizeTextIndex] = { ...updated[resizeTextIndex], height: newHeight, y: newY };
                 return updated;
             });
+        } else if (isResizingTextCorner && resizeTextIndex !== -1) {
+            const deltaX = x - resizeTextStartPos.x;
+            const deltaY = y - resizeTextStartPos.y;
+
+            let newWidth = resizeTextStartSize.width;
+            let newHeight = resizeTextStartSize.height;
+            let newX = resizeTextStartBoxPos.x;
+            let newY = resizeTextStartBoxPos.y;
+
+            switch (resizeTextCornerHandle) {
+                case 'se':
+                    newWidth = Math.max(50, resizeTextStartSize.width + deltaX);
+                    newHeight = Math.max(50, resizeTextStartSize.height + deltaY);
+                    break;
+                case 'sw':
+                    newWidth = Math.max(50, resizeTextStartSize.width - deltaX);
+                    newHeight = Math.max(50, resizeTextStartSize.height + deltaY);
+                    newX = resizeTextStartBoxPos.x + deltaX;
+                    break;
+                case 'ne':
+                    newWidth = Math.max(50, resizeTextStartSize.width + deltaX);
+                    newHeight = Math.max(50, resizeTextStartSize.height - deltaY);
+                    newY = resizeTextStartBoxPos.y + deltaY;
+                    break;
+                case 'nw':
+                    newWidth = Math.max(50, resizeTextStartSize.width - deltaX);
+                    newHeight = Math.max(50, resizeTextStartSize.height - deltaY);
+                    newX = resizeTextStartBoxPos.x + deltaX;
+                    newY = resizeTextStartBoxPos.y + deltaY;
+                    break;
+            }
+
+            // Constrain to canvas bounds
+            if (newX < 0) {
+                newWidth = Math.max(50, newWidth + newX);
+                newX = 0;
+            }
+            if (newY < 0) {
+                newHeight = Math.max(50, newHeight + newY);
+                newY = 0;
+            }
+            if (newX + newWidth > canvas.width) {
+                newWidth = Math.max(50, canvas.width - newX);
+            }
+            if (newY + newHeight > canvas.height) {
+                newHeight = Math.max(50, canvas.height - newY);
+            }
+
+            setTextBoxes((prev: Template['textBoxes']) => {
+                const updated = [...prev];
+                updated[resizeTextIndex] = {
+                    ...updated[resizeTextIndex],
+                    x: newX,
+                    y: newY,
+                    width: newWidth,
+                    height: newHeight
+                };
+                return updated;
+            });
         } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
@@ -778,7 +870,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             // Check for text resize handles first
             const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
             if (resizeHandleResult.index !== -1) {
-                canvas.style.cursor = resizeHandleResult.handle.startsWith('width-') ? 'ew-resize' : 'ns-resize';
+                if (resizeHandleResult.handle.startsWith('width-')) {
+                    canvas.style.cursor = 'ew-resize';
+                } else if (resizeHandleResult.handle.startsWith('height-')) {
+                    canvas.style.cursor = 'ns-resize';
+                } else if (['nw', 'ne', 'sw', 'se'].includes(resizeHandleResult.handle)) {
+                    canvas.style.cursor = `${resizeHandleResult.handle}-resize`;
+                }
             } else {
                 const imageResult = getImageAtPosition(x, y);
                 if (imageResult.index !== -1) {
@@ -819,6 +917,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         // NEW: reset height-resize
         setIsResizingTextHeight(false);
         setIsResizingFromTop(false);
+        // Corner resize reset
+        setIsResizingTextCorner(false);
+        setResizeTextCornerHandle('');
+        setResizeTextStartPos({ x: 0, y: 0 });
+        setResizeTextStartSize({ width: 0, height: 0 });
+        setResizeTextStartBoxPos({ x: 0, y: 0 });
         const canvas = canvasRef.current;
         if (canvas) {
             canvas.style.cursor = 'default';
@@ -881,9 +985,21 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             if (resizeHandleResult.handle.startsWith('width-')) {
                 setIsResizingTextWidth(true);
                 setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
-            } else {
+            } else if (resizeHandleResult.handle.startsWith('height-')) {
                 setIsResizingTextHeight(true);
                 setIsResizingFromTop(resizeHandleResult.handle === 'height-top');
+            } else if (['nw', 'ne', 'sw', 'se'].includes(resizeHandleResult.handle)) {
+                setIsResizingTextCorner(true);
+                setResizeTextCornerHandle(resizeHandleResult.handle);
+                setResizeTextStartPos({ x, y });
+                setResizeTextStartSize({
+                    width: textBoxes[resizeHandleResult.index].width,
+                    height: textBoxes[resizeHandleResult.index].height
+                });
+                setResizeTextStartBoxPos({
+                    x: textBoxes[resizeHandleResult.index].x,
+                    y: textBoxes[resizeHandleResult.index].y
+                });
             }
             setResizeTextIndex(resizeHandleResult.index);
             return;
@@ -908,12 +1024,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const canvas = canvasRef.current;
         if (!canvas || e.touches.length !== 1) return;
 
-        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage && !isResizingTextWidth) return;
+        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage && !isResizingTextWidth && !isResizingTextHeight && !isResizingTextCorner) return;
         if (isDragging && dragIndex === -1) return;
         if (isDraggingImage && dragImageIndex === -1) return;
         if (isRotatingImage && rotateImageIndex === -1) return;
         if (isResizingImage && resizeImageIndex === -1) return;
         if (isResizingTextWidth && resizeTextIndex === -1) return;
+        if (isResizingTextHeight && resizeTextIndex === -1) return;
+        if (isResizingTextCorner && resizeTextIndex === -1) return;
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -1066,6 +1184,65 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 updated[resizeTextIndex] = { ...updated[resizeTextIndex], height: newHeight, y: newY };
                 return updated;
             });
+        } else if (isResizingTextCorner && resizeTextIndex !== -1) {
+            const deltaX = x - resizeTextStartPos.x;
+            const deltaY = y - resizeTextStartPos.y;
+
+            let newWidth = resizeTextStartSize.width;
+            let newHeight = resizeTextStartSize.height;
+            let newX = resizeTextStartBoxPos.x;
+            let newY = resizeTextStartBoxPos.y;
+
+            switch (resizeTextCornerHandle) {
+                case 'se':
+                    newWidth = Math.max(50, resizeTextStartSize.width + deltaX);
+                    newHeight = Math.max(50, resizeTextStartSize.height + deltaY);
+                    break;
+                case 'sw':
+                    newWidth = Math.max(50, resizeTextStartSize.width - deltaX);
+                    newHeight = Math.max(50, resizeTextStartSize.height + deltaY);
+                    newX = resizeTextStartBoxPos.x + deltaX;
+                    break;
+                case 'ne':
+                    newWidth = Math.max(50, resizeTextStartSize.width + deltaX);
+                    newHeight = Math.max(50, resizeTextStartSize.height - deltaY);
+                    newY = resizeTextStartBoxPos.y + deltaY;
+                    break;
+                case 'nw':
+                    newWidth = Math.max(50, resizeTextStartSize.width - deltaX);
+                    newHeight = Math.max(50, resizeTextStartSize.height - deltaY);
+                    newX = resizeTextStartBoxPos.x + deltaX;
+                    newY = resizeTextStartBoxPos.y + deltaY;
+                    break;
+            }
+
+            // Constrain to canvas bounds
+            if (newX < 0) {
+                newWidth = Math.max(50, newWidth + newX);
+                newX = 0;
+            }
+            if (newY < 0) {
+                newHeight = Math.max(50, newHeight + newY);
+                newY = 0;
+            }
+            if (newX + newWidth > canvas.width) {
+                newWidth = Math.max(50, canvas.width - newX);
+            }
+            if (newY + newHeight > canvas.height) {
+                newHeight = Math.max(50, canvas.height - newY);
+            }
+
+            setTextBoxes((prev: Template['textBoxes']) => {
+                const updated = [...prev];
+                updated[resizeTextIndex] = {
+                    ...updated[resizeTextIndex],
+                    x: newX,
+                    y: newY,
+                    width: newWidth,
+                    height: newHeight
+                };
+                return updated;
+            });
         } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
@@ -1105,6 +1282,15 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsResizingTextWidth(false);
         setResizeTextIndex(-1);
         setIsResizingFromLeft(false);
+        // NEW: reset height-resize
+        setIsResizingTextHeight(false);
+        setIsResizingFromTop(false);
+        // Corner resize reset
+        setIsResizingTextCorner(false);
+        setResizeTextCornerHandle('');
+        setResizeTextStartPos({ x: 0, y: 0 });
+        setResizeTextStartSize({ width: 0, height: 0 });
+        setResizeTextStartBoxPos({ x: 0, y: 0 });
     };
 
     const calculateFontSize = useCallback((
@@ -1693,6 +1879,34 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 const labelX = selectedBox.x + selectedBox.width + 10;
                 const labelY = selectedBox.y + selectedBox.height / 2;
                 ctx.fillText(`${Math.round(selectedBox.height)}px`, labelX, labelY);
+
+                // Draw corner handles (nw, ne, sw, se)
+                const cornerHandles = [
+                    { name: 'nw', x: selectedBox.x - handleSize / 2, y: selectedBox.y - handleSize / 2 },
+                    { name: 'ne', x: selectedBox.x + selectedBox.width - handleSize / 2, y: selectedBox.y - handleSize / 2 },
+                    { name: 'sw', x: selectedBox.x - handleSize / 2, y: selectedBox.y + selectedBox.height - handleSize / 2 },
+                    { name: 'se', x: selectedBox.x + selectedBox.width - handleSize / 2, y: selectedBox.y + selectedBox.height - handleSize / 2 }
+                ];
+
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#6a7bd1';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = isMobile ? 4 : 3;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                ctx.shadowBlur = 6;
+                ctx.shadowOffsetX = 3;
+                ctx.shadowOffsetY = 3;
+
+                cornerHandles.forEach(handle => {
+                    drawRoundedRect(handle.x, handle.y, handleSize, handleSize, 8);
+                    ctx.fill();
+                    ctx.stroke();
+                });
+
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
 
                 ctx.restore();
             }
