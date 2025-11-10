@@ -40,11 +40,15 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [texts, setTexts] = useState<string[]>(Array(template.textBoxes.length).fill(''));
 
     const [textBoxes, setTextBoxes] = useState<Template['textBoxes']>(template.textBoxes);
+    const [textBoxRotations, setTextBoxRotations] = useState<number[]>(Array(template.textBoxes.length).fill(0));
     const [originalTextBoxCount] = useState<number>(template.textBoxes.length);
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragIndex, setDragIndex] = useState<number>(-1);
     const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [selectedTextIndex, setSelectedTextIndex] = useState<number>(-1);
+    const [isRotatingText, setIsRotatingText] = useState<boolean>(false);
+    const [rotateTextIndex, setRotateTextIndex] = useState<number>(-1);
+    const [rotateTextStartAngle, setRotateTextStartAngle] = useState<number>(0);
     const [isResizingTextWidth, setIsResizingTextWidth] = useState<boolean>(false);
     const [resizeTextIndex, setResizeTextIndex] = useState<number>(-1);
     const [isResizingFromLeft, setIsResizingFromLeft] = useState<boolean>(false);
@@ -258,11 +262,40 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (selectedTextIndex === -1 || !texts[selectedTextIndex]) return { index: -1, handle: '' };
 
         const box = textBoxes[selectedTextIndex];
+        const rotation = textBoxRotations[selectedTextIndex] || 0;
         const isMobile = isMobileDevice();
         const canvas = canvasRef.current;
         if (!canvas) return { index: -1, handle: '' };
         const baseHandleSize = Math.max(30, Math.min(canvas.width, canvas.height) * 0.04);
         const handleSize = isMobile ? Math.max(baseHandleSize, 45) : Math.max(baseHandleSize, 35);
+
+        const boxCenterX = box.x + box.width / 2;
+        const boxCenterY = box.y + box.height / 2;
+
+        // Check rotation handle first (above the box)
+        const rotationHandleSize = isMobile ? 60 : 50;
+        const rotationHandleX = boxCenterX;
+        const rotationHandleY = box.y - 35;
+        const distToRotationHandle = Math.sqrt(
+            Math.pow(x - rotationHandleX, 2) + Math.pow(y - rotationHandleY, 2)
+        );
+        if (distToRotationHandle <= rotationHandleSize / 2) {
+            return { index: selectedTextIndex, handle: 'rotate' };
+        }
+
+        // Transform coordinates to box-local space if rotated
+        let localX = x - boxCenterX;
+        let localY = y - boxCenterY;
+        if (rotation !== 0) {
+            const rad = (-rotation * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            const tempX = localX * cos - localY * sin;
+            localY = localX * sin + localY * cos;
+            localX = tempX;
+        }
+        localX += boxCenterX;
+        localY += boxCenterY;
 
         // Corner handles (nw, ne, sw, se)
         const cornerHandles = [
@@ -273,7 +306,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         ];
 
         for (const handle of cornerHandles) {
-            if (x >= handle.x && x <= handle.x + handleSize && y >= handle.y && y <= handle.y + handleSize) {
+            if (localX >= handle.x && localX <= handle.x + handleSize && localY >= handle.y && localY <= handle.y + handleSize) {
                 return { index: selectedTextIndex, handle: handle.name };
             }
         }
@@ -283,33 +316,33 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         // left
         const leftHandleX = box.x - handleSize / 2;
         const leftHandleY = textBoxCenterY - handleSize / 2;
-        if (x >= leftHandleX && x <= leftHandleX + handleSize && y >= leftHandleY && y <= leftHandleY + handleSize) {
+        if (localX >= leftHandleX && localX <= leftHandleX + handleSize && localY >= leftHandleY && localY <= leftHandleY + handleSize) {
             return { index: selectedTextIndex, handle: 'width-left' };
         }
 
         // right
         const rightHandleX = box.x + box.width - handleSize / 2;
         const rightHandleY = textBoxCenterY - handleSize / 2;
-        if (x >= rightHandleX && x <= rightHandleX + handleSize && y >= rightHandleY && y <= rightHandleY + handleSize) {
+        if (localX >= rightHandleX && localX <= rightHandleX + handleSize && localY >= rightHandleY && localY <= rightHandleY + handleSize) {
             return { index: selectedTextIndex, handle: 'width-right' };
         }
 
-        // NEW: top / bottom
+        // top / bottom
         const textBoxCenterX = box.x + box.width / 2;
         const topHandleX = textBoxCenterX - handleSize / 2;
         const topHandleY = box.y - handleSize / 2;
-        if (x >= topHandleX && x <= topHandleX + handleSize && y >= topHandleY && y <= topHandleY + handleSize) {
+        if (localX >= topHandleX && localX <= topHandleX + handleSize && localY >= topHandleY && localY <= topHandleY + handleSize) {
             return { index: selectedTextIndex, handle: 'height-top' };
         }
 
         const bottomHandleX = textBoxCenterX - handleSize / 2;
         const bottomHandleY = box.y + box.height - handleSize / 2;
-        if (x >= bottomHandleX && x <= bottomHandleX + handleSize && y >= bottomHandleY && y <= bottomHandleY + handleSize) {
+        if (localX >= bottomHandleX && localX <= bottomHandleX + handleSize && localY >= bottomHandleY && localY <= bottomHandleY + handleSize) {
             return { index: selectedTextIndex, handle: 'height-bottom' };
         }
 
         return { index: -1, handle: '' };
-    }, [selectedTextIndex, textBoxes, texts, isMobileDevice, canvasRef]);
+    }, [selectedTextIndex, textBoxes, texts, textBoxRotations, isMobileDevice, canvasRef]);
 
     const generateImageId = (): string => {
         return `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -591,7 +624,16 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
         if (resizeHandleResult.index !== -1) {
-            if (resizeHandleResult.handle.startsWith('width-')) {
+            if (resizeHandleResult.handle === 'rotate') {
+                setIsRotatingText(true);
+                setRotateTextIndex(resizeHandleResult.index);
+                const box = textBoxes[resizeHandleResult.index];
+                const boxCenterX = box.x + box.width / 2;
+                const boxCenterY = box.y + box.height / 2;
+                const angle = Math.atan2(y - boxCenterY, x - boxCenterX) * 180 / Math.PI;
+                setRotateTextStartAngle(angle - (textBoxRotations[resizeHandleResult.index] || 0));
+                canvas.style.cursor = 'grab';
+            } else if (resizeHandleResult.handle.startsWith('width-')) {
                 setIsResizingTextWidth(true);
                 setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
                 canvas.style.cursor = 'ew-resize';
@@ -747,6 +789,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 };
                 return updated;
             });
+        } else if (isRotatingText && rotateTextIndex !== -1) {
+            const box = textBoxes[rotateTextIndex];
+            const boxCenterX = box.x + box.width / 2;
+            const boxCenterY = box.y + box.height / 2;
+            const angle = Math.atan2(y - boxCenterY, x - boxCenterX) * 180 / Math.PI;
+            const newRotation = angle - rotateTextStartAngle;
+
+            setTextBoxRotations(prev => {
+                const updated = [...prev];
+                updated[rotateTextIndex] = newRotation;
+                return updated;
+            });
         } else if (isResizingTextWidth && resizeTextIndex !== -1) {
             const box = textBoxes[resizeTextIndex];
             let newWidth = box.width;
@@ -870,7 +924,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             // Check for text resize handles first
             const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
             if (resizeHandleResult.index !== -1) {
-                if (resizeHandleResult.handle.startsWith('width-')) {
+                if (resizeHandleResult.handle === 'rotate') {
+                    canvas.style.cursor = 'grab';
+                } else if (resizeHandleResult.handle.startsWith('width-')) {
                     canvas.style.cursor = 'ew-resize';
                 } else if (resizeHandleResult.handle.startsWith('height-')) {
                     canvas.style.cursor = 'ns-resize';
@@ -923,6 +979,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setResizeTextStartPos({ x: 0, y: 0 });
         setResizeTextStartSize({ width: 0, height: 0 });
         setResizeTextStartBoxPos({ x: 0, y: 0 });
+        // Text rotation reset
+        setIsRotatingText(false);
+        setRotateTextIndex(-1);
+        setRotateTextStartAngle(0);
         const canvas = canvasRef.current;
         if (canvas) {
             canvas.style.cursor = 'default';
@@ -982,7 +1042,15 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const resizeHandleResult = getTextResizeHandleAtPosition(x, y);
         if (resizeHandleResult.index !== -1) {
-            if (resizeHandleResult.handle.startsWith('width-')) {
+            if (resizeHandleResult.handle === 'rotate') {
+                setIsRotatingText(true);
+                setRotateTextIndex(resizeHandleResult.index);
+                const box = textBoxes[resizeHandleResult.index];
+                const boxCenterX = box.x + box.width / 2;
+                const boxCenterY = box.y + box.height / 2;
+                const angle = Math.atan2(y - boxCenterY, x - boxCenterX) * 180 / Math.PI;
+                setRotateTextStartAngle(angle - (textBoxRotations[resizeHandleResult.index] || 0));
+            } else if (resizeHandleResult.handle.startsWith('width-')) {
                 setIsResizingTextWidth(true);
                 setIsResizingFromLeft(resizeHandleResult.handle === 'width-left');
             } else if (resizeHandleResult.handle.startsWith('height-')) {
@@ -1024,7 +1092,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const canvas = canvasRef.current;
         if (!canvas || e.touches.length !== 1) return;
 
-        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage && !isResizingTextWidth && !isResizingTextHeight && !isResizingTextCorner) return;
+        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage && !isResizingTextWidth && !isResizingTextHeight && !isResizingTextCorner && !isRotatingText) return;
         if (isDragging && dragIndex === -1) return;
         if (isDraggingImage && dragImageIndex === -1) return;
         if (isRotatingImage && rotateImageIndex === -1) return;
@@ -1032,6 +1100,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (isResizingTextWidth && resizeTextIndex === -1) return;
         if (isResizingTextHeight && resizeTextIndex === -1) return;
         if (isResizingTextCorner && resizeTextIndex === -1) return;
+        if (isRotatingText && rotateTextIndex === -1) return;
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -1142,6 +1211,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     width: newWidth,
                     height: newHeight
                 };
+                return updated;
+            });
+        } else if (isRotatingText && rotateTextIndex !== -1) {
+            const box = textBoxes[rotateTextIndex];
+            const boxCenterX = box.x + box.width / 2;
+            const boxCenterY = box.y + box.height / 2;
+            const angle = Math.atan2(y - boxCenterY, x - boxCenterX) * 180 / Math.PI;
+            const newRotation = angle - rotateTextStartAngle;
+
+            setTextBoxRotations(prev => {
+                const updated = [...prev];
+                updated[rotateTextIndex] = newRotation;
                 return updated;
             });
         } else if (isResizingTextWidth && resizeTextIndex !== -1) {
@@ -1291,6 +1372,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setResizeTextStartPos({ x: 0, y: 0 });
         setResizeTextStartSize({ width: 0, height: 0 });
         setResizeTextStartBoxPos({ x: 0, y: 0 });
+        // Text rotation reset
+        setIsRotatingText(false);
+        setRotateTextIndex(-1);
+        setRotateTextStartAngle(0);
     };
 
     const calculateFontSize = useCallback((
@@ -1411,13 +1496,23 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     }, []);
 
-    const drawText = useCallback(() => (
+    const drawText = useCallback((rotation: number = 0) => (
         ctx: CanvasRenderingContext2D,
         text: string,
         box: Template['textBoxes'][number],
         settings: TextSettings
     ) => {
         if (!text) return;
+
+        const boxCenterX = box.x + box.width / 2;
+        const boxCenterY = box.y + box.height / 2;
+
+        ctx.save();
+        if (rotation !== 0) {
+            ctx.translate(boxCenterX, boxCenterY);
+            ctx.rotate((rotation * Math.PI) / 180);
+            ctx.translate(-boxCenterX, -boxCenterY);
+        }
 
         const { fontSize, lines } = calculateFontSize(ctx, text, box, settings.fontSize, settings.fontFamily, settings.fontWeight, settings.letterSpacing, settings.textCase);
 
@@ -1560,6 +1655,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 currentY += lineHeight;
             });
         }
+
+        ctx.restore();
     }, [isMobileDevice, calculateFontSize, transformText]);
 
     const draw = useCallback(async () => {
@@ -1569,7 +1666,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!ctx) return;
 
         const now = Date.now();
-        const isActivelyDragging = isDraggingImage || isResizingImage || isRotatingImage || isDragging;
+        const isActivelyDragging = isDraggingImage || isResizingImage || isRotatingImage || isDragging || isRotatingText;
 
         if (isActivelyDragging && isOptimizedDrawing.current && (now - lastDrawTime.current) < 16) {
             return;
@@ -1727,16 +1824,26 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }
 
             textBoxes.forEach((box, i) => {
-                drawText()(ctx, texts[i], box, textSettings[i]);
+                const rotation = textBoxRotations[i] || 0;
+                drawText(rotation)(ctx, texts[i], box, textSettings[i]);
             });
 
             if (selectedTextIndex !== -1 && selectedTextIndex < textBoxes.length && texts[selectedTextIndex]) {
                 const selectedBox = textBoxes[selectedTextIndex];
+                const rotation = textBoxRotations[selectedTextIndex] || 0;
                 const isMobile = isMobileDevice();
                 const baseHandleSize = Math.max(30, Math.min(canvas.width, canvas.height) * 0.04);
                 const handleSize = isMobile ? Math.max(baseHandleSize, 45) : Math.max(baseHandleSize, 35);
 
+                const boxCenterX = selectedBox.x + selectedBox.width / 2;
+                const boxCenterY = selectedBox.y + selectedBox.height / 2;
+
                 ctx.save();
+                if (rotation !== 0) {
+                    ctx.translate(boxCenterX, boxCenterY);
+                    ctx.rotate((rotation * Math.PI) / 180);
+                    ctx.translate(-boxCenterX, -boxCenterY);
+                }
 
                 const textBoxCenterY = selectedBox.y + selectedBox.height / 2;
 
@@ -1880,7 +1987,51 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 const labelY = selectedBox.y + selectedBox.height / 2;
                 ctx.fillText(`${Math.round(selectedBox.height)}px`, labelX, labelY);
 
-                // Draw corner handles (nw, ne, sw, se)
+                ctx.restore();
+
+                // Draw rotation handle (outside rotated context)
+                const rotationHandleSize = isMobile ? 60 : 50;
+                const rotationHandleX = boxCenterX;
+                const rotationHandleY = selectedBox.y - 35;
+
+                ctx.setLineDash([]);
+                ctx.strokeStyle = '#6a7bd1';
+                ctx.lineWidth = isMobile ? 5 : 4;
+                ctx.beginPath();
+                ctx.moveTo(boxCenterX, selectedBox.y);
+                ctx.lineTo(rotationHandleX, rotationHandleY);
+                ctx.stroke();
+
+                ctx.fillStyle = '#6a7bd1';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = isMobile ? 4 : 3;
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 4;
+                ctx.shadowOffsetX = 1;
+                ctx.shadowOffsetY = 1;
+
+                ctx.beginPath();
+                ctx.arc(rotationHandleX, rotationHandleY, rotationHandleSize / 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `${isMobile ? 24 : 20}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('↻', rotationHandleX, rotationHandleY);
+
+                // Draw corner handles (nw, ne, sw, se) - need to restore context first
+                ctx.save();
+                if (rotation !== 0) {
+                    ctx.translate(boxCenterX, boxCenterY);
+                    ctx.rotate((rotation * Math.PI) / 180);
+                    ctx.translate(-boxCenterX, -boxCenterY);
+                }
                 const cornerHandles = [
                     { name: 'nw', x: selectedBox.x - handleSize / 2, y: selectedBox.y - handleSize / 2 },
                     { name: 'ne', x: selectedBox.x + selectedBox.width - handleSize / 2, y: selectedBox.y - handleSize / 2 },
@@ -1911,13 +2062,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 ctx.restore();
             }
         };
-    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, loadAndCacheImage, strokes, currentStroke]);
+    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke]);
 
 
 
     useEffect(() => {
         draw();
-    }, [draw, texts, textBoxes, textSettings, imageOverlays, selectedImageIndex, selectedTextIndex, strokes, currentStroke]);
+    }, [draw, texts, textBoxes, textSettings, textBoxRotations, imageOverlays, selectedImageIndex, selectedTextIndex, strokes, currentStroke]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -2033,6 +2184,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         setTexts(prev => [...prev, 'memehub']);
         setTextBoxes(prev => [...prev, newTextBox]);
+        setTextBoxRotations(prev => [...prev, 0]);
         setTextSettings(prev => [...prev, {
             fontSize: Math.max(60, Math.min(canvas.width, canvas.height) * 0.08),
             color: '#ffffff',
@@ -2064,6 +2216,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setTexts(prev => prev.filter((_, i) => i !== index));
         setTextBoxes(prev => prev.filter((_, i) => i !== index));
         setTextSettings(prev => prev.filter((_, i) => i !== index));
+        setTextBoxRotations(prev => prev.filter((_, i) => i !== index));
 
         toast.success('Text box removed');
     }, [originalTextBoxCount]);
