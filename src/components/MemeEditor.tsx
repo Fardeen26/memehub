@@ -570,6 +570,17 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         });
     };
 
+    const handleImageOpacityChange = useCallback((index: number, opacity: number) => {
+        setImageOverlays(prev => {
+            const updated = [...prev];
+            updated[index] = {
+                ...updated[index],
+                opacity: Math.max(0, Math.min(1, opacity))
+            };
+            return updated;
+        });
+    }, []);
+
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -2894,40 +2905,60 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: -10 }}
                                         transition={{ duration: 0.2, delay: index * 0.05 }}
-                                        className={`flex items-center justify-between p-2 rounded-md border transition-colors ${selectedImageIndex === index
+                                        className={`flex flex-col p-2 rounded-md border transition-colors ${selectedImageIndex === index
                                             ? 'dark:bg-black dark:border-white/15 bg-[#0f0f0f] border-white/20'
                                             : 'dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 bg-black/80 border-white/20'
                                             }`}
                                         onClick={() => setSelectedImageIndex(index)}
                                     >
-                                        <div className="flex items-center space-x-2 cursor-pointer flex-1">
-                                            <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center">
-                                                <ImageIcon className="h-4 w-4 text-white/60 dark:text-white/60" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="text-xs text-white/80 dark:text-white/80 truncate">
-                                                    image.png
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-2 cursor-pointer flex-1">
+                                                <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center">
+                                                    <ImageIcon className="h-4 w-4 text-white/60 dark:text-white/60" />
                                                 </div>
-                                                <div className="text-xs text-white/40 dark:text-white/40">
-                                                    {Math.round(overlay.width)}×{Math.round(overlay.height)}px
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-xs text-white/80 dark:text-white/80 truncate">
+                                                        image.png
+                                                    </div>
+                                                    <div className="text-xs text-white/40 dark:text-white/40">
+                                                        {Math.round(overlay.width)}×{Math.round(overlay.height)}px
+                                                    </div>
                                                 </div>
                                             </div>
+                                            <motion.button
+                                                whileTap={{ scale: 0.9 }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeImageOverlay(index);
+                                                    if (selectedImageIndex === index) {
+                                                        setSelectedImageIndex(-1);
+                                                    } else if (selectedImageIndex > index) {
+                                                        setSelectedImageIndex(selectedImageIndex - 1);
+                                                    }
+                                                }}
+                                                className="p-1 rounded-full hover:scale-110 transition-colors"
+                                            >
+                                                <Trash2 className="h-4 w-4 text-white" />
+                                            </motion.button>
                                         </div>
-                                        <motion.button
-                                            whileTap={{ scale: 0.9 }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                removeImageOverlay(index);
-                                                if (selectedImageIndex === index) {
-                                                    setSelectedImageIndex(-1);
-                                                } else if (selectedImageIndex > index) {
-                                                    setSelectedImageIndex(selectedImageIndex - 1);
-                                                }
-                                            }}
-                                            className="p-1 rounded-full hover:scale-110 transition-colors"
-                                        >
-                                            <Trash2 className="h-4 w-4 text-white" />
-                                        </motion.button>
+                                        {/* Opacity Control */}
+                                        <div className="mt-2 pt-2 border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+                                            <label className="block text-xs text-white/60 mb-1">
+                                                Opacity: {Math.round(overlay.opacity * 100)}%
+                                            </label>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="1"
+                                                step="0.01"
+                                                value={overlay.opacity}
+                                                onChange={(e) => handleImageOpacityChange(index, parseFloat(e.target.value))}
+                                                className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                                style={{
+                                                    background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${overlay.opacity * 100}%, rgba(255,255,255,0.2) ${overlay.opacity * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                }}
+                                            />
+                                        </div>
                                     </motion.div>
                                 ))}
                             </div>
