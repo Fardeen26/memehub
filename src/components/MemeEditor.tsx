@@ -3,7 +3,7 @@
 // @ts-nocheck
 
 import { Template } from '@/types/template';
-import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash } from 'lucide-react';
+import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -141,6 +141,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [eraseBrushOpacity, setEraseBrushOpacity] = useState(1);
     const [currentEraseStroke, setCurrentEraseStroke] = useState<EraseStroke | null>(null);
     const [isErasing, setIsErasing] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const loadAndCacheImage = useCallback(async (src: string): Promise<HTMLImageElement> => {
         if (imageCache.current.has(src)) {
@@ -2580,24 +2581,44 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
         >
-            <motion.button
-                className="bg-transparent cursor-pointer flex items-center"
-                onClick={onReset}
-                whileHover={{ x: -5 }}
-                transition={{ duration: 0.2 }}
-            >
-                <MoveLeft className='h-4 w-4' /> &nbsp; Back
-            </motion.button>
-            <div className="flex max-sm:flex-col max-sm:space-y-10 items-start space-x-16">
+            <div className="flex items-center justify-between">
+                <motion.button
+                    className="bg-transparent cursor-pointer flex items-center"
+                    onClick={onReset}
+                    whileHover={{ x: -5 }}
+                    transition={{ duration: 0.2 }}
+                >
+                    <MoveLeft className='h-4 w-4' /> &nbsp; Back
+                </motion.button>
+                <motion.button
+                    className="bg-transparent max-sm:hidden cursor-pointer flex items-center space-x-2 px-3 py-1.5 rounded-md border border-white/20 hover:bg-white/5 transition-colors"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    whileTap={{ scale: 0.95 }}
+                    title={isExpanded ? "Collapse Editor" : "Expand Editor"}
+                >
+                    {isExpanded ? (
+                        <>
+                            <Minimize2 className='h-4 w-4' />
+                            <span className="text-sm">Collapse</span>
+                        </>
+                    ) : (
+                        <>
+                            <Maximize2 className='h-4 w-4' />
+                            <span className="text-sm">Expand</span>
+                        </>
+                    )}
+                </motion.button>
+            </div>
+            <div className={`flex ${isExpanded ? 'flex-col space-y-6' : 'max-sm:flex-col max-sm:space-y-10'} items-start ${isExpanded ? '' : 'space-x-16'}`}>
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.1 }}
-                    className='max-sm:mx-auto'
+                    className={isExpanded ? 'w-full flex justify-center' : 'max-sm:mx-auto'}
                 >
                     <canvas
                         ref={canvasRef}
-                        className="border border-gray-300 dark:border-gray-700 w-[400px] max-sm:w-full h-fit bg-white select-none"
+                        className={`border border-gray-300 dark:border-gray-700 ${isExpanded ? 'w-full max-w-[800px]' : 'w-[400px] max-sm:w-full'} h-fit bg-white select-none`}
                         onMouseDown={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawStart(e.nativeEvent) : handleMouseDown}
                         onMouseMove={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawMove(e.nativeEvent) : handleMouseMove}
                         onMouseUp={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
@@ -2659,7 +2680,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 </motion.div>
 
                 <motion.div
-                    className="space-y-2 max-sm:-mt-4 w-full"
+                    className={`space-y-2 ${isExpanded ? 'w-full max-w-[800px] mx-auto' : 'max-sm:-mt-4 w-full'}`}
                     initial={{ opacity: 0, x: 0 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.2 }}
