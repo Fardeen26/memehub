@@ -24,6 +24,12 @@ export type TextSettings = {
     };
 };
 
+export type EraseStroke = {
+    points: { x: number; y: number }[];
+    size: number;
+    opacity: number;
+};
+
 export type ImageOverlay = {
     id: string;
     src: string;
@@ -35,5 +41,6 @@ export type ImageOverlay = {
     originalHeight: number;
     opacity: number;
     rotation: number;
+    eraseStrokes: EraseStroke[];
 };
 

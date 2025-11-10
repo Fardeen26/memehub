@@ -31,7 +31,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from 'sonner';
-import { MemeEditorProps, TextSettings, ImageOverlay } from '@/types/editor';
+import { MemeEditorProps, TextSettings, ImageOverlay, EraseStroke } from '@/types/editor';
 import Image from 'next/image';
 import { useFontLoader, FONT_CONFIGS } from '@/hooks/useFontLoader';
 
@@ -133,6 +133,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [strokes, setStrokes] = useState<Stroke[]>([]);
     const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
+
+    // Image erase mode state
+    const [isImageEraseMode, setIsImageEraseMode] = useState(false);
+    const [imageEraseTargetIndex, setImageEraseTargetIndex] = useState<number>(-1);
+    const [eraseBrushSize, setEraseBrushSize] = useState(20);
+    const [eraseBrushOpacity, setEraseBrushOpacity] = useState(1);
+    const [currentEraseStroke, setCurrentEraseStroke] = useState<EraseStroke | null>(null);
+    const [isErasing, setIsErasing] = useState(false);
 
     const loadAndCacheImage = useCallback(async (src: string): Promise<HTMLImageElement> => {
         if (imageCache.current.has(src)) {
@@ -431,7 +439,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 originalWidth: img.width,
                 originalHeight: img.height,
                 opacity: 1,
-                rotation: 0
+                rotation: 0,
+                eraseStrokes: []
             };
 
             setImageOverlays(prev => [...prev, newOverlay]);
@@ -568,7 +577,48 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }
             return prev.filter((_, i) => i !== index);
         });
+        if (imageEraseTargetIndex === index) {
+            setIsImageEraseMode(false);
+            setImageEraseTargetIndex(-1);
+        } else if (imageEraseTargetIndex > index) {
+            setImageEraseTargetIndex(imageEraseTargetIndex - 1);
+        }
     };
+
+    const addEraseStrokeToImage = useCallback((imageIndex: number, stroke: EraseStroke) => {
+        setImageOverlays(prev => {
+            const updated = [...prev];
+            updated[imageIndex] = {
+                ...updated[imageIndex],
+                eraseStrokes: [...updated[imageIndex].eraseStrokes, stroke]
+            };
+            return updated;
+        });
+    }, []);
+
+    const undoImageErase = useCallback((imageIndex: number) => {
+        setImageOverlays(prev => {
+            const updated = [...prev];
+            if (updated[imageIndex] && updated[imageIndex].eraseStrokes.length > 0) {
+                updated[imageIndex] = {
+                    ...updated[imageIndex],
+                    eraseStrokes: updated[imageIndex].eraseStrokes.slice(0, -1)
+                };
+            }
+            return updated;
+        });
+    }, []);
+
+    const clearImageErase = useCallback((imageIndex: number) => {
+        setImageOverlays(prev => {
+            const updated = [...prev];
+            updated[imageIndex] = {
+                ...updated[imageIndex],
+                eraseStrokes: []
+            };
+            return updated;
+        });
+    }, []);
 
     const handleImageOpacityChange = useCallback((index: number, opacity: number) => {
         setImageOverlays(prev => {
@@ -584,6 +634,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
+
+        // Don't handle normal interactions when in erase or drawing mode
+        if (isImageEraseMode || isDrawingMode) return;
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -688,6 +741,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
+
+        // Don't handle normal interactions when in erase or drawing mode
+        if (isImageEraseMode || isDrawingMode) return;
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -1004,6 +1060,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         e.preventDefault();
         const canvas = canvasRef.current;
         if (!canvas || e.touches.length !== 1) return;
+
+        // Don't handle normal interactions when in erase or drawing mode
+        if (isImageEraseMode || isDrawingMode) return;
 
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
@@ -1737,26 +1796,92 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     const overlayImg = imageCache.current.get(overlay.src);
                     if (!overlayImg) continue;
 
-                    ctx.save();
-                    ctx.globalAlpha = overlay.opacity;
+                    // Check if this image has erase strokes
+                    const overlayIndex = imageOverlays.indexOf(overlay);
+                    const hasEraseStrokes = overlay.eraseStrokes.length > 0 || 
+                        (currentEraseStroke && imageEraseTargetIndex === overlayIndex && imageEraseTargetIndex !== -1);
 
-                    if (overlay.rotation !== 0) {
-                        const centerX = overlay.x + overlay.width / 2;
-                        const centerY = overlay.y + overlay.height / 2;
-                        ctx.translate(centerX, centerY);
-                        ctx.rotate((overlay.rotation * Math.PI) / 180);
-                        ctx.drawImage(overlayImg, -overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
+                    if (hasEraseStrokes) {
+                        // Create a temporary canvas for the image with erase mask applied
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = overlay.width;
+                        tempCanvas.height = overlay.height;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        
+                        if (tempCtx) {
+                            // Draw the image to the temp canvas
+                            tempCtx.drawImage(overlayImg, 0, 0, overlay.width, overlay.height);
+                            
+                            // Apply erase strokes using destination-out to actually remove pixels
+                            tempCtx.globalCompositeOperation = 'destination-out';
+                            tempCtx.lineCap = 'round';
+                            tempCtx.lineJoin = 'round';
+                            
+                            // Draw all erase strokes
+                            const allStrokes = [...overlay.eraseStrokes];
+                            if (currentEraseStroke && imageEraseTargetIndex === overlayIndex && imageEraseTargetIndex !== -1) {
+                                allStrokes.push(currentEraseStroke);
+                            }
+                            
+                            for (const stroke of allStrokes) {
+                                if (!stroke.points.length) continue;
+                                tempCtx.save();
+                                tempCtx.globalAlpha = stroke.opacity;
+                                tempCtx.lineWidth = stroke.size;
+                                tempCtx.strokeStyle = 'rgba(0, 0, 0, 1)';
+                                tempCtx.beginPath();
+                                tempCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                                for (let i = 1; i < stroke.points.length; i++) {
+                                    tempCtx.lineTo(stroke.points[i].x, stroke.points[i].y);
+                                }
+                                tempCtx.stroke();
+                                tempCtx.restore();
+                            }
+                            
+                            // Reset composite operation
+                            tempCtx.globalCompositeOperation = 'source-over';
+                            tempCtx.globalAlpha = 1;
+                            
+                            // Now draw the masked image to the main canvas
+                            ctx.save();
+                            ctx.globalAlpha = overlay.opacity;
+                            
+                            if (overlay.rotation !== 0) {
+                                const centerX = overlay.x + overlay.width / 2;
+                                const centerY = overlay.y + overlay.height / 2;
+                                ctx.translate(centerX, centerY);
+                                ctx.rotate((overlay.rotation * Math.PI) / 180);
+                                ctx.drawImage(tempCanvas, -overlay.width / 2, -overlay.height / 2);
+                            } else {
+                                ctx.drawImage(tempCanvas, overlay.x, overlay.y);
+                            }
+                            
+                            ctx.restore();
+                        }
                     } else {
-                        ctx.drawImage(overlayImg, overlay.x, overlay.y, overlay.width, overlay.height);
+                        // No erase strokes, draw normally
+                        ctx.save();
+                        ctx.globalAlpha = overlay.opacity;
+                        
+                        if (overlay.rotation !== 0) {
+                            const centerX = overlay.x + overlay.width / 2;
+                            const centerY = overlay.y + overlay.height / 2;
+                            ctx.translate(centerX, centerY);
+                            ctx.rotate((overlay.rotation * Math.PI) / 180);
+                            ctx.drawImage(overlayImg, -overlay.width / 2, -overlay.height / 2, overlay.width, overlay.height);
+                        } else {
+                            ctx.drawImage(overlayImg, overlay.x, overlay.y, overlay.width, overlay.height);
+                        }
+                        
+                        ctx.restore();
                     }
-
-                    ctx.restore();
                 } catch (error) {
                     console.error('Error drawing overlay image:', error);
                 }
             }
 
-            if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length) {
+            // Only show selection handles if not in erase mode
+            if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length && !isImageEraseMode) {
                 const selectedImg = imageOverlays[selectedImageIndex];
 
                 const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -2073,7 +2198,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 ctx.restore();
             }
         };
-    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke]);
+    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke]);
 
 
 
@@ -2247,8 +2372,117 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         return { x, y };
     };
 
+    const getImageLocalPos = (canvasPos: Point, imageOverlay: ImageOverlay): Point | null => {
+        // Check if point is within image bounds (considering rotation)
+        if (imageOverlay.rotation !== 0) {
+            // For rotated images, we need to transform the point
+            const centerX = imageOverlay.x + imageOverlay.width / 2;
+            const centerY = imageOverlay.y + imageOverlay.height / 2;
+            const rad = (-imageOverlay.rotation * Math.PI) / 180;
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            
+            // Transform to local coordinates
+            const localX = canvasPos.x - centerX;
+            const localY = canvasPos.y - centerY;
+            const rotatedX = localX * cos - localY * sin;
+            const rotatedY = localX * sin + localY * cos;
+            
+            const localPos = { x: rotatedX + imageOverlay.width / 2, y: rotatedY + imageOverlay.height / 2 };
+            
+            if (localPos.x >= 0 && localPos.x <= imageOverlay.width && localPos.y >= 0 && localPos.y <= imageOverlay.height) {
+                return localPos;
+            }
+        } else {
+            if (canvasPos.x >= imageOverlay.x && canvasPos.x <= imageOverlay.x + imageOverlay.width &&
+                canvasPos.y >= imageOverlay.y && canvasPos.y <= imageOverlay.y + imageOverlay.height) {
+                return {
+                    x: canvasPos.x - imageOverlay.x,
+                    y: canvasPos.y - imageOverlay.y
+                };
+            }
+        }
+        return null;
+    };
+
+    // Image erase event handlers
+    const handleImageEraseStart = (e: MouseEvent | TouchEvent) => {
+        if (!isImageEraseMode || imageEraseTargetIndex === -1) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const canvasPos = getPointerPos(e, canvas);
+        const overlay = imageOverlays[imageEraseTargetIndex];
+        if (!overlay) return;
+        
+        // Always start erasing, even if click is outside the image
+        // This allows user to click outside and drag onto the image
+        setIsErasing(true);
+        setCurrentEraseStroke({
+            points: [],
+            size: eraseBrushSize,
+            opacity: eraseBrushOpacity
+        });
+        
+        // If the click is within the image, add the first point
+        const localPos = getImageLocalPos(canvasPos, overlay);
+        if (localPos) {
+            setCurrentEraseStroke({
+                points: [localPos],
+                size: eraseBrushSize,
+                opacity: eraseBrushOpacity
+            });
+        }
+        if (e.cancelable) e.preventDefault();
+    };
+
+    const handleImageEraseMove = (e: MouseEvent | TouchEvent) => {
+        if (!isImageEraseMode || !isErasing || !currentEraseStroke || imageEraseTargetIndex === -1) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const canvasPos = getPointerPos(e, canvas);
+        const overlay = imageOverlays[imageEraseTargetIndex];
+        if (!overlay) return;
+        
+        // Only add points that are within the image bounds
+        const localPos = getImageLocalPos(canvasPos, overlay);
+        if (localPos) {
+            setCurrentEraseStroke(prev => {
+                if (!prev) return null;
+                // Avoid adding duplicate points if mouse hasn't moved much
+                const lastPoint = prev.points[prev.points.length - 1];
+                if (lastPoint) {
+                    const dist = Math.sqrt(
+                        Math.pow(localPos.x - lastPoint.x, 2) + 
+                        Math.pow(localPos.y - lastPoint.y, 2)
+                    );
+                    // Only add point if it's moved at least 1 pixel
+                    if (dist < 1) return prev;
+                }
+                return { ...prev, points: [...prev.points, localPos] };
+            });
+        }
+        if (e.cancelable) e.preventDefault();
+    };
+
+    const handleImageEraseEnd = (e?: MouseEvent | TouchEvent) => {
+        if (!isImageEraseMode || !isErasing || !currentEraseStroke || imageEraseTargetIndex === -1) return;
+        
+        // Only save the stroke if it has at least one point (user actually drew on the image)
+        if (currentEraseStroke.points.length > 0) {
+            addEraseStrokeToImage(imageEraseTargetIndex, currentEraseStroke);
+        }
+        
+        setCurrentEraseStroke(null);
+        setIsErasing(false);
+        if (e && 'preventDefault' in e && e.cancelable) e.preventDefault();
+    };
+
     // Drawing event handlers
     const handleDrawStart = (e: MouseEvent | TouchEvent) => {
+        if (isImageEraseMode) {
+            handleImageEraseStart(e);
+            return;
+        }
         if (!isDrawingMode) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -2263,6 +2497,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (e.cancelable) e.preventDefault();
     };
     const handleDrawMove = (e: MouseEvent | TouchEvent) => {
+        if (isImageEraseMode) {
+            handleImageEraseMove(e);
+            return;
+        }
         if (!isDrawingMode || !isDrawing || !currentStroke) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -2271,6 +2509,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (e.cancelable) e.preventDefault();
     };
     const handleDrawEnd = (e?: MouseEvent | TouchEvent) => {
+        if (isImageEraseMode) {
+            handleImageEraseEnd(e);
+            return;
+        }
         if (!isDrawingMode || !isDrawing || !currentStroke) return;
         setStrokes((prev) => {
             const updated = [...prev, currentStroke];
@@ -2306,7 +2548,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     };
     useEffect(() => {
-        if (!isDrawingMode) return;
+        if (!isDrawingMode && !isImageEraseMode) return;
         const canvas = canvasRef.current;
         if (!canvas) return;
         const mouseDown = (e: MouseEvent) => handleDrawStart(e);
@@ -2329,7 +2571,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             canvas.removeEventListener('touchmove', touchMove);
             window.removeEventListener('touchend', touchEnd);
         };
-    }, [isDrawingMode, isEraser, drawColor, drawSize, currentStroke, isDrawing]);
+    }, [isDrawingMode, isImageEraseMode, isEraser, drawColor, drawSize, currentStroke, isDrawing, imageEraseTargetIndex, eraseBrushSize, eraseBrushOpacity, currentEraseStroke, isErasing, imageOverlays]);
 
     return (
         <motion.section
@@ -2356,13 +2598,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     <canvas
                         ref={canvasRef}
                         className="border border-gray-300 dark:border-gray-700 w-[400px] max-sm:w-full h-fit bg-white select-none"
-                        onMouseDown={isDrawingMode ? (e) => handleDrawStart(e.nativeEvent) : handleMouseDown}
-                        onMouseMove={isDrawingMode ? (e) => handleDrawMove(e.nativeEvent) : handleMouseMove}
-                        onMouseUp={isDrawingMode ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
-                        onMouseLeave={isDrawingMode ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
-                        onTouchStart={isDrawingMode ? (e) => handleDrawStart(e.nativeEvent) : handleTouchStart}
-                        onTouchMove={isDrawingMode ? (e) => handleDrawMove(e.nativeEvent) : handleTouchMove}
-                        onTouchEnd={isDrawingMode ? (e) => handleDrawEnd(e.nativeEvent) : handleTouchEnd}
+                        onMouseDown={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawStart(e.nativeEvent) : handleMouseDown}
+                        onMouseMove={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawMove(e.nativeEvent) : handleMouseMove}
+                        onMouseUp={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
+                        onMouseLeave={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
+                        onTouchStart={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawStart(e.nativeEvent) : handleTouchStart}
+                        onTouchMove={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawMove(e.nativeEvent) : handleTouchMove}
+                        onTouchEnd={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleTouchEnd}
                         style={{ touchAction: 'none' }}
                     />
 
@@ -2958,6 +3200,92 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                     background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${overlay.opacity * 100}%, rgba(255,255,255,0.2) ${overlay.opacity * 100}%, rgba(255,255,255,0.2) 100%)`
                                                 }}
                                             />
+                                        </div>
+                                        {/* Erase Controls */}
+                                        <div className="mt-2 pt-2 border-t border-white/10 space-y-2" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center space-x-2">
+                                                <motion.button
+                                                    whileTap={{ scale: 0.98 }}
+                                                    className={`flex-1 px-2 py-1.5 text-xs rounded-md border transition-colors ${
+                                                        isImageEraseMode && imageEraseTargetIndex === index
+                                                            ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]'
+                                                            : 'bg-black/70 dark:bg-white/15 border-white/20 text-white hover:bg-white/10'
+                                                    }`}
+                                                    onClick={() => {
+                                                        if (isImageEraseMode && imageEraseTargetIndex === index) {
+                                                            setIsImageEraseMode(false);
+                                                            setImageEraseTargetIndex(-1);
+                                                            setSelectedImageIndex(index); // Re-select the image when exiting erase mode
+                                                        } else {
+                                                            setIsImageEraseMode(true);
+                                                            setImageEraseTargetIndex(index);
+                                                            setSelectedImageIndex(index); // Select the image when entering erase mode
+                                                            setIsDrawingMode(false);
+                                                        }
+                                                    }}
+                                                >
+                                                    {isImageEraseMode && imageEraseTargetIndex === index ? 'Exit Erase' : 'Erase'}
+                                                </motion.button>
+                                                {isImageEraseMode && imageEraseTargetIndex === index && (
+                                                    <>
+                                                        <motion.button
+                                                            whileTap={{ scale: 0.98 }}
+                                                            className="px-2 py-1.5 text-xs rounded-md border bg-black/70 dark:bg-white/15 border-white/20 text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            onClick={() => undoImageErase(index)}
+                                                            disabled={overlay.eraseStrokes.length === 0}
+                                                            title="Undo Last Erase"
+                                                        >
+                                                            <Undo2 className="h-3 w-3" />
+                                                        </motion.button>
+                                                        <motion.button
+                                                            whileTap={{ scale: 0.98 }}
+                                                            className="px-2 py-1.5 text-xs rounded-md border bg-black/70 dark:bg-white/15 border-white/20 text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            onClick={() => clearImageErase(index)}
+                                                            disabled={overlay.eraseStrokes.length === 0}
+                                                            title="Clear All Erase"
+                                                        >
+                                                            <Trash className="h-3 w-3" />
+                                                        </motion.button>
+                                                    </>
+                                                )}
+                                            </div>
+                                            {isImageEraseMode && imageEraseTargetIndex === index && (
+                                                <div className="space-y-2">
+                                                    <div>
+                                                        <label className="block text-xs text-white/60 mb-1">
+                                                            Brush Size: {eraseBrushSize}px
+                                                        </label>
+                                                        <input
+                                                            type="range"
+                                                            min="5"
+                                                            max="100"
+                                                            value={eraseBrushSize}
+                                                            onChange={(e) => setEraseBrushSize(Number(e.target.value))}
+                                                            className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                                            style={{
+                                                                background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((eraseBrushSize - 5) / 95) * 100}%, rgba(255,255,255,0.2) ${((eraseBrushSize - 5) / 95) * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs text-white/60 mb-1">
+                                                            Brush Opacity: {Math.round(eraseBrushOpacity * 100)}%
+                                                        </label>
+                                                        <input
+                                                            type="range"
+                                                            min="0.1"
+                                                            max="1"
+                                                            step="0.1"
+                                                            value={eraseBrushOpacity}
+                                                            onChange={(e) => setEraseBrushOpacity(Number(e.target.value))}
+                                                            className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                                            style={{
+                                                                background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${eraseBrushOpacity * 100}%, rgba(255,255,255,0.2) ${eraseBrushOpacity * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </motion.div>
                                 ))}
