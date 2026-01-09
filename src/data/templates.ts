@@ -65,6 +65,42 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 100, y: 470, width: 450, height: 400, fontSize: 70, minFont: 20, align: "center" as const }
         ]
     },
+
+    
+        "Crying Wojak Vs Chad": {
+          originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755084172/meme-templates/Crying%20Wojak%20Vs%20Chad.png",
+          "width": 1000,
+          "height": 540,
+          textBoxes: [
+            {
+              "x": 20,
+              "y": 10,
+              "width": 960,
+              "height": 170,
+              "fontSize": 60,
+              "minFont": 20,
+              "align": "center",
+              "verticalAlign": "top"
+            },
+            {
+              "x": 20,
+              "y": 380,
+              "width": 960,
+              "height": 150,
+              "fontSize": 60,
+              "minFont": 20,
+              "align": "center",
+              "verticalAlign": "middle"
+            }
+          ],
+        },
+
+
+
+
+
+
+
     // "arjun-kapoor": {
     //     originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1754999475/memes/arjun-kapoor.png",
     //     textBoxes: [
