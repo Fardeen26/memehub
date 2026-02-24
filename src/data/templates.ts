@@ -368,7 +368,7 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
             { x: 50, y: 1880, width: 2000, height: 300, fontSize: 180, minFont: 40, align: "center" as const }
         ]
     },
-    "hungery-monkey": {
+    "hungry-monkey": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755020825/meme-templates/hungery-monkey.jpg",
         textBoxes: [
             { x: 240, y: 450, width: 450, height: 100, fontSize: 60, minFont: 40, align: "center" as const },
@@ -457,7 +457,7 @@ export const rawTemplates: Record<string, OptimizedMemeTemplate> = {
         ]
     },
 
-    "black-&-white-woolfs": {
+    "black-&-white-wolves": {
         originalUrl: "https://res.cloudinary.com/dl27j0qcm/image/upload/v1755022305/temp43_u6vh2x.jpg",
         textBoxes: [
             { x: 100, y: 1850, width: 2600, height: 1600, fontSize: 400, minFont: 40, align: "center" as const },
