@@ -33,6 +33,9 @@ export type EraseStroke = {
 export type ImageOverlay = {
     id: string;
     src: string;
+    label?: string;
+    /** GIF / animated SVG — canvas redraws each frame */
+    animated?: boolean;
     x: number;
     y: number;
     width: number;
@@ -42,5 +45,29 @@ export type ImageOverlay = {
     opacity: number;
     rotation: number;
     eraseStrokes: EraseStroke[];
+};
+
+export type ShapeType =
+    | 'rectangle'
+    | 'ellipse'
+    | 'arrow'
+    | 'line'
+    | 'triangle'
+    | 'star'
+    | 'speech-bubble';
+
+export type ShapeOverlay = {
+    id: string;
+    type: ShapeType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    strokeColor: string;
+    fillColor: string;
+    strokeWidth: number;
+    filled: boolean;
+    opacity: number;
 };
 

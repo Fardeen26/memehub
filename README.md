@@ -8,6 +8,7 @@ A modern, web-based meme generator built with Next.js and TypeScript. Create hil
 - **Custom Uploads**: Upload your own images to create unique memes
 - **Interactive Editor**: Drag-and-drop text positioning with real-time preview
 - **Template Search**: Quickly find templates with built-in search functionality
+- **Giphy Stickers & GIFs**: Search real sticker and GIF catalogs from Giphy (not custom assets)
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 - **Modern UI**: Clean, intuitive interface built with Tailwind CSS
 
@@ -46,7 +47,14 @@ pnpm install
 
 ```
 
-3. Run the development server:
+3. Copy environment variables and add a [Giphy API key](https://developers.giphy.com/dashboard/) (powers stickers & GIFs in the editor):
+
+```bash
+cp .env.example .env.local
+# Set GIPHY_API_KEY=your_key
+```
+
+4. Run the development server:
 ```bash
 bun dev
 # or
@@ -57,7 +65,7 @@ yarn dev
 pnpm dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
 ## Usage
 

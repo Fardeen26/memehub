@@ -3,7 +3,7 @@
 // @ts-nocheck
 
 import { Template } from '@/types/template';
-import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Maximize2, Minimize2 } from 'lucide-react';
+import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Maximize2, Minimize2, Shapes, ChevronDown, ChevronUp, Layers } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -34,6 +34,9 @@ import { toast } from 'sonner';
 import { MemeEditorProps, TextSettings, ImageOverlay, EraseStroke } from '@/types/editor';
 import Image from 'next/image';
 import { useFontLoader, FONT_CONFIGS } from '@/hooks/useFontLoader';
+import { useCanvasShapes } from '@/hooks/useCanvasShapes';
+import ElementsPanel from '@/components/ElementsPanel';
+import { resolveImageSrc } from '@/lib/resolveImageSrc';
 
 export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -120,12 +123,28 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
 
+    const {
+        shapeOverlays,
+        selectedShapeIndex,
+        setSelectedShapeIndex,
+        addShape,
+        removeShape,
+        updateShape,
+        tryShapeMouseDown,
+        handleShapeMouseMove,
+        endShapeInteraction,
+        drawShapesLayer,
+        isShapeInteracting,
+        getShapeAtPosition,
+    } = useCanvasShapes(canvasRef);
+
     const lastDrawTime = useRef<number>(0);
     const isOptimizedDrawing = useRef<boolean>(false);
 
     type Point = { x: number; y: number };
     type Stroke = { points: Point[]; color: string; size: number; eraser: boolean };
     const [isDrawingMode, setIsDrawingMode] = useState(false);
+    const [showElementsPanel, setShowElementsPanel] = useState(false);
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [isEraser, setIsEraser] = useState(false);
     const [drawColor, setDrawColor] = useState('#ff0000');
@@ -399,21 +418,15 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         return { index: -1, handle: '' };
     }, [imageOverlays]);
 
-    const addImageOverlay = useCallback(async (file: File | string, isDataUrl: boolean = false) => {
+    const addImageOverlay = useCallback(async (
+        input: File | string,
+        options?: { isDataUrl?: boolean; label?: string; animated?: boolean }
+    ) => {
         try {
-            let imageSrc: string;
-
-            if (isDataUrl) {
-                imageSrc = file as string;
-            } else {
-                const reader = new FileReader();
-                imageSrc = await new Promise<string>((resolve) => {
-                    reader.onload = (e) => {
-                        resolve(e.target?.result as string);
-                    };
-                    reader.readAsDataURL(file as File);
-                });
-            }
+            const imageSrc = await resolveImageSrc(input, options?.isDataUrl);
+            const isAnimated =
+                options?.animated ??
+                (/\.gif(\?|$)/i.test(imageSrc) || /giphy\.com/i.test(imageSrc));
 
             const img = await loadAndCacheImage(imageSrc);
 
@@ -433,6 +446,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const newOverlay: ImageOverlay = {
                 id: generateImageId(),
                 src: imageSrc,
+                label: options?.label || 'Image',
+                animated: isAnimated,
                 x: (canvas.width - width) / 2,
                 y: (canvas.height - height) / 2,
                 width,
@@ -444,13 +459,24 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 eraseStrokes: []
             };
 
-            setImageOverlays(prev => [...prev, newOverlay]);
+            setImageOverlays(prev => {
+                setSelectedImageIndex(prev.length);
+                setSelectedShapeIndex(-1);
+                return [...prev, newOverlay];
+            });
 
         } catch (error) {
             console.error('Error adding image overlay:', error);
             toast.error('Failed to add image');
         }
-    }, [loadAndCacheImage]);
+    }, [loadAndCacheImage, setSelectedShapeIndex]);
+
+    const addMediaFromLibrary = useCallback(
+        async (src: string, label: string, animated: boolean) => {
+            await addImageOverlay(src, { label, animated });
+        },
+        [addImageOverlay]
+    );
 
     const handleDialogFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -492,7 +518,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             if (uploadMethod === 'file' && selectedFile) {
                 await addImageOverlay(selectedFile);
             } else if (uploadMethod === 'paste' && pastedImageData) {
-                await addImageOverlay(pastedImageData, true);
+                await addImageOverlay(pastedImageData, { isDataUrl: true });
             } else {
                 toast.error('Please select a file or paste an image');
                 return;
@@ -646,6 +672,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
 
+        if (tryShapeMouseDown(x, y, canvas)) {
+            setSelectedImageIndex(-1);
+            return;
+        }
+        setSelectedShapeIndex(-1);
+
         const imageResult = getImageAtPosition(x, y);
         if (imageResult.index !== -1) {
             setSelectedImageIndex(imageResult.index);
@@ -752,6 +784,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
+
+        if (isShapeInteracting) {
+            handleShapeMouseMove(x, y, canvas);
+            return;
+        }
 
         // Mouse move handler logic
         if (isDraggingImage && dragImageIndex !== -1) {
@@ -1002,24 +1039,33 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     canvas.style.cursor = `${resizeHandleResult.handle}-resize`;
                 }
             } else {
-                const imageResult = getImageAtPosition(x, y);
-                if (imageResult.index !== -1) {
-                    if (imageResult.handle === 'move') {
-                        canvas.style.cursor = 'grab';
-                    } else if (imageResult.handle === 'rotate') {
-                        canvas.style.cursor = 'grab';
-                    } else {
-                        canvas.style.cursor = `${imageResult.handle}-resize`;
-                    }
+                const shapeHit = getShapeAtPosition(x, y);
+                if (shapeHit && shapeHit.index !== -1) {
+                    canvas.style.cursor =
+                        shapeHit.handle === 'move' || shapeHit.handle === 'rotate'
+                            ? 'grab'
+                            : `${shapeHit.handle}-resize`;
                 } else {
-                    const textIndex = getTextAtPosition(x, y);
-                    canvas.style.cursor = textIndex !== -1 ? 'grab' : 'default';
+                    const imageResult = getImageAtPosition(x, y);
+                    if (imageResult.index !== -1) {
+                        if (imageResult.handle === 'move') {
+                            canvas.style.cursor = 'grab';
+                        } else if (imageResult.handle === 'rotate') {
+                            canvas.style.cursor = 'grab';
+                        } else {
+                            canvas.style.cursor = `${imageResult.handle}-resize`;
+                        }
+                    } else {
+                        const textIndex = getTextAtPosition(x, y);
+                        canvas.style.cursor = textIndex !== -1 ? 'grab' : 'default';
+                    }
                 }
             }
         }
     };
 
     const handleMouseUp = () => {
+        endShapeInteraction();
         setIsDragging(false);
         setDragIndex(-1);
         setDragOffset({ x: 0, y: 0 });
@@ -1072,6 +1118,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const touch = e.touches[0];
         const x = (touch.clientX - rect.left) * scaleX;
         const y = (touch.clientY - rect.top) * scaleY;
+
+        if (tryShapeMouseDown(x, y, canvas)) {
+            setSelectedImageIndex(-1);
+            return;
+        }
+        setSelectedShapeIndex(-1);
 
         const imageResult = getImageAtPosition(x, y);
         if (imageResult.index !== -1) {
@@ -1163,7 +1215,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const canvas = canvasRef.current;
         if (!canvas || e.touches.length !== 1) return;
 
-        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage && !isResizingTextWidth && !isResizingTextHeight && !isResizingTextCorner && !isRotatingText) return;
+        if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage && !isResizingTextWidth && !isResizingTextHeight && !isResizingTextCorner && !isRotatingText && !isShapeInteracting) return;
         if (isDragging && dragIndex === -1) return;
         if (isDraggingImage && dragImageIndex === -1) return;
         if (isRotatingImage && rotateImageIndex === -1) return;
@@ -1180,6 +1232,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const touch = e.touches[0];
         const x = (touch.clientX - rect.left) * scaleX;
         const y = (touch.clientY - rect.top) * scaleY;
+
+        if (isShapeInteracting) {
+            handleShapeMouseMove(x, y, canvas);
+            return;
+        }
 
         if (isDraggingImage && dragImageIndex !== -1) {
             const newX = x - dragImageOffset.x;
@@ -1416,6 +1473,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
         e.preventDefault();
+        endShapeInteraction();
         setIsDragging(false);
         setDragIndex(-1);
         setDragOffset({ x: 0, y: 0 });
@@ -1737,7 +1795,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!ctx) return;
 
         const now = Date.now();
-        const isActivelyDragging = isDraggingImage || isResizingImage || isRotatingImage || isDragging || isRotatingText;
+        const isActivelyDragging = isDraggingImage || isResizingImage || isRotatingImage || isDragging || isRotatingText || isShapeInteracting;
 
         if (isActivelyDragging && isOptimizedDrawing.current && (now - lastDrawTime.current) < 16) {
             return;
@@ -1880,6 +1938,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     console.error('Error drawing overlay image:', error);
                 }
             }
+
+            drawShapesLayer(ctx);
 
             // Only show selection handles if not in erase mode
             if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length && !isImageEraseMode) {
@@ -2199,13 +2259,29 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 ctx.restore();
             }
         };
-    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke]);
+    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, isShapeInteracting, imageOverlays, shapeOverlays, selectedImageIndex, selectedShapeIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer]);
 
 
 
     useEffect(() => {
         draw();
-    }, [draw, texts, textBoxes, textSettings, textBoxRotations, imageOverlays, selectedImageIndex, selectedTextIndex, strokes, currentStroke]);
+    }, [draw, texts, textBoxes, textSettings, textBoxRotations, imageOverlays, shapeOverlays, selectedImageIndex, selectedShapeIndex, selectedTextIndex, strokes, currentStroke]);
+
+    const hasAnimatedOverlays = imageOverlays.some((o) => o.animated);
+    useEffect(() => {
+        if (!hasAnimatedOverlays) return;
+        let raf = 0;
+        let last = 0;
+        const tick = (now: number) => {
+            if (now - last >= 33) {
+                last = now;
+                draw();
+            }
+            raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [hasAnimatedOverlays, draw]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -2256,11 +2332,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             if (isEditableTarget(event.target)) return;
             if (isDrawingMode || isImageEraseMode) return;
 
-            if (event.key === 'Delete' && selectedImageIndex !== -1) {
-                removeImageOverlay(selectedImageIndex);
-                setSelectedImageIndex(-1);
-                event.preventDefault();
-                return;
+            if (event.key === 'Delete' || event.key === 'Backspace') {
+                if (selectedShapeIndex !== -1) {
+                    removeShape(selectedShapeIndex);
+                    event.preventDefault();
+                    return;
+                }
+                if (selectedImageIndex !== -1) {
+                    removeImageOverlay(selectedImageIndex);
+                    setSelectedImageIndex(-1);
+                    event.preventDefault();
+                    return;
+                }
             }
 
             const step = event.shiftKey ? 10 : 1;
@@ -2269,6 +2352,15 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             const canvas = canvasRef.current;
             if (!canvas) return;
+
+            if (selectedShapeIndex !== -1 && selectedShapeIndex < shapeOverlays.length) {
+                const shape = shapeOverlays[selectedShapeIndex];
+                const newX = Math.max(0, Math.min(canvas.width - shape.width, shape.x + delta.dx));
+                const newY = Math.max(0, Math.min(canvas.height - shape.height, shape.y + delta.dy));
+                updateShape(selectedShapeIndex, { x: newX, y: newY });
+                event.preventDefault();
+                return;
+            }
 
             if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length) {
                 const img = imageOverlays[selectedImageIndex];
@@ -2313,11 +2405,15 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         return () => document.removeEventListener('keydown', keyHandler);
     }, [
         selectedImageIndex,
+        selectedShapeIndex,
         selectedTextIndex,
         imageOverlays,
+        shapeOverlays,
         textBoxes,
         isDrawingMode,
         isImageEraseMode,
+        removeShape,
+        updateShape,
     ]);
 
     useEffect(() => {
@@ -2764,180 +2860,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.2 }}
                 >
-                    {/* Action Buttons Row */}
-                    <div className="flex space-x-2">
-                        <Dialog open={isUploadDialogOpen} onOpenChange={(open) => {
-                            setIsUploadDialogOpen(open);
-                            if (!open) {
-                                resetDialogState();
-                            }
-                        }}>
-                            <DialogTrigger asChild>
-                                <motion.button
-                                    whileTap={{ scale: 0.98 }}
-                                    className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-black/70 dark:bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full text-center"
-                                    onClick={() => setIsUploadDialogOpen(true)}
-                                >
-                                    <Upload className="h-3 w-3" />
-                                    <span>Upload Image</span>
-                                </motion.button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-md bg-[#0f0f0f] border-white/20">
-                                <DialogHeader>
-                                    <DialogTitle className="text-white">Upload Image</DialogTitle>
-                                    <DialogDescription className="text-white/60">
-                                        Choose how you want to add an image to your meme.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                    {/* Upload Method Selection */}
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <motion.button
-                                            whileTap={{ scale: 0.98 }}
-                                            className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'file'
-                                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
-                                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                                                }`}
-                                            onClick={() => setUploadMethod('file')}
-                                        >
-                                            <Upload className="h-6 w-6 mx-auto mb-2" />
-                                            <div className="text-xs font-medium">Upload File</div>
-                                        </motion.button>
-                                        <motion.button
-                                            whileTap={{ scale: 0.98 }}
-                                            className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'paste'
-                                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
-                                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                                                }`}
-                                            onClick={() => setUploadMethod('paste')}
-                                        >
-                                            <ImageIcon className="h-6 w-6 mx-auto mb-2" />
-                                            <div className="text-xs font-medium">Paste Image</div>
-                                        </motion.button>
-                                    </div>
-
-                                    {/* File Upload Option */}
-                                    {uploadMethod === 'file' && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="space-y-2"
-                                        >
-                                            <label className="block text-sm dark:text-white/80">Select an image file:</label>
-                                            <input
-                                                ref={fileInputRef}
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleDialogFileUpload}
-                                                className="w-full p-2 text-sm border rounded-md bg-white/5 border-white/20 text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-[#6a7bd1] file:text-white hover:file:bg-[#6975b3] file:cursor-pointer"
-                                            />
-                                            {selectedFile && (
-                                                <div className="text-xs text-green-400 mt-1">
-                                                    ✓ Selected: {selectedFile.name}
-                                                </div>
-                                            )}
-                                        </motion.div>
-                                    )}
-
-                                    {/* Paste Option */}
-                                    {uploadMethod === 'paste' && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ duration: 0.2 }}
-                                            className="space-y-2"
-                                        >
-                                            <label className="block text-sm text-white/80">Paste your image here:</label>
-                                            <div
-                                                className="w-full h-32 border-2 border-dashed border-white/20 rounded-md flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
-                                                onPaste={handleDialogPaste}
-                                                tabIndex={0}
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
-                                                        e.preventDefault();
-                                                    }
-                                                }}
-                                            >
-                                                {pastedImageData ? (
-                                                    <div className="text-center">
-                                                        <Image
-                                                            src={pastedImageData}
-                                                            alt="Pasted preview"
-                                                            className="max-w-full max-h-24 mx-auto mb-2 rounded"
-                                                            width={100}
-                                                            height={100}
-                                                        />
-                                                        <div className="text-xs text-green-400">✓ Image pasted successfully</div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-center text-white/60">
-                                                        <ImageIcon className="h-8 w-8 mx-auto mb-2" />
-                                                        {isMobileDevice() ? (
-                                                            <>
-                                                                <div className="text-sm mb-3">Copy an image and tap below</div>
-                                                                <motion.button
-                                                                    whileTap={{ scale: 0.98 }}
-                                                                    onClick={handleMobilePaste}
-                                                                    className="px-4 text-xs py-2 bg-white/20 text-white rounded-md transition-colors"
-                                                                >
-                                                                    Paste from Clipboard
-                                                                </motion.button>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <div className="text-sm">Press Ctrl+V to paste an image</div>
-                                                                <div className="text-xs">or click here and paste</div>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <motion.button
-                                        whileTap={{ scale: 0.98 }}
-                                        className="px-4 py-2 bg-transparent border border-white/20 text-white text-sm rounded-md hover:bg-white/5 transition-colors max-sm:mt-1"
-                                        onClick={() => setIsUploadDialogOpen(false)}
-                                    >
-                                        Cancel
-                                    </motion.button>
-                                    <motion.button
-                                        whileTap={{ scale: 0.98 }}
-                                        className="px-4 py-2 bg-[#6a7bd1] hover:bg-[#6975b3] text-white text-sm rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        onClick={handleUploadConfirm}
-                                        disabled={!selectedFile && !pastedImageData}
-                                    >
-                                        Upload Image
-                                    </motion.button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-
-                        {/* Add Text Button */}
-                        <motion.button
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3, delay: 0.1 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-black/70 dark:bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full"
-                            onClick={addTextBox}
-                        >
-                            <Plus className="h-3 w-3" />
-                            <span>Add Text</span>
-                        </motion.button>
-                        <motion.button
-                            whileTap={{ scale: 0.98 }}
-                            className={`p-2 rounded-md border text-xs flex items-center space-x-1 ${isDrawingMode ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]' : ' bg-black/70 dark:bg-white/15 border border-white/20 text-white'}`}
-                            onClick={() => setIsDrawingMode((v) => !v)}
-                            title="Draw Mode"
-                        >
-                            <Pencil className="h-4 w-4" /> <span>Draw</span>
-                        </motion.button>
-                    </div>
-
+                    {/* Text inputs — primary */}
                     {texts.map((txt, i) => (
                         <motion.div
                             key={i}
@@ -3231,6 +3154,325 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         </motion.div>
                     ))}
 
+                    {/* Action Buttons Row */}
+                    <div className="flex space-x-2">
+                        <Dialog open={isUploadDialogOpen} onOpenChange={(open) => {
+                            setIsUploadDialogOpen(open);
+                            if (!open) {
+                                resetDialogState();
+                            }
+                        }}>
+                            <DialogTrigger asChild>
+                                <motion.button
+                                    whileTap={{ scale: 0.98 }}
+                                    className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-black/70 dark:bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full text-center"
+                                    onClick={() => setIsUploadDialogOpen(true)}
+                                >
+                                    <Upload className="h-3 w-3" />
+                                    <span>Upload Image</span>
+                                </motion.button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md bg-[#0f0f0f] border-white/20">
+                                <DialogHeader>
+                                    <DialogTitle className="text-white">Upload Image</DialogTitle>
+                                    <DialogDescription className="text-white/60">
+                                        Choose how you want to add an image to your meme.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                    {/* Upload Method Selection */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <motion.button
+                                            whileTap={{ scale: 0.98 }}
+                                            className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'file'
+                                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                                }`}
+                                            onClick={() => setUploadMethod('file')}
+                                        >
+                                            <Upload className="h-6 w-6 mx-auto mb-2" />
+                                            <div className="text-xs font-medium">Upload File</div>
+                                        </motion.button>
+                                        <motion.button
+                                            whileTap={{ scale: 0.98 }}
+                                            className={`p-3 rounded-md border-2 transition-colors ${uploadMethod === 'paste'
+                                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                                }`}
+                                            onClick={() => setUploadMethod('paste')}
+                                        >
+                                            <ImageIcon className="h-6 w-6 mx-auto mb-2" />
+                                            <div className="text-xs font-medium">Paste Image</div>
+                                        </motion.button>
+                                    </div>
+
+                                    {/* File Upload Option */}
+                                    {uploadMethod === 'file' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="space-y-2"
+                                        >
+                                            <label className="block text-sm dark:text-white/80">Select an image file:</label>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleDialogFileUpload}
+                                                className="w-full p-2 text-sm border rounded-md bg-white/5 border-white/20 text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-[#6a7bd1] file:text-white hover:file:bg-[#6975b3] file:cursor-pointer"
+                                            />
+                                            {selectedFile && (
+                                                <div className="text-xs text-green-400 mt-1">
+                                                    ✓ Selected: {selectedFile.name}
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    )}
+
+                                    {/* Paste Option */}
+                                    {uploadMethod === 'paste' && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ duration: 0.2 }}
+                                            className="space-y-2"
+                                        >
+                                            <label className="block text-sm text-white/80">Paste your image here:</label>
+                                            <div
+                                                className="w-full h-32 border-2 border-dashed border-white/20 rounded-md flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                                                onPaste={handleDialogPaste}
+                                                tabIndex={0}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
+                                                        e.preventDefault();
+                                                    }
+                                                }}
+                                            >
+                                                {pastedImageData ? (
+                                                    <div className="text-center">
+                                                        <Image
+                                                            src={pastedImageData}
+                                                            alt="Pasted preview"
+                                                            className="max-w-full max-h-24 mx-auto mb-2 rounded"
+                                                            width={100}
+                                                            height={100}
+                                                        />
+                                                        <div className="text-xs text-green-400">✓ Image pasted successfully</div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-center text-white/60">
+                                                        <ImageIcon className="h-8 w-8 mx-auto mb-2" />
+                                                        {isMobileDevice() ? (
+                                                            <>
+                                                                <div className="text-sm mb-3">Copy an image and tap below</div>
+                                                                <motion.button
+                                                                    whileTap={{ scale: 0.98 }}
+                                                                    onClick={handleMobilePaste}
+                                                                    className="px-4 text-xs py-2 bg-white/20 text-white rounded-md transition-colors"
+                                                                >
+                                                                    Paste from Clipboard
+                                                                </motion.button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="text-sm">Press Ctrl+V to paste an image</div>
+                                                                <div className="text-xs">or click here and paste</div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </div>
+                                <DialogFooter>
+                                    <motion.button
+                                        whileTap={{ scale: 0.98 }}
+                                        className="px-4 py-2 bg-transparent border border-white/20 text-white text-sm rounded-md hover:bg-white/5 transition-colors max-sm:mt-1"
+                                        onClick={() => setIsUploadDialogOpen(false)}
+                                    >
+                                        Cancel
+                                    </motion.button>
+                                    <motion.button
+                                        whileTap={{ scale: 0.98 }}
+                                        className="px-4 py-2 bg-[#6a7bd1] hover:bg-[#6975b3] text-white text-sm rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        onClick={handleUploadConfirm}
+                                        disabled={!selectedFile && !pastedImageData}
+                                    >
+                                        Upload Image
+                                    </motion.button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
+                        {/* Add Text Button */}
+                        <motion.button
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: 0.1 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-black/70 dark:bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full"
+                            onClick={addTextBox}
+                        >
+                            <Plus className="h-3 w-3" />
+                            <span>Add Text</span>
+                        </motion.button>
+                        <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            className={`p-2 rounded-md border text-xs flex items-center space-x-1 ${isDrawingMode ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]' : ' bg-black/70 dark:bg-white/15 border border-white/20 text-white'}`}
+                            onClick={() => setIsDrawingMode((v) => !v)}
+                            title="Draw Mode"
+                        >
+                            <Pencil className="h-4 w-4" /> <span>Draw</span>
+                        </motion.button>
+                    </div>
+
+                    <motion.button
+                        type="button"
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowElementsPanel((v) => !v)}
+                        aria-expanded={showElementsPanel}
+                        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md border text-xs transition-colors ${
+                            showElementsPanel
+                                ? 'bg-[#6a7bd1]/20 border-[#6a7bd1]/50 text-white'
+                                : 'bg-black/70 border-white/20 text-white/60 hover:text-white hover:bg-white/10'
+                        }`}
+                    >
+                        <span className="flex items-center gap-2">
+                            <Layers className="h-3.5 w-3.5 shrink-0" />
+                            Stickers, GIFs & shapes
+                        </span>
+                        {showElementsPanel ? (
+                            <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                        ) : (
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                        )}
+                    </motion.button>
+
+                    {showElementsPanel && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <ElementsPanel
+                                onAddMedia={addMediaFromLibrary}
+                                onAddShape={(type) => {
+                                    addShape(type);
+                                    setSelectedImageIndex(-1);
+                                }}
+                                disabled={isDrawingMode || isImageEraseMode}
+                            />
+                        </motion.div>
+                    )}
+
+                    {/* Shapes List */}
+                    {shapeOverlays.length > 0 && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-4 space-y-2"
+                        >
+                            <div className="flex items-center gap-1.5 text-xs text-white/60 mb-1">
+                                <Shapes className="h-3.5 w-3.5" />
+                                Shapes on canvas
+                            </div>
+                            <div className="space-y-1">
+                                {shapeOverlays.map((shape, index) => (
+                                    <motion.div
+                                        key={shape.id}
+                                        className={`flex flex-col p-2 rounded-md border transition-colors ${
+                                            selectedShapeIndex === index
+                                                ? 'dark:bg-black dark:border-white/15 bg-[#0f0f0f] border-white/20'
+                                                : 'dark:bg-white/5 dark:border-white/10 bg-black/80 border-white/20'
+                                        }`}
+                                        onClick={() => {
+                                            setSelectedShapeIndex(index);
+                                            setSelectedImageIndex(-1);
+                                        }}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs text-white/80 capitalize">
+                                                {shape.type.replace('-', ' ')}
+                                            </span>
+                                            <motion.button
+                                                whileTap={{ scale: 0.9 }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeShape(index);
+                                                }}
+                                                className="p-1 rounded-full hover:scale-110"
+                                            >
+                                                <Trash2 className="h-4 w-4 text-white" />
+                                            </motion.button>
+                                        </div>
+                                        {selectedShapeIndex === index && (
+                                            <div
+                                                className="mt-2 pt-2 border-t border-white/10 grid grid-cols-2 gap-2"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <div>
+                                                    <label className="block text-[10px] text-white/50 mb-0.5">Stroke</label>
+                                                    <input
+                                                        type="color"
+                                                        value={shape.strokeColor}
+                                                        onChange={(e) =>
+                                                            updateShape(index, { strokeColor: e.target.value })
+                                                        }
+                                                        className="w-full h-7 rounded border border-white/20 cursor-pointer"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] text-white/50 mb-0.5">Fill</label>
+                                                    <input
+                                                        type="color"
+                                                        value={shape.fillColor}
+                                                        onChange={(e) =>
+                                                            updateShape(index, { fillColor: e.target.value })
+                                                        }
+                                                        className="w-full h-7 rounded border border-white/20 cursor-pointer"
+                                                        disabled={shape.type === 'line'}
+                                                    />
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="block text-[10px] text-white/50 mb-0.5">
+                                                        Stroke width: {shape.strokeWidth}px
+                                                    </label>
+                                                    <input
+                                                        type="range"
+                                                        min="1"
+                                                        max="24"
+                                                        value={shape.strokeWidth}
+                                                        onChange={(e) =>
+                                                            updateShape(index, {
+                                                                strokeWidth: Number(e.target.value),
+                                                            })
+                                                        }
+                                                        className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                                    />
+                                                </div>
+                                                {shape.type !== 'line' && (
+                                                    <label className="col-span-2 flex items-center gap-2 text-xs text-white/70 cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={shape.filled}
+                                                            onChange={(e) =>
+                                                                updateShape(index, { filled: e.target.checked })
+                                                            }
+                                                            className="rounded"
+                                                        />
+                                                        Filled shape
+                                                    </label>
+                                                )}
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+
                     {/* Images List */}
                     {imageOverlays.length > 0 && (
                         <motion.div
@@ -3260,9 +3502,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="text-xs text-white/80 dark:text-white/80 truncate">
-                                                        image.png
+                                                        {overlay.label || 'Image'}
                                                     </div>
-                                                    <div className="text-xs text-white/40 dark:text-white/40">
+                                                    <div className="text-xs text-white/40 dark:text-white/40 flex items-center gap-1">
+                                                        {overlay.animated && (
+                                                            <span className="text-[9px] px-1 rounded bg-[#6a7bd1]/40 text-white/90">GIF</span>
+                                                        )}
                                                         {Math.round(overlay.width)}×{Math.round(overlay.height)}px
                                                     </div>
                                                 </div>
