@@ -1,30 +1,45 @@
-"use client"
+"use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowDownRight } from "lucide-react";
-import { templates } from "@/data/templates";
+import { templates as curatedTemplates } from "@/data/templates";
 import MainContainer from "./MainContainer";
 import { motion } from "framer-motion";
 import useSelected from "@/hooks/useSelected";
-import type { Template } from "@/types/template";
+import { useTrendingTemplates } from "@/hooks/useTrendingTemplates";
+import {
+    curatedToEditorTemplates,
+    mergeCuratedAndTrending,
+} from "@/lib/templateUtils";
 
 export default function TemplateSearch() {
     const [searchQuery, setSearchQuery] = useState("");
-    const { selected } = useSelected()
+    const { selected, setCurrentPage } = useSelected();
+    const { templates: trendingTemplates } = useTrendingTemplates();
 
-    const filteredTemplates = Object.entries(templates).filter(([key]) =>
-        key.toLowerCase().replace(/-/g, ' ').includes(searchQuery.toLowerCase())
-    );
+    const allTemplates = useMemo(() => {
+        const curated = curatedToEditorTemplates(curatedTemplates);
+        return mergeCuratedAndTrending(curated, trendingTemplates);
+    }, [trendingTemplates]);
 
-    const convertedTemplates: Record<string, Template> = Object.fromEntries(
-        filteredTemplates.map(([key, template]) => [
-            key,
-            {
-                image: template.image || template.originalUrl,
-                textBoxes: template.textBoxes
-            }
-        ])
-    );
+    const filteredTemplates = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) return allTemplates;
+
+        return Object.fromEntries(
+            Object.entries(allTemplates).filter(([key, template]) => {
+                const displayName = template.displayName || key.replace(/-/g, " ");
+                return (
+                    key.toLowerCase().includes(query) ||
+                    displayName.toLowerCase().includes(query)
+                );
+            })
+        );
+    }, [allTemplates, searchQuery]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, setCurrentPage]);
 
     return (
         <motion.div
@@ -32,7 +47,7 @@ export default function TemplateSearch() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
-            <div className={`justify-center pb-16 relative w-full ${selected ? 'hidden' : 'flex'}`}>
+            <div className={`justify-center pb-16 relative w-full ${selected ? "hidden" : "flex"}`}>
                 <motion.div
                     className="relative w-full max-w-md"
                     whileFocus={{ scale: 1.02 }}
@@ -45,10 +60,8 @@ export default function TemplateSearch() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="rounded-3xl text-sm py-2 pl-4 pr-10 w-full bg-[#0f0f0f] border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#6a7bd1] transition"
                         style={{
-                            boxShadow: "0 0 0 2px rgba(106,123,209,0.3), 0 4px 24px 0px rgba(106,123,209,0.5), 0 0 0 0 transparent",
-                        }}
-                        whileFocus={{
-                            boxShadow: "0 0 0 2px rgba(106,123,209,0.5), 0 4px 24px 0px rgba(106,123,209,0.7), 0 0 0 0 transparent",
+                            boxShadow:
+                                "0 0 0 2px rgba(106,123,209,0.3), 0 4px 24px 0px rgba(106,123,209,0.5), 0 0 0 0 transparent",
                         }}
                     />
                     <motion.span
@@ -60,9 +73,14 @@ export default function TemplateSearch() {
                     </motion.span>
                 </motion.div>
             </div>
-            {
-                filteredTemplates.length < 1 ? <div className="min-h-[30vh] max-sm:min-h-[50vh]"><p className="text-center">No templates found</p></div> : <MainContainer templates={convertedTemplates} />
-            }
+
+            {Object.keys(filteredTemplates).length === 0 ? (
+                <div className="min-h-[30vh] max-sm:min-h-[50vh]">
+                    <p className="text-center">No templates found</p>
+                </div>
+            ) : (
+                <MainContainer templates={filteredTemplates} />
+            )}
         </motion.div>
     );
-} 
+}

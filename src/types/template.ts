@@ -1,4 +1,4 @@
-type TextBox = {
+export type TextBox = {
     x: number;
     y: number;
     width: number;
@@ -12,4 +12,5 @@ type TextBox = {
 export type Template = {
     image: string;
     textBoxes: TextBox[];
+    displayName?: string;
 };

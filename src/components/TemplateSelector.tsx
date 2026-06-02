@@ -194,7 +194,6 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
 
     return (
         <div className="space-y-6 w-full">
-            {/* Custom Template Upload Section */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -211,7 +210,6 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                 />
             </motion.div>
 
-            {/* Templates Grid */}
             <section className="grid grid-cols-6 max-sm:grid-cols-2 max-md:grid-cols-3 max-lg:grid-cols-4 gap-6 grid-flow-dense w-full max-sm:-mt-3">
                 <AnimatePresence mode="popLayout">
                     {paginatedTemplates.map(([key, tpl], index) => {
@@ -237,7 +235,7 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                                 >
                                     <Image
                                         src={tpl.image}
-                                        alt={key}
+                                        alt={tpl.displayName || key}
                                         fill
                                         className="object-cover rounded-2xl shadow transition-opacity duration-300"
                                         loading={isPriority ? 'eager' : 'lazy'}
@@ -252,12 +250,12 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                                     />
                                 </motion.div>
                                 <motion.p
-                                    className="text-center text-base font-medium mt-2 capitalize"
+                                    className="text-center text-base font-medium mt-2 capitalize line-clamp-2"
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     transition={{ delay: 0.1 }}
                                 >
-                                    {key.replace(/-/g, ' ')}
+                                    {tpl.displayName || key.replace(/-/g, ' ').replace(/^imgflip /i, '')}
                                 </motion.p>
                             </motion.div>
                         );
@@ -265,7 +263,6 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                 </AnimatePresence>
             </section>
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -273,7 +270,6 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                     transition={{ duration: 0.3, delay: 0.2 }}
                     className="flex flex-col items-center pt-6 space-y-4"
                 >
-
                     <Pagination>
                         <PaginationContent>
                             <PaginationItem>
