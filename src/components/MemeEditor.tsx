@@ -2230,16 +2230,95 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, [isUploadDialogOpen, handlePaste]);
 
     useEffect(() => {
+        const isEditableTarget = (target: EventTarget | null) => {
+            if (!(target instanceof HTMLElement)) return false;
+            const tag = target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+            return target.isContentEditable;
+        };
+
+        const getArrowDelta = (key: string, step: number): { dx: number; dy: number } | null => {
+            switch (key) {
+                case 'ArrowLeft':
+                    return { dx: -step, dy: 0 };
+                case 'ArrowRight':
+                    return { dx: step, dy: 0 };
+                case 'ArrowUp':
+                    return { dx: 0, dy: -step };
+                case 'ArrowDown':
+                    return { dx: 0, dy: step };
+                default:
+                    return null;
+            }
+        };
+
         const keyHandler = (event: KeyboardEvent) => {
+            if (isEditableTarget(event.target)) return;
+            if (isDrawingMode || isImageEraseMode) return;
+
             if (event.key === 'Delete' && selectedImageIndex !== -1) {
                 removeImageOverlay(selectedImageIndex);
                 setSelectedImageIndex(-1);
                 event.preventDefault();
+                return;
+            }
+
+            const step = event.shiftKey ? 10 : 1;
+            const delta = getArrowDelta(event.key, step);
+            if (!delta) return;
+
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+
+            if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length) {
+                const img = imageOverlays[selectedImageIndex];
+                const newX = Math.max(0, Math.min(canvas.width - img.width, img.x + delta.dx));
+                const newY = Math.max(0, Math.min(canvas.height - img.height, img.y + delta.dy));
+
+                setImageOverlays((prev) => {
+                    const updated = [...prev];
+                    updated[selectedImageIndex] = {
+                        ...updated[selectedImageIndex],
+                        x: newX,
+                        y: newY,
+                    };
+                    return updated;
+                });
+                event.preventDefault();
+                return;
+            }
+
+            if (selectedTextIndex !== -1 && selectedTextIndex < textBoxes.length) {
+                const box = textBoxes[selectedTextIndex];
+                const newX = Math.max(
+                    -box.width * 0.8,
+                    Math.min(canvas.width - box.width * 0.2, box.x + delta.dx)
+                );
+                const newY = Math.max(0, Math.min(canvas.height, box.y + delta.dy));
+
+                setTextBoxes((prev: Template['textBoxes']) => {
+                    const updated = [...prev];
+                    updated[selectedTextIndex] = {
+                        ...updated[selectedTextIndex],
+                        x: newX,
+                        y: newY,
+                    };
+                    return updated;
+                });
+                event.preventDefault();
             }
         };
+
         document.addEventListener('keydown', keyHandler);
         return () => document.removeEventListener('keydown', keyHandler);
-    }, [selectedImageIndex]);
+    }, [
+        selectedImageIndex,
+        selectedTextIndex,
+        imageOverlays,
+        textBoxes,
+        isDrawingMode,
+        isImageEraseMode,
+    ]);
 
     useEffect(() => {
         if (isUploadDialogOpen && uploadMethod === 'paste') {
