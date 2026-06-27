@@ -55,7 +55,7 @@ export default function TemplateSearch() {
                 >
                     <motion.input
                         type="text"
-                        placeholder="Search template"
+                        placeholder="search templates"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="rounded-3xl text-sm py-2 pl-4 pr-10 w-full bg-[#0f0f0f] border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-[#6a7bd1] transition"
