@@ -13,7 +13,7 @@ import type { ShapeType } from '@/types/editor';
 import type { GiphyMediaItem } from '@/types/giphy';
 
 type ElementsPanelProps = {
-    onAddMedia: (item: GiphyMediaItem) => void;
+    onAddMedia: (item: GiphyMediaItem) => void | Promise<void>;
     onAddShape: (type: ShapeType) => void;
     disabled?: boolean;
 };
@@ -28,14 +28,16 @@ function MediaGrid({
     onLoadMore,
     onSelect,
     disabled,
+    addingItemId,
 }: {
     items: ReturnType<typeof useGiphyMedia>['items'];
     loading: boolean;
     error: string | null;
     hasMore: boolean;
     onLoadMore: () => void;
-    onSelect: (item: GiphyMediaItem) => void;
+    onSelect: (item: GiphyMediaItem) => void | Promise<void>;
     disabled: boolean;
+    addingItemId: string | null;
 }) {
     if (error && items.length === 0) {
         return (
@@ -61,24 +63,46 @@ function MediaGrid({
     return (
         <>
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 max-h-44 overflow-y-auto p-1.5 rounded-md border border-white/10 bg-black/40">
-                {items.map((item) => (
-                    <motion.button
-                        key={item.id}
-                        type="button"
-                        disabled={disabled}
-                        whileTap={{ scale: 0.92 }}
-                        title={item.title}
-                        onClick={() => onSelect(item)}
-                        className="aspect-square rounded-md border border-white/15 bg-white/5 hover:bg-white/15 hover:border-[#6a7bd1]/60 overflow-hidden disabled:opacity-50"
-                    >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={item.previewUrl}
-                            alt=""
-                            className="w-full h-full object-cover pointer-events-none"
-                        />
-                    </motion.button>
-                ))}
+                {items.map((item) => {
+                    const isAdding = addingItemId === item.id;
+                    const isWaiting = Boolean(addingItemId) && !isAdding;
+
+                    return (
+                        <motion.button
+                            key={item.id}
+                            type="button"
+                            disabled={disabled || Boolean(addingItemId)}
+                            whileTap={{ scale: 0.92 }}
+                            title={isAdding ? `Adding ${item.title || 'media'}...` : item.title}
+                            aria-busy={isAdding}
+                            onClick={() => onSelect(item)}
+                            className={`group relative aspect-square rounded-md border bg-white/5 overflow-hidden transition-all duration-200 disabled:cursor-not-allowed ${
+                                isAdding
+                                    ? 'border-[#8ea0ff] shadow-[0_0_18px_rgba(106,123,209,0.45)]'
+                                    : 'border-white/15 hover:bg-white/15 hover:border-[#6a7bd1]/60'
+                            } ${isWaiting ? 'opacity-35' : ''}`}
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={item.previewUrl}
+                                alt=""
+                                className={`w-full h-full object-cover pointer-events-none transition-transform duration-300 ${
+                                    isAdding ? 'scale-110 opacity-45 blur-[1px]' : 'group-hover:scale-105'
+                                }`}
+                            />
+                            {isAdding && (
+                                <span className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/55 text-white">
+                                    <span className="relative flex h-9 w-9 items-center justify-center">
+                                        <span className="absolute inset-0 rounded-full border border-[#8ea0ff]/30 bg-[#6a7bd1]/20 animate-ping" />
+                                        <span className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/70">
+                                            <Loader2 className="h-4 w-4 animate-spin text-[#b8c2ff]" />
+                                        </span>
+                                    </span>
+                                </span>
+                            )}
+                        </motion.button>
+                    );
+                })}
                 {loading &&
                     items.length === 0 &&
                     Array.from({ length: 8 }).map((_, i) => (
@@ -91,7 +115,7 @@ function MediaGrid({
             {hasMore && (
                 <button
                     type="button"
-                    disabled={disabled || loading}
+                    disabled={disabled || Boolean(addingItemId) || loading}
                     onClick={onLoadMore}
                     className="w-full py-1.5 text-xs rounded-md border border-white/20 text-white/70 hover:bg-white/10 disabled:opacity-50 flex items-center justify-center gap-1"
                 >
@@ -110,12 +134,15 @@ export default function ElementsPanel({
 }: ElementsPanelProps) {
     const [tab, setTab] = useState<Tab>('stickers');
     const [searchInput, setSearchInput] = useState('');
+    const [addingMediaId, setAddingMediaId] = useState<string | null>(null);
 
     const stickers = useGiphyMedia('sticker', tab === 'stickers');
     const gifs = useGiphyMedia('gif', tab === 'gifs');
 
     const active = tab === 'stickers' ? stickers : gifs;
     const quickQueries = tab === 'stickers' ? GIPHY_STICKER_QUERIES : GIPHY_GIF_QUERIES;
+    const isAddingMedia = addingMediaId !== null;
+    const controlsDisabled = disabled || isAddingMedia;
 
     useEffect(() => {
         setSearchInput(active.query);
@@ -123,7 +150,19 @@ export default function ElementsPanel({
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (controlsDisabled) return;
         active.search(searchInput);
+    };
+
+    const handleSelectMedia = async (item: GiphyMediaItem) => {
+        if (controlsDisabled) return;
+
+        setAddingMediaId(item.id);
+        try {
+            await onAddMedia(item);
+        } finally {
+            setAddingMediaId((current) => (current === item.id ? null : current));
+        }
     };
 
     const tabClass = (activeTab: boolean) =>
@@ -136,7 +175,7 @@ export default function ElementsPanel({
             <div className="flex rounded-md border border-white/20 overflow-hidden">
                 <button
                     type="button"
-                    disabled={disabled}
+                    disabled={controlsDisabled}
                     onClick={() => setTab('stickers')}
                     className={tabClass(tab === 'stickers')}
                 >
@@ -145,7 +184,7 @@ export default function ElementsPanel({
                 </button>
                 <button
                     type="button"
-                    disabled={disabled}
+                    disabled={controlsDisabled}
                     onClick={() => setTab('gifs')}
                     className={tabClass(tab === 'gifs')}
                 >
@@ -154,7 +193,7 @@ export default function ElementsPanel({
                 </button>
                 <button
                     type="button"
-                    disabled={disabled}
+                    disabled={controlsDisabled}
                     onClick={() => setTab('shapes')}
                     className={tabClass(tab === 'shapes')}
                 >
@@ -173,13 +212,13 @@ export default function ElementsPanel({
                                 value={searchInput}
                                 onChange={(e) => setSearchInput(e.target.value)}
                                 placeholder={`Search Giphy ${tab}...`}
-                                disabled={disabled}
+                                disabled={controlsDisabled}
                                 className="w-full pl-8 pr-2 py-1.5 text-xs rounded-md bg-black/70 border border-white/20 text-white placeholder:text-white/40"
                             />
                         </div>
                         <button
                             type="submit"
-                            disabled={disabled || active.loading}
+                            disabled={controlsDisabled || active.loading}
                             className="px-3 py-1.5 text-xs rounded-md bg-[#6a7bd1] hover:bg-[#6975b3] text-white disabled:opacity-50"
                         >
                             Go
@@ -191,7 +230,7 @@ export default function ElementsPanel({
                             <button
                                 key={q}
                                 type="button"
-                                disabled={disabled}
+                                disabled={controlsDisabled}
                                 onClick={() => {
                                     setSearchInput(q);
                                     active.search(q);
@@ -210,7 +249,8 @@ export default function ElementsPanel({
                         hasMore={active.hasMore}
                         onLoadMore={active.loadMore}
                         disabled={disabled}
-                        onSelect={onAddMedia}
+                        addingItemId={addingMediaId}
+                        onSelect={handleSelectMedia}
                     />
 
                     <p className="text-[9px] text-white/35 text-right">Powered by GIPHY</p>
@@ -227,7 +267,7 @@ export default function ElementsPanel({
                         <motion.button
                             key={shape.type}
                             type="button"
-                            disabled={disabled}
+                            disabled={controlsDisabled}
                             whileTap={{ scale: 0.95 }}
                             title={shape.label}
                             onClick={() => onAddShape(shape.type)}
