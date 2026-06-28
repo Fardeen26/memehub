@@ -197,20 +197,24 @@ export function useCanvasShapes(canvasRef: RefObject<HTMLCanvasElement | null>) 
         setRotateShapeIndex(-1);
     }, []);
 
+    const isShapeInteracting =
+        isDraggingShape || isResizingShape || isRotatingShape;
+
     const drawShapesLayer = useCallback(
         (ctx: CanvasRenderingContext2D) => {
             for (const shape of shapeOverlays) {
                 drawShape(ctx, shape);
             }
-            if (selectedShapeIndex >= 0 && selectedShapeIndex < shapeOverlays.length) {
+            if (
+                !isShapeInteracting &&
+                selectedShapeIndex >= 0 &&
+                selectedShapeIndex < shapeOverlays.length
+            ) {
                 drawTransformableSelection(ctx, shapeOverlays[selectedShapeIndex]);
             }
         },
-        [shapeOverlays, selectedShapeIndex]
+        [shapeOverlays, selectedShapeIndex, isShapeInteracting]
     );
-
-    const isShapeInteracting =
-        isDraggingShape || isResizingShape || isRotatingShape;
 
     return {
         shapeOverlays,

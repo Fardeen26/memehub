@@ -1788,6 +1788,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         ctx.restore();
     }, [isMobileDevice, calculateFontSize, transformText]);
 
+    const isTextInteracting =
+        isDragging || isRotatingText || isResizingTextWidth || isResizingTextHeight || isResizingTextCorner;
+    const isImageInteracting = isDraggingImage || isResizingImage || isRotatingImage;
+    const isElementInteracting = isTextInteracting || isImageInteracting || isShapeInteracting;
+
     const draw = useCallback(async () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -1795,7 +1800,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!ctx) return;
 
         const now = Date.now();
-        const isActivelyDragging = isDraggingImage || isResizingImage || isRotatingImage || isDragging || isRotatingText || isShapeInteracting;
+        const isActivelyDragging = isElementInteracting;
 
         if (isActivelyDragging && isOptimizedDrawing.current && (now - lastDrawTime.current) < 16) {
             return;
@@ -1942,7 +1947,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             drawShapesLayer(ctx);
 
             // Only show selection handles if not in erase mode
-            if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length && !isImageEraseMode) {
+            if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length && !isImageEraseMode && !isImageInteracting) {
                 const selectedImg = imageOverlays[selectedImageIndex];
 
                 const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -2025,7 +2030,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 drawText(rotation)(ctx, texts[i], box, textSettings[i]);
             });
 
-            if (selectedTextIndex !== -1 && selectedTextIndex < textBoxes.length && texts[selectedTextIndex]) {
+            if (selectedTextIndex !== -1 && selectedTextIndex < textBoxes.length && texts[selectedTextIndex] && !isTextInteracting) {
                 const selectedBox = textBoxes[selectedTextIndex];
                 const rotation = textBoxRotations[selectedTextIndex] || 0;
                 const isMobile = isMobileDevice();
@@ -2259,7 +2264,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 ctx.restore();
             }
         };
-    }, [template, textSettings, drawText, waitForFont, isDraggingImage, isResizingImage, isRotatingImage, isDragging, isShapeInteracting, imageOverlays, shapeOverlays, selectedImageIndex, selectedShapeIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer]);
+    }, [template, textSettings, drawText, waitForFont, isElementInteracting, isImageInteracting, isTextInteracting, imageOverlays, shapeOverlays, selectedImageIndex, selectedShapeIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer]);
 
 
 
