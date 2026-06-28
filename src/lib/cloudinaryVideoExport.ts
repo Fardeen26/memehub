@@ -3,10 +3,12 @@ export const CLOUDINARY_MP4_POLL_INTERVAL_MS = 1_500;
 export const CLOUDINARY_MP4_MAX_DIMENSION = 1080;
 
 export type CloudinaryVideoUploadSignature = {
+    allowedFormats: string;
     apiKey: string;
     cloudName: string;
     deliveryBaseUrl: string;
     folder: string;
+    maxFileSize: string;
     overwrite: string;
     publicId: string;
     signature: string;
@@ -80,10 +82,12 @@ export async function uploadVideoCaptureToCloudinary(
     const formData = new FormData();
 
     formData.append('file', blob, getCaptureFilename(blob));
+    formData.append('allowed_formats', signature.allowedFormats);
     formData.append('api_key', signature.apiKey);
     formData.append('timestamp', String(signature.timestamp));
     formData.append('signature', signature.signature);
     formData.append('folder', signature.folder);
+    formData.append('max_file_size', signature.maxFileSize);
     formData.append('public_id', signature.publicId);
     formData.append('tags', signature.tags);
     formData.append('overwrite', signature.overwrite);

@@ -6,6 +6,18 @@ export const dynamic = 'force-dynamic';
 
 const EXPORT_PREFIX = 'memehub/generated-exports';
 const DEFAULT_MAX_AGE_HOURS = 24;
+const CLOUDINARY_PAGE_SIZE = 100;
+const CLOUDINARY_DELETE_BATCH_SIZE = 100;
+
+type CloudinaryResource = {
+    created_at?: string;
+    public_id?: string;
+};
+
+type CloudinaryResourcesResponse = {
+    next_cursor?: string;
+    resources?: CloudinaryResource[];
+};
 
 function isAuthorized(request: NextRequest): boolean {
     const secret = process.env.CLOUDINARY_CLEANUP_SECRET;
@@ -39,31 +51,44 @@ export async function POST(request: NextRequest) {
 
     const maxAgeHours = Number(request.nextUrl.searchParams.get('maxAgeHours')) || DEFAULT_MAX_AGE_HOURS;
     const cutoffMs = Date.now() - maxAgeHours * 60 * 60 * 1000;
-    const resources = await cloudinary.api.resources({
-        max_results: 100,
-        prefix: EXPORT_PREFIX,
-        resource_type: 'video',
-        type: 'upload',
-    });
+    const publicIds: string[] = [];
+    let nextCursor: string | undefined;
 
-    const publicIds = (resources.resources || [])
-        .filter((resource: { created_at?: string; public_id?: string }) => {
-            if (!resource.public_id || !resource.created_at) return false;
-            return new Date(resource.created_at).getTime() < cutoffMs;
-        })
-        .map((resource: { public_id: string }) => resource.public_id);
+    do {
+        const resources = (await cloudinary.api.resources({
+            max_results: CLOUDINARY_PAGE_SIZE,
+            next_cursor: nextCursor,
+            prefix: EXPORT_PREFIX,
+            resource_type: 'video',
+            type: 'upload',
+        })) as CloudinaryResourcesResponse;
+
+        for (const resource of resources.resources || []) {
+            if (!resource.public_id || !resource.created_at) continue;
+            if (new Date(resource.created_at).getTime() < cutoffMs) {
+                publicIds.push(resource.public_id);
+            }
+        }
+
+        nextCursor = resources.next_cursor;
+    } while (nextCursor);
 
     if (publicIds.length === 0) {
         return NextResponse.json({ deleted: 0 });
     }
 
-    const deleteResult = await cloudinary.api.delete_resources(publicIds, {
-        resource_type: 'video',
-        type: 'upload',
-    });
+    const deleted: Record<string, string> = {};
+    for (let index = 0; index < publicIds.length; index += CLOUDINARY_DELETE_BATCH_SIZE) {
+        const batch = publicIds.slice(index, index + CLOUDINARY_DELETE_BATCH_SIZE);
+        const deleteResult = await cloudinary.api.delete_resources(batch, {
+            resource_type: 'video',
+            type: 'upload',
+        });
+        Object.assign(deleted, deleteResult.deleted || {});
+    }
 
     return NextResponse.json({
         deleted: publicIds.length,
-        result: deleteResult.deleted || {},
+        result: deleted,
     });
 }

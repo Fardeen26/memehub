@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
     GIF_MAX_BYTES,
+    GIF_MAX_CANVAS_PIXELS,
     GIF_MAX_DECODED_FRAMES,
+    GIF_MAX_DIMENSION,
     GifDecodeLimitError,
     assertGifDecodeLimits,
+    assertGifDimensionLimits,
     getAnimatedExportDurationMs,
     normalizeGifDelay,
     selectGifFrameIndex,
@@ -39,6 +42,39 @@ describe('gifAnimation', () => {
     it('rejects too many decoded GIF frames', () => {
         expect(() =>
             assertGifDecodeLimits({ byteLength: 1024, frameCount: GIF_MAX_DECODED_FRAMES + 1 })
+        ).toThrow(GifDecodeLimitError);
+    });
+
+    it('rejects oversized GIF canvas dimensions before decompression', () => {
+        expect(() =>
+            assertGifDimensionLimits({
+                height: 100,
+                width: GIF_MAX_DIMENSION + 1,
+            })
+        ).toThrow(GifDecodeLimitError);
+    });
+
+    it('rejects oversized GIF frame patches before decompression', () => {
+        expect(() =>
+            assertGifDimensionLimits(
+                {
+                    frameDimensions: [
+                        {
+                            height: GIF_MAX_CANVAS_PIXELS + 1,
+                            left: 0,
+                            top: 0,
+                            width: 1,
+                        },
+                    ],
+                    height: GIF_MAX_CANVAS_PIXELS + 1,
+                    width: 1,
+                },
+                {
+                    maxCanvasPixels: Number.MAX_SAFE_INTEGER,
+                    maxFramePixels: GIF_MAX_CANVAS_PIXELS,
+                    maxHeight: Number.MAX_SAFE_INTEGER,
+                }
+            )
         ).toThrow(GifDecodeLimitError);
     });
 

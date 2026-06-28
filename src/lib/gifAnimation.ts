@@ -2,13 +2,19 @@ import { decompressFrames, parseGIF, type ParsedFrame, type ParsedGif } from 'gi
 
 export const GIF_MAX_BYTES = 10 * 1024 * 1024;
 export const GIF_MAX_DECODED_FRAMES = 150;
+export const GIF_MAX_DIMENSION = 2048;
+export const GIF_MAX_CANVAS_PIXELS = 1920 * 1080;
 export const GIF_MIN_FRAME_DELAY_MS = 20;
 export const ANIMATED_EXPORT_MIN_DURATION_MS = 5000;
 export const ANIMATED_EXPORT_MAX_DURATION_MS = 5000;
 
 export type GifDecodeLimits = {
     maxBytes?: number;
+    maxCanvasPixels?: number;
+    maxFramePixels?: number;
     maxFrames?: number;
+    maxHeight?: number;
+    maxWidth?: number;
 };
 
 export type DecodedGifFrame = {
@@ -29,6 +35,7 @@ export type DecodedGif = {
 };
 
 type CanvasFactory = () => HTMLCanvasElement;
+type GifFrameDimensions = { height: number; left: number; top: number; width: number };
 
 export class GifDecodeLimitError extends Error {
     constructor(message: string) {
@@ -44,6 +51,84 @@ export function normalizeGifDelay(delayMs: number | undefined): number {
 
 export function getGifImageFrameCount(parsedGif: ParsedGif): number {
     return parsedGif.frames.filter((frame) => 'image' in frame && frame.image).length;
+}
+
+function getGifFrameDimensions(parsedGif: ParsedGif): GifFrameDimensions[] {
+    return parsedGif.frames.flatMap((frame) => {
+        if (!('image' in frame) || !frame.image) return [];
+        const { descriptor } = frame.image;
+
+        return [{
+            height: descriptor.height,
+            left: descriptor.left,
+            top: descriptor.top,
+            width: descriptor.width,
+        }];
+    });
+}
+
+function assertValidGifDimensions(
+    label: string,
+    dimensions: { height: number; width: number },
+    limits: { maxHeight: number; maxPixels: number; maxWidth: number }
+): void {
+    const { height, width } = dimensions;
+
+    if (
+        !Number.isFinite(width) ||
+        !Number.isFinite(height) ||
+        width <= 0 ||
+        height <= 0
+    ) {
+        throw new GifDecodeLimitError(`${label} has invalid dimensions.`);
+    }
+
+    if (width > limits.maxWidth || height > limits.maxHeight) {
+        throw new GifDecodeLimitError(
+            `${label} is too large for browser export. Max dimensions are ${limits.maxWidth}x${limits.maxHeight}.`
+        );
+    }
+
+    if (width * height > limits.maxPixels) {
+        throw new GifDecodeLimitError(
+            `${label} has too many pixels for browser export. Max is ${limits.maxPixels.toLocaleString()} pixels.`
+        );
+    }
+}
+
+export function assertGifDimensionLimits(
+    input: { frameDimensions?: GifFrameDimensions[]; height: number; width: number },
+    limits: GifDecodeLimits = {}
+): void {
+    const maxWidth = limits.maxWidth ?? GIF_MAX_DIMENSION;
+    const maxHeight = limits.maxHeight ?? GIF_MAX_DIMENSION;
+    const maxCanvasPixels = limits.maxCanvasPixels ?? GIF_MAX_CANVAS_PIXELS;
+    const maxFramePixels = limits.maxFramePixels ?? maxCanvasPixels;
+
+    assertValidGifDimensions('Animated GIF', input, {
+        maxHeight,
+        maxPixels: maxCanvasPixels,
+        maxWidth,
+    });
+
+    for (const frame of input.frameDimensions || []) {
+        assertValidGifDimensions('Animated GIF frame', frame, {
+            maxHeight,
+            maxPixels: maxFramePixels,
+            maxWidth,
+        });
+
+        if (
+            !Number.isFinite(frame.left) ||
+            !Number.isFinite(frame.top) ||
+            frame.left < 0 ||
+            frame.top < 0 ||
+            frame.left + frame.width > input.width ||
+            frame.top + frame.height > input.height
+        ) {
+            throw new GifDecodeLimitError('Animated GIF frame exceeds the GIF canvas bounds.');
+        }
+    }
 }
 
 export function assertGifDecodeLimits(
@@ -131,6 +216,14 @@ export function decodeGifFromArrayBuffer(
     const parsedGif = parseGIF(arrayBuffer);
     const sourceFrameCount = getGifImageFrameCount(parsedGif);
     assertGifDecodeLimits({ byteLength: arrayBuffer.byteLength, frameCount: sourceFrameCount }, limits);
+    assertGifDimensionLimits(
+        {
+            frameDimensions: getGifFrameDimensions(parsedGif),
+            height: parsedGif.lsd.height,
+            width: parsedGif.lsd.width,
+        },
+        limits
+    );
 
     const frames = decompressFrames(parsedGif, true).filter(Boolean) as ParsedFrame[];
     assertGifDecodeLimits({ byteLength: arrayBuffer.byteLength, frameCount: frames.length }, limits);
