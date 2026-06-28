@@ -42,15 +42,8 @@ export default function MainContainer({ templates }: MainContainerProps) {
         <div className="w-full max-sm:w-full mx-auto p-4 max-sm:p-1 flex flex-col flex-wrap items-center">
             <AnimatePresence mode="wait">
                 {!selected ? (
-                    <motion.div
+                    <div
                         key="selector"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{
-                            duration: 0.4,
-                            ease: [0.22, 1, 0.36, 1]
-                        }}
                         className="w-full max-w-6xl"
                     >
                         <TemplateSelector
@@ -58,7 +51,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                             onSelect={handleSelect}
                             onCustomTemplateSelect={handleCustomTemplateSelect}
                         />
-                    </motion.div>
+                    </div>
                 ) : (
                     <motion.div
                         key="editor"

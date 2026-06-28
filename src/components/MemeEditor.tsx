@@ -61,9 +61,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     // Corner resize flags
     const [isResizingTextCorner, setIsResizingTextCorner] = useState<boolean>(false);
     const [resizeTextCornerHandle, setResizeTextCornerHandle] = useState<string>('');
-    const [resizeTextStartPos, setResizeTextStartPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [resizeTextStartSize, setResizeTextStartSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
     const [resizeTextStartBoxPos, setResizeTextStartBoxPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [resizeTextStartFontSize, setResizeTextStartFontSize] = useState<number>(0);
 
     const { loadFont, preloadFont } = useFontLoader();
 
@@ -200,68 +200,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         );
     }, [getDefaultFont]);
 
-    const handleChange = useCallback((idx: number, value: string) => {
-        setTexts(prev => {
-            const arr = [...prev];
-            arr[idx] = value;
-            return arr;
-        });
-    }, []);
-
-    const handleSettingsChange = useCallback((idx: number, setting: keyof TextSettings, value: string | number) => {
-        setTextSettings(prev => {
-            const updated = [...prev];
-            updated[idx] = {
-                ...updated[idx],
-                [setting]: value
-            };
-            return updated;
-        });
-
-        if (setting === 'fontFamily' && typeof value === 'string' && FONT_CONFIGS[value]) {
-            loadFont(FONT_CONFIGS[value]);
-        }
-    }, [loadFont]);
-
-    const handleShadowChange = useCallback((idx: number, shadowProperty: keyof TextSettings['shadow'], value: string | number) => {
-        setTextSettings(prev => {
-            const updated = [...prev];
-            updated[idx] = {
-                ...updated[idx],
-                shadow: {
-                    ...updated[idx].shadow,
-                    [shadowProperty]: value
-                }
-            };
-            return updated;
-        });
-    }, []);
-
-    const handleOutlineChange = useCallback((idx: number, outlineProperty: keyof TextSettings['outline'], value: string | number) => {
-        setTextSettings(prev => {
-            const updated = [...prev];
-            updated[idx] = {
-                ...updated[idx],
-                outline: {
-                    ...updated[idx].outline,
-                    [outlineProperty]: value
-                }
-            };
-            return updated;
-        });
-    }, []);
-
-    const handleTextBoxChange = useCallback((idx: number, property: keyof Template['textBoxes'][number], value: number) => {
-        setTextBoxes(prev => {
-            const updated = [...prev];
-            updated[idx] = {
-                ...updated[idx],
-                [property]: value
-            };
-            return updated;
-        });
-    }, []);
-
     const transformText = useCallback((text: string, textCase: TextSettings['textCase']): string => {
         switch (textCase) {
             case 'uppercase':
@@ -274,7 +212,398 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     }, []);
 
-    const MIN_FONT_SIZE = template.textBoxes[0].minFont;
+    const MIN_FONT_SIZE = template.textBoxes[0]?.minFont ?? 10;
+    const CUSTOM_TEXT_MIN_FONT_SIZE = 10;
+    const MAX_TEXT_FONT_SIZE = 300;
+    const MIN_TEXT_BOX_SIZE = 24;
+
+    const clampValue = useCallback((value: number, min: number, max: number) => {
+        return Math.max(min, Math.min(max, value));
+    }, []);
+
+    const getFontFallbacks = useCallback((fontFamily: string): string => {
+        return [
+            fontFamily,
+            fontFamily === 'Impact' ? 'Arial Black' : 'Impact',
+            'Arial Black',
+            'Helvetica Neue',
+            'Arial',
+            'sans-serif'
+        ].join(', ');
+    }, []);
+
+    const getTextWidthWithSpacing = useCallback((
+        ctx: CanvasRenderingContext2D,
+        text: string,
+        letterSpacing: number
+    ): number => {
+        if (letterSpacing === 0) {
+            return ctx.measureText(text).width;
+        }
+
+        return text.split('').reduce((width, char, index) => {
+            return width + ctx.measureText(char).width + (index > 0 ? letterSpacing : 0);
+        }, 0);
+    }, []);
+
+    const getMeasuredTextBoxSize = useCallback((
+        ctx: CanvasRenderingContext2D,
+        text: string,
+        settings: TextSettings,
+        maxWidth?: number
+    ): { width: number; height: number; lines: string[] } => {
+        const fontSize = Math.max(1, settings.fontSize || 1);
+        const fontFallbacks = getFontFallbacks(settings.fontFamily);
+
+        ctx.save();
+        ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
+
+        const transformedText = transformText(text || '', settings.textCase);
+        const shadowPadding = Math.max(
+            Math.abs(settings.shadow?.offsetX || 0),
+            Math.abs(settings.shadow?.offsetY || 0)
+        ) + (settings.shadow?.blur || 0);
+        const padding = Math.ceil(
+            Math.max(8, fontSize * 0.14) +
+            (settings.outline?.width || 0) * 2 +
+            shadowPadding
+        );
+        const maxContentWidth = maxWidth
+            ? Math.max(MIN_TEXT_BOX_SIZE, maxWidth - padding * 2)
+            : Number.POSITIVE_INFINITY;
+
+        const lines: string[] = [];
+        const manualLines = transformedText.length ? transformedText.split('\n') : [''];
+
+        manualLines.forEach((manualLine) => {
+            if (!manualLine) {
+                lines.push('');
+                return;
+            }
+
+            if (!Number.isFinite(maxContentWidth)) {
+                lines.push(manualLine);
+                return;
+            }
+
+            const words = manualLine.split(' ');
+            let currentLine = '';
+
+            words.forEach((word) => {
+                const testLine = currentLine ? `${currentLine} ${word}` : word;
+                const textWidth = getTextWidthWithSpacing(ctx, testLine, settings.letterSpacing);
+
+                if (textWidth > maxContentWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            });
+
+            lines.push(currentLine);
+        });
+
+        const longestLineWidth = lines.reduce((width, line) => {
+            return Math.max(width, getTextWidthWithSpacing(ctx, line, settings.letterSpacing));
+        }, 0);
+        const lineHeight = fontSize * 1.2;
+
+        ctx.restore();
+
+        return {
+            width: Math.max(MIN_TEXT_BOX_SIZE, Math.ceil(longestLineWidth + padding * 2)),
+            height: Math.max(MIN_TEXT_BOX_SIZE, Math.ceil(lines.length * lineHeight + padding * 2)),
+            lines
+        };
+    }, [getFontFallbacks, getTextWidthWithSpacing, transformText]);
+
+    const constrainTextBoxToCanvas = useCallback((
+        box: Template['textBoxes'][number],
+        canvas: HTMLCanvasElement
+    ): Template['textBoxes'][number] => {
+        let nextX = box.x;
+        let nextY = box.y;
+
+        if (box.width <= canvas.width) {
+            nextX = clampValue(nextX, 0, Math.max(0, canvas.width - box.width));
+        } else {
+            nextX = clampValue(nextX, canvas.width - box.width, 0);
+        }
+
+        if (box.height <= canvas.height) {
+            nextY = clampValue(nextY, 0, Math.max(0, canvas.height - box.height));
+        } else {
+            nextY = clampValue(nextY, canvas.height - box.height, 0);
+        }
+
+        return {
+            ...box,
+            x: nextX,
+            y: nextY
+        };
+    }, [clampValue]);
+
+    const fitTextBoxToContent = useCallback((
+        box: Template['textBoxes'][number],
+        text: string,
+        settings: TextSettings,
+        options?: { mode?: 'center' | 'draw-origin'; maxWidth?: number }
+    ): Template['textBoxes'][number] => {
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (!canvas || !ctx) return box;
+
+        const mode = options?.mode || 'draw-origin';
+        const maxWidth = Math.max(
+            MIN_TEXT_BOX_SIZE,
+            Math.min(options?.maxWidth ?? canvas.width * 0.9, canvas.width * 0.95)
+        );
+        const measured = getMeasuredTextBoxSize(ctx, text, settings, maxWidth);
+        let nextX = box.x;
+        let nextY = box.y;
+
+        if (mode === 'center') {
+            nextX = box.x + box.width / 2 - measured.width / 2;
+            nextY = box.y + box.height / 2 - measured.height / 2;
+        } else if (box.align === 'right') {
+            nextX = box.x + box.width - measured.width;
+        } else if (box.align === 'center') {
+            nextX = box.x + box.width / 2 - measured.width / 2;
+        }
+
+        return constrainTextBoxToCanvas({
+            ...box,
+            x: nextX,
+            y: nextY,
+            width: measured.width,
+            height: measured.height,
+            fontSize: settings.fontSize,
+            minFont: box.minFont ?? CUSTOM_TEXT_MIN_FONT_SIZE,
+            align: box.align || 'center'
+        }, canvas);
+    }, [CUSTOM_TEXT_MIN_FONT_SIZE, getMeasuredTextBoxSize, constrainTextBoxToCanvas]);
+
+    const updateTextBoxToContent = useCallback((
+        idx: number,
+        text: string,
+        settings: TextSettings
+    ) => {
+        setTextBoxes(prev => {
+            const box = prev[idx];
+            if (!box) return prev;
+
+            const canvas = canvasRef.current;
+            const templateMaxWidth = idx < originalTextBoxCount
+                ? template.textBoxes[idx]?.width
+                : undefined;
+            const maxWidth = templateMaxWidth && canvas
+                ? Math.min(templateMaxWidth, canvas.width * 0.95)
+                : undefined;
+            const updated = [...prev];
+            updated[idx] = fitTextBoxToContent(box, text, settings, {
+                mode: 'draw-origin',
+                maxWidth
+            });
+            return updated;
+        });
+    }, [fitTextBoxToContent, originalTextBoxCount, template.textBoxes]);
+
+    const handleChange = useCallback((idx: number, value: string) => {
+        setTexts(prev => {
+            const arr = [...prev];
+            arr[idx] = value;
+            return arr;
+        });
+
+        const settings = textSettings[idx];
+        if (settings) {
+            updateTextBoxToContent(idx, value, settings);
+        }
+    }, [textSettings, updateTextBoxToContent]);
+
+    const handleSettingsChange = useCallback((idx: number, setting: keyof TextSettings, value: string | number) => {
+        const currentSettings = textSettings[idx];
+        if (!currentSettings) return;
+
+        const nextSettings = {
+            ...currentSettings,
+            [setting]: value
+        };
+
+        setTextSettings(prev => {
+            const updated = [...prev];
+            updated[idx] = {
+                ...updated[idx],
+                [setting]: value
+            };
+            return updated;
+        });
+
+        updateTextBoxToContent(idx, texts[idx] || '', nextSettings);
+
+        if (setting === 'fontFamily' && typeof value === 'string' && FONT_CONFIGS[value]) {
+            loadFont(FONT_CONFIGS[value])
+                .then(() => updateTextBoxToContent(idx, texts[idx] || '', nextSettings))
+                .catch(() => undefined);
+        }
+    }, [loadFont, textSettings, texts, updateTextBoxToContent]);
+
+    const handleShadowChange = useCallback((idx: number, shadowProperty: keyof TextSettings['shadow'], value: string | number) => {
+        const currentSettings = textSettings[idx];
+        if (!currentSettings) return;
+
+        const nextSettings = {
+            ...currentSettings,
+            shadow: {
+                ...currentSettings.shadow,
+                [shadowProperty]: value
+            }
+        };
+
+        setTextSettings(prev => {
+            const updated = [...prev];
+            updated[idx] = {
+                ...updated[idx],
+                shadow: {
+                    ...updated[idx].shadow,
+                    [shadowProperty]: value
+                }
+            };
+            return updated;
+        });
+
+        updateTextBoxToContent(idx, texts[idx] || '', nextSettings);
+    }, [textSettings, texts, updateTextBoxToContent]);
+
+    const handleOutlineChange = useCallback((idx: number, outlineProperty: keyof TextSettings['outline'], value: string | number) => {
+        const currentSettings = textSettings[idx];
+        if (!currentSettings) return;
+
+        const nextSettings = {
+            ...currentSettings,
+            outline: {
+                ...currentSettings.outline,
+                [outlineProperty]: value
+            }
+        };
+
+        setTextSettings(prev => {
+            const updated = [...prev];
+            updated[idx] = {
+                ...updated[idx],
+                outline: {
+                    ...updated[idx].outline,
+                    [outlineProperty]: value
+                }
+            };
+            return updated;
+        });
+
+        updateTextBoxToContent(idx, texts[idx] || '', nextSettings);
+    }, [textSettings, texts, updateTextBoxToContent]);
+
+    const handleTextBoxChange = useCallback((idx: number, property: keyof Template['textBoxes'][number], value: number) => {
+        setTextBoxes(prev => {
+            const updated = [...prev];
+            updated[idx] = {
+                ...updated[idx],
+                [property]: value
+            };
+            return updated;
+        });
+    }, []);
+
+    const resizeTextFromCorner = useCallback((
+        pointerX: number,
+        pointerY: number,
+        canvas: HTMLCanvasElement
+    ) => {
+        const index = resizeTextIndex;
+        const handle = resizeTextCornerHandle;
+        const settings = textSettings[index];
+        const box = textBoxes[index];
+        const ctx = canvas.getContext('2d');
+
+        if (index === -1 || !handle || !settings || !box || !ctx) return;
+
+        const startWidth = Math.max(1, resizeTextStartSize.width);
+        const startHeight = Math.max(1, resizeTextStartSize.height);
+        const startX = resizeTextStartBoxPos.x;
+        const startY = resizeTextStartBoxPos.y;
+
+        const anchorX = handle.includes('e') ? startX : startX + startWidth;
+        const anchorY = handle.includes('s') ? startY : startY + startHeight;
+        const startCornerX = handle.includes('e') ? startX + startWidth : startX;
+        const startCornerY = handle.includes('s') ? startY + startHeight : startY;
+
+        const startDistance = Math.max(1, Math.hypot(startCornerX - anchorX, startCornerY - anchorY));
+        const currentDistance = Math.max(1, Math.hypot(pointerX - anchorX, pointerY - anchorY));
+        const scale = clampValue(currentDistance / startDistance, 0.1, 8);
+        const minFont = Math.max(CUSTOM_TEXT_MIN_FONT_SIZE, box.minFont ?? CUSTOM_TEXT_MIN_FONT_SIZE);
+        const startFontSize = resizeTextStartFontSize || settings.fontSize;
+        const nextFontSize = Math.round(clampValue(startFontSize * scale, minFont, MAX_TEXT_FONT_SIZE));
+        const nextSettings = {
+            ...settings,
+            fontSize: nextFontSize
+        };
+        const measured = getMeasuredTextBoxSize(
+            ctx,
+            texts[index] || '',
+            nextSettings,
+            Math.max(MIN_TEXT_BOX_SIZE, canvas.width * 0.95)
+        );
+
+        const nextX = handle.includes('w') ? anchorX - measured.width : anchorX;
+        const nextY = handle.includes('n') ? anchorY - measured.height : anchorY;
+        const nextBox = constrainTextBoxToCanvas({
+            ...box,
+            x: nextX,
+            y: nextY,
+            width: measured.width,
+            height: measured.height,
+            fontSize: nextFontSize,
+            minFont: box.minFont ?? CUSTOM_TEXT_MIN_FONT_SIZE,
+            align: box.align || 'center'
+        }, canvas);
+
+        setTextSettings(prev => {
+            const updated = [...prev];
+            if (updated[index]) {
+                updated[index] = {
+                    ...updated[index],
+                    fontSize: nextFontSize
+                };
+            }
+            return updated;
+        });
+
+        setTextBoxes((prev: Template['textBoxes']) => {
+            const updated = [...prev];
+            if (updated[index]) {
+                updated[index] = {
+                    ...updated[index],
+                    ...nextBox
+                };
+            }
+            return updated;
+        });
+    }, [
+        CUSTOM_TEXT_MIN_FONT_SIZE,
+        MAX_TEXT_FONT_SIZE,
+        MIN_TEXT_BOX_SIZE,
+        clampValue,
+        constrainTextBoxToCanvas,
+        getMeasuredTextBoxSize,
+        resizeTextCornerHandle,
+        resizeTextIndex,
+        resizeTextStartBoxPos,
+        resizeTextStartFontSize,
+        resizeTextStartSize,
+        textBoxes,
+        textSettings,
+        texts
+    ]);
 
     const getTextAtPosition = useCallback((x: number, y: number): number => {
         for (let i = textBoxes.length - 1; i >= 0; i--) {
@@ -741,7 +1070,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             } else if (['nw', 'ne', 'sw', 'se'].includes(resizeHandleResult.handle)) {
                 setIsResizingTextCorner(true);
                 setResizeTextCornerHandle(resizeHandleResult.handle);
-                setResizeTextStartPos({ x, y });
                 setResizeTextStartSize({
                     width: textBoxes[resizeHandleResult.index].width,
                     height: textBoxes[resizeHandleResult.index].height
@@ -750,6 +1078,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     x: textBoxes[resizeHandleResult.index].x,
                     y: textBoxes[resizeHandleResult.index].y
                 });
+                setResizeTextStartFontSize(textSettings[resizeHandleResult.index]?.fontSize || textBoxes[resizeHandleResult.index].fontSize);
                 canvas.style.cursor = `${resizeHandleResult.handle}-resize`;
             }
             setResizeTextIndex(resizeHandleResult.index);
@@ -951,64 +1280,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 return updated;
             });
         } else if (isResizingTextCorner && resizeTextIndex !== -1) {
-            const deltaX = x - resizeTextStartPos.x;
-            const deltaY = y - resizeTextStartPos.y;
-
-            let newWidth = resizeTextStartSize.width;
-            let newHeight = resizeTextStartSize.height;
-            let newX = resizeTextStartBoxPos.x;
-            let newY = resizeTextStartBoxPos.y;
-
-            switch (resizeTextCornerHandle) {
-                case 'se':
-                    newWidth = Math.max(50, resizeTextStartSize.width + deltaX);
-                    newHeight = Math.max(50, resizeTextStartSize.height + deltaY);
-                    break;
-                case 'sw':
-                    newWidth = Math.max(50, resizeTextStartSize.width - deltaX);
-                    newHeight = Math.max(50, resizeTextStartSize.height + deltaY);
-                    newX = resizeTextStartBoxPos.x + deltaX;
-                    break;
-                case 'ne':
-                    newWidth = Math.max(50, resizeTextStartSize.width + deltaX);
-                    newHeight = Math.max(50, resizeTextStartSize.height - deltaY);
-                    newY = resizeTextStartBoxPos.y + deltaY;
-                    break;
-                case 'nw':
-                    newWidth = Math.max(50, resizeTextStartSize.width - deltaX);
-                    newHeight = Math.max(50, resizeTextStartSize.height - deltaY);
-                    newX = resizeTextStartBoxPos.x + deltaX;
-                    newY = resizeTextStartBoxPos.y + deltaY;
-                    break;
-            }
-
-            // Constrain to canvas bounds
-            if (newX < 0) {
-                newWidth = Math.max(50, newWidth + newX);
-                newX = 0;
-            }
-            if (newY < 0) {
-                newHeight = Math.max(50, newHeight + newY);
-                newY = 0;
-            }
-            if (newX + newWidth > canvas.width) {
-                newWidth = Math.max(50, canvas.width - newX);
-            }
-            if (newY + newHeight > canvas.height) {
-                newHeight = Math.max(50, canvas.height - newY);
-            }
-
-            setTextBoxes((prev: Template['textBoxes']) => {
-                const updated = [...prev];
-                updated[resizeTextIndex] = {
-                    ...updated[resizeTextIndex],
-                    x: newX,
-                    y: newY,
-                    width: newWidth,
-                    height: newHeight
-                };
-                return updated;
-            });
+            resizeTextFromCorner(x, y, canvas);
         } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
@@ -1090,9 +1362,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         // Corner resize reset
         setIsResizingTextCorner(false);
         setResizeTextCornerHandle('');
-        setResizeTextStartPos({ x: 0, y: 0 });
         setResizeTextStartSize({ width: 0, height: 0 });
         setResizeTextStartBoxPos({ x: 0, y: 0 });
+        setResizeTextStartFontSize(0);
         // Text rotation reset
         setIsRotatingText(false);
         setRotateTextIndex(-1);
@@ -1182,7 +1454,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             } else if (['nw', 'ne', 'sw', 'se'].includes(resizeHandleResult.handle)) {
                 setIsResizingTextCorner(true);
                 setResizeTextCornerHandle(resizeHandleResult.handle);
-                setResizeTextStartPos({ x, y });
                 setResizeTextStartSize({
                     width: textBoxes[resizeHandleResult.index].width,
                     height: textBoxes[resizeHandleResult.index].height
@@ -1191,6 +1462,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     x: textBoxes[resizeHandleResult.index].x,
                     y: textBoxes[resizeHandleResult.index].y
                 });
+                setResizeTextStartFontSize(textSettings[resizeHandleResult.index]?.fontSize || textBoxes[resizeHandleResult.index].fontSize);
             }
             setResizeTextIndex(resizeHandleResult.index);
             return;
@@ -1394,64 +1666,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 return updated;
             });
         } else if (isResizingTextCorner && resizeTextIndex !== -1) {
-            const deltaX = x - resizeTextStartPos.x;
-            const deltaY = y - resizeTextStartPos.y;
-
-            let newWidth = resizeTextStartSize.width;
-            let newHeight = resizeTextStartSize.height;
-            let newX = resizeTextStartBoxPos.x;
-            let newY = resizeTextStartBoxPos.y;
-
-            switch (resizeTextCornerHandle) {
-                case 'se':
-                    newWidth = Math.max(50, resizeTextStartSize.width + deltaX);
-                    newHeight = Math.max(50, resizeTextStartSize.height + deltaY);
-                    break;
-                case 'sw':
-                    newWidth = Math.max(50, resizeTextStartSize.width - deltaX);
-                    newHeight = Math.max(50, resizeTextStartSize.height + deltaY);
-                    newX = resizeTextStartBoxPos.x + deltaX;
-                    break;
-                case 'ne':
-                    newWidth = Math.max(50, resizeTextStartSize.width + deltaX);
-                    newHeight = Math.max(50, resizeTextStartSize.height - deltaY);
-                    newY = resizeTextStartBoxPos.y + deltaY;
-                    break;
-                case 'nw':
-                    newWidth = Math.max(50, resizeTextStartSize.width - deltaX);
-                    newHeight = Math.max(50, resizeTextStartSize.height - deltaY);
-                    newX = resizeTextStartBoxPos.x + deltaX;
-                    newY = resizeTextStartBoxPos.y + deltaY;
-                    break;
-            }
-
-            // Constrain to canvas bounds
-            if (newX < 0) {
-                newWidth = Math.max(50, newWidth + newX);
-                newX = 0;
-            }
-            if (newY < 0) {
-                newHeight = Math.max(50, newHeight + newY);
-                newY = 0;
-            }
-            if (newX + newWidth > canvas.width) {
-                newWidth = Math.max(50, canvas.width - newX);
-            }
-            if (newY + newHeight > canvas.height) {
-                newHeight = Math.max(50, canvas.height - newY);
-            }
-
-            setTextBoxes((prev: Template['textBoxes']) => {
-                const updated = [...prev];
-                updated[resizeTextIndex] = {
-                    ...updated[resizeTextIndex],
-                    x: newX,
-                    y: newY,
-                    width: newWidth,
-                    height: newHeight
-                };
-                return updated;
-            });
+            resizeTextFromCorner(x, y, canvas);
         } else if (isDragging && dragIndex !== -1) {
             const newX = x - dragOffset.x;
             const newY = y - dragOffset.y;
@@ -1498,9 +1713,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         // Corner resize reset
         setIsResizingTextCorner(false);
         setResizeTextCornerHandle('');
-        setResizeTextStartPos({ x: 0, y: 0 });
         setResizeTextStartSize({ width: 0, height: 0 });
         setResizeTextStartBoxPos({ x: 0, y: 0 });
+        setResizeTextStartFontSize(0);
         // Text rotation reset
         setIsRotatingText(false);
         setRotateTextIndex(-1);
@@ -1519,6 +1734,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     ): { fontSize: number; lines: string[] } => {
         let fontSize = maxFontSize;
         let lines: string[] = [];
+        const minFontSize = box.minFont ?? MIN_FONT_SIZE;
 
         const transformedText = transformText(text, textCase);
 
@@ -1577,7 +1793,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             return processedLines;
         };
 
-        while (fontSize > MIN_FONT_SIZE) {
+        while (fontSize > minFontSize) {
             ctx.font = `${fontWeight} ${fontSize}px ${fontFallbacks}`;
             lines = processTextWithLineBreaks(transformedText);
 
@@ -1588,8 +1804,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             fontSize -= 2;
         }
 
-        if (fontSize < MIN_FONT_SIZE) {
-            fontSize = MIN_FONT_SIZE;
+        if (fontSize < minFontSize) {
+            fontSize = minFontSize;
             ctx.font = `${fontWeight} ${fontSize}px ${fontFallbacks}`;
             lines = processTextWithLineBreaks(transformedText);
         }
@@ -2486,24 +2702,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        const textBoxWidth = Math.min(canvas.width * 0.8, 600);
-        const textBoxHeight = Math.min(canvas.height * 0.3, 200);
-
-        const newTextBox = {
-            x: canvas.width / 2 - textBoxWidth / 2,
-            y: canvas.height / 2 - textBoxHeight / 2,
-            width: textBoxWidth,
-            height: textBoxHeight,
-            fontSize: 40,
-            align: 'center' as const,
-            minFont: MIN_FONT_SIZE
-        };
-
-        setTexts(prev => [...prev, 'memehub']);
-        setTextBoxes(prev => [...prev, newTextBox]);
-        setTextBoxRotations(prev => [...prev, 0]);
-        setTextSettings(prev => [...prev, {
-            fontSize: Math.max(60, Math.min(canvas.width, canvas.height) * 0.08),
+        const defaultText = 'memehub';
+        const defaultSettings = {
+            fontSize: Math.round(clampValue(
+                Math.max(60, Math.min(canvas.width, canvas.height) * 0.08),
+                CUSTOM_TEXT_MIN_FONT_SIZE,
+                MAX_TEXT_FONT_SIZE
+            )),
             color: '#ffffff',
             fontFamily: getDefaultFont(),
             fontWeight: '900',
@@ -2519,10 +2724,40 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 offsetY: 1,
                 color: '#000000'
             }
-        }]);
+        };
+
+        const baseTextBox = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            width: 0,
+            height: 0,
+            fontSize: defaultSettings.fontSize,
+            align: 'center' as const,
+            minFont: CUSTOM_TEXT_MIN_FONT_SIZE
+        };
+        const newTextBox = fitTextBoxToContent(baseTextBox, defaultText, defaultSettings, {
+            mode: 'center'
+        });
+
+        setTexts(prev => [...prev, defaultText]);
+        setTextBoxes(prev => {
+            setSelectedTextIndex(prev.length);
+            setSelectedImageIndex(-1);
+            setSelectedShapeIndex(-1);
+            return [...prev, newTextBox];
+        });
+        setTextBoxRotations(prev => [...prev, 0]);
+        setTextSettings(prev => [...prev, defaultSettings]);
 
         toast.success('Text box added! Drag it to position.');
-    }, [getDefaultFont, MIN_FONT_SIZE]);
+    }, [
+        CUSTOM_TEXT_MIN_FONT_SIZE,
+        MAX_TEXT_FONT_SIZE,
+        clampValue,
+        fitTextBoxToContent,
+        getDefaultFont,
+        setSelectedShapeIndex
+    ]);
 
     const removeTextBox = useCallback((index: number) => {
         if (index < originalTextBoxCount) {

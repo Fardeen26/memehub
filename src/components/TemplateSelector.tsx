@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Template } from '@/types/template';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
     Pagination,
     PaginationContent,
@@ -28,9 +27,6 @@ const PRELOAD_NEXT_PAGE = true;
 
 export default function TemplateSelector({ templates, onSelect, onCustomTemplateSelect }: TemplateSelectorProps) {
     const { currentPage, setCurrentPage } = useSelected();
-    const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
-    const intersectionObserverRef = useRef<IntersectionObserver | null>(null);
-    const imageRefs = useRef<Map<string, HTMLElement>>(new Map());
 
     const templateEntries = useMemo(() => Object.entries(templates), [templates]);
     const totalPages = Math.ceil(templateEntries.length / TEMPLATES_PER_PAGE);
@@ -73,59 +69,9 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
         }
     }, [nextPageTemplates]);
 
-    useEffect(() => {
-        intersectionObserverRef.current = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target as HTMLElement;
-                        const imageSrc = img.dataset.src;
-                        if (imageSrc && !loadedImages.has(imageSrc)) {
-                            setLoadedImages(prev => new Set([...prev, imageSrc]));
-                        }
-                    }
-                });
-            },
-            {
-                rootMargin: '50px',
-                threshold: 0.1,
-            }
-        );
-
-        return () => {
-            intersectionObserverRef.current?.disconnect();
-        };
-    }, [loadedImages]);
-
-    useEffect(() => {
-        const observer = intersectionObserverRef.current;
-        if (!observer) return;
-
-        const currentImageRefs = imageRefs.current;
-
-        currentImageRefs.forEach((element) => {
-            observer.observe(element);
-        });
-
-        return () => {
-            currentImageRefs.forEach((element) => {
-                observer.unobserve(element);
-            });
-        };
-    }, [paginatedTemplates]);
-
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const setImageRef = (key: string) => (element: HTMLElement | null) => {
-        if (element) {
-            imageRefs.current.set(key, element);
-            element.dataset.src = templates[key]?.image;
-        } else {
-            imageRefs.current.delete(key);
-        }
+        window.scrollTo({ top: 0 });
     };
 
     const renderPaginationItems = () => {
@@ -194,12 +140,7 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
 
     return (
         <div className="space-y-6 w-full">
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="flex"
-            >
+            <div className="flex">
                 <CustomTemplateUpload
                     onTemplateCreate={onCustomTemplateSelect || (() => { })}
                     buttonText="Use Custom Template"
@@ -208,68 +149,38 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                     title="Upload Custom Template"
                     description="Upload your own image to create a custom meme template."
                 />
-            </motion.div>
+            </div>
 
             <section className="grid grid-cols-6 max-sm:grid-cols-2 max-md:grid-cols-3 max-lg:grid-cols-4 gap-6 grid-flow-dense w-full max-sm:-mt-3">
-                <AnimatePresence mode="popLayout">
-                    {paginatedTemplates.map(([key, tpl], index) => {
+                {paginatedTemplates.map(([key, tpl], index) => {
                         const isPriority = index < 6 && currentPage === 1;
                         return (
-                            <motion.div
+                            <div
                                 key={key}
-                                ref={setImageRef(key)}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -20 }}
-                                transition={{
-                                    duration: 0.3,
-                                    delay: index * 0.05,
-                                    ease: [0.22, 1, 0.36, 1]
-                                }}
                                 onClick={() => onSelect(key)}
                             >
-                                <motion.div
-                                    className="relative aspect-square cursor-pointer"
-                                    whileHover={{ scale: 1.02 }}
-                                    transition={{ duration: 0.2 }}
-                                >
+                                <div className="relative aspect-square cursor-pointer">
                                     <Image
                                         src={tpl.image}
                                         alt={tpl.displayName || key}
                                         fill
-                                        className="object-cover rounded-2xl shadow transition-opacity duration-300"
+                                        className="object-cover rounded-2xl shadow"
                                         loading={isPriority ? 'eager' : 'lazy'}
                                         priority={isPriority}
                                         quality={100}
                                         sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 16.67vw"
-                                        placeholder="blur"
-                                        blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-                                        onLoad={() => {
-                                            setLoadedImages(prev => new Set([...prev, tpl.image]));
-                                        }}
                                     />
-                                </motion.div>
-                                <motion.p
-                                    className="text-center text-base font-medium mt-2 capitalize line-clamp-2"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: 0.1 }}
-                                >
+                                </div>
+                                <p className="text-center text-base font-medium mt-2 capitalize line-clamp-2">
                                     {tpl.displayName || key.replace(/-/g, ' ').replace(/^imgflip /i, '')}
-                                </motion.p>
-                            </motion.div>
+                                </p>
+                            </div>
                         );
                     })}
-                </AnimatePresence>
             </section>
 
             {totalPages > 1 && (
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: 0.2 }}
-                    className="flex flex-col items-center pt-6 space-y-4"
-                >
+                <div className="flex flex-col items-center pt-6 space-y-4">
                     <Pagination>
                         <PaginationContent>
                             <PaginationItem>
@@ -289,7 +200,7 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                             </PaginationItem>
                         </PaginationContent>
                     </Pagination>
-                </motion.div>
+                </div>
             )}
         </div>
     );

@@ -42,12 +42,13 @@ export default function TemplateSearch() {
     }, [searchQuery, setCurrentPage]);
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        >
-            <div className={`justify-center pb-16 relative w-full ${selected ? "hidden" : "flex"}`}>
+        <>
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className={`justify-center pb-16 relative w-full ${selected ? "hidden" : "flex"}`}
+            >
                 <motion.div
                     className="relative w-full max-w-md"
                     whileFocus={{ scale: 1.02 }}
@@ -72,7 +73,7 @@ export default function TemplateSearch() {
                         <ArrowDownRight className="w-4 h-4" />
                     </motion.span>
                 </motion.div>
-            </div>
+            </motion.div>
 
             {Object.keys(filteredTemplates).length === 0 ? (
                 <div className="min-h-[30vh] max-sm:min-h-[50vh]">
@@ -81,6 +82,6 @@ export default function TemplateSearch() {
             ) : (
                 <MainContainer templates={filteredTemplates} />
             )}
-        </motion.div>
+        </>
     );
 }
