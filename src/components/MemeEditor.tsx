@@ -3,7 +3,7 @@
 // @ts-nocheck
 
 import { Template } from '@/types/template';
-import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Maximize2, Minimize2, Shapes, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Maximize2, Minimize2, Shapes, ChevronDown, ChevronUp, Layers, Download, Video, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -37,6 +37,28 @@ import { useFontLoader, FONT_CONFIGS } from '@/hooks/useFontLoader';
 import { useCanvasShapes } from '@/hooks/useCanvasShapes';
 import ElementsPanel from '@/components/ElementsPanel';
 import { resolveImageSrc } from '@/lib/resolveImageSrc';
+import type { GiphyMediaItem } from '@/types/giphy';
+import {
+    GIF_MAX_BYTES,
+    GifDecodeLimitError,
+    decodeGifFromArrayBuffer,
+    fetchGifArrayBuffer,
+    getAnimatedExportDurationMs,
+    getGifFrameCanvas,
+    isGifSource,
+    type DecodedGif,
+} from '@/lib/gifAnimation';
+import {
+    getAnimatedExportCapability,
+    getStillExportMimeType,
+} from '@/lib/exportCapabilities';
+import {
+    downloadBlob,
+    encodeSceneToGifBlob,
+    recordSceneToWebmBlob,
+    renderSceneToPngBlob,
+    type SceneRenderOptions,
+} from '@/lib/canvasExport';
 
 export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -122,6 +144,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+    const decodedGifCache = useRef<Map<string, DecodedGif>>(new Map());
+    const fontLoadCache = useRef<Map<string, Promise<void>>>(new Map());
+    const currentAnimationTimeRef = useRef<number>(0);
+    const [isExporting, setIsExporting] = useState<boolean>(false);
+    const [exportStatus, setExportStatus] = useState<string | null>(null);
 
     const {
         shapeOverlays,
@@ -177,6 +204,25 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             img.onerror = reject;
             img.src = src;
         });
+    }, []);
+
+    const getAnimationNow = useCallback(() => {
+        if (typeof performance !== 'undefined') {
+            return performance.now();
+        }
+        return Date.now();
+    }, []);
+
+    const decodeGifForOverlay = useCallback(async (overlayId: string, src: string, file?: File) => {
+        const buffer = file ? await file.arrayBuffer() : await fetchGifArrayBuffer(src);
+        const decodedGif = decodeGifFromArrayBuffer(buffer);
+        decodedGifCache.current.set(overlayId, decodedGif);
+        return decodedGif;
+    }, []);
+
+    const isUnsupportedAnimatedUploadCandidate = useCallback((file: File) => {
+        const lowerName = file.name.toLowerCase();
+        return file.type === 'image/webp' || lowerName.endsWith('.webp') || lowerName.endsWith('.apng');
     }, []);
 
     useEffect(() => {
@@ -420,22 +466,69 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const addImageOverlay = useCallback(async (
         input: File | string,
-        options?: { isDataUrl?: boolean; label?: string; animated?: boolean }
+        options?: { isDataUrl?: boolean; label?: string; animated?: boolean; mimeType?: string; stillUrl?: string }
     ) => {
         try {
+            const fileInput = input instanceof File ? input : undefined;
             const imageSrc = await resolveImageSrc(input, options?.isDataUrl);
-            const isAnimated =
+            const mimeType = options?.mimeType || fileInput?.type || (isGifSource(imageSrc) ? 'image/gif' : undefined);
+            const isGif = isGifSource(imageSrc, mimeType);
+            const requestedAnimated =
                 options?.animated ??
-                (/\.gif(\?|$)/i.test(imageSrc) || /giphy\.com/i.test(imageSrc));
+                (isGif || /giphy\.com/i.test(imageSrc));
 
-            const img = await loadAndCacheImage(imageSrc);
+            if (fileInput && isUnsupportedAnimatedUploadCandidate(fileInput) && !isGif) {
+                toast.info('Animated WebP/APNG uploads are treated as static in v1. Only animated GIF uploads animate.');
+            }
+
+            if (fileInput && isGif && fileInput.size > GIF_MAX_BYTES) {
+                throw new GifDecodeLimitError('Animated GIF is too large for browser export. Max size is 10MB.');
+            }
 
             const canvas = canvasRef.current;
             if (!canvas) return;
 
+            const overlayId = generateImageId();
+            let decodedGif: DecodedGif | null = null;
+            let staticSrc = imageSrc;
+            let naturalWidth = 0;
+            let naturalHeight = 0;
+
+            if (requestedAnimated && isGif) {
+                try {
+                    decodedGif = await decodeGifForOverlay(overlayId, imageSrc, fileInput);
+                    if (decodedGif.frameCount <= 1) {
+                        decodedGifCache.current.delete(overlayId);
+                        decodedGif = null;
+                    }
+                } catch (error) {
+                    decodedGifCache.current.delete(overlayId);
+                    const message =
+                        error instanceof GifDecodeLimitError
+                            ? error.message
+                            : 'Animated GIF decoding failed. Adding as a static image instead.';
+                    if (error instanceof GifDecodeLimitError) {
+                        throw error;
+                    }
+                    toast.error(message);
+                    if (options?.stillUrl) {
+                        staticSrc = options.stillUrl;
+                    }
+                }
+            }
+
+            if (decodedGif) {
+                naturalWidth = decodedGif.width;
+                naturalHeight = decodedGif.height;
+            } else {
+                const img = await loadAndCacheImage(staticSrc);
+                naturalWidth = img.width;
+                naturalHeight = img.height;
+            }
+
             const maxSize = 300;
-            let width = img.width;
-            let height = img.height;
+            let width = naturalWidth;
+            let height = naturalHeight;
 
             if (width > maxSize || height > maxSize) {
                 const ratio = Math.min(maxSize / width, maxSize / height);
@@ -444,16 +537,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }
 
             const newOverlay: ImageOverlay = {
-                id: generateImageId(),
-                src: imageSrc,
+                id: overlayId,
+                src: staticSrc,
                 label: options?.label || 'Image',
-                animated: isAnimated,
+                animated: Boolean(decodedGif),
+                mimeType,
+                animationStartMs: decodedGif ? getAnimationNow() : undefined,
                 x: (canvas.width - width) / 2,
                 y: (canvas.height - height) / 2,
                 width,
                 height,
-                originalWidth: img.width,
-                originalHeight: img.height,
+                originalWidth: naturalWidth,
+                originalHeight: naturalHeight,
                 opacity: 1,
                 rotation: 0,
                 eraseStrokes: []
@@ -467,13 +562,19 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         } catch (error) {
             console.error('Error adding image overlay:', error);
-            toast.error('Failed to add image');
+            const message = error instanceof Error ? error.message : 'Failed to add image';
+            toast.error(message);
         }
-    }, [loadAndCacheImage, setSelectedShapeIndex]);
+    }, [decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setSelectedShapeIndex]);
 
     const addMediaFromLibrary = useCallback(
-        async (src: string, label: string, animated: boolean) => {
-            await addImageOverlay(src, { label, animated });
+        async (item: GiphyMediaItem) => {
+            await addImageOverlay(item.url, {
+                label: item.title,
+                animated: item.animated,
+                mimeType: item.mimeHint,
+                stillUrl: item.stillUrl,
+            });
         },
         [addImageOverlay]
     );
@@ -482,6 +583,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const file = event.target.files?.[0];
         if (file) {
             if (file.type.startsWith('image/')) {
+                if (isGifSource(file.name, file.type) && file.size > GIF_MAX_BYTES) {
+                    toast.error('Animated GIF is too large for browser export. Max size is 10MB.');
+                    event.target.value = '';
+                    return;
+                }
                 setSelectedFile(file);
                 setUploadMethod('file');
             } else {
@@ -601,6 +707,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const overlay = prev[index];
             if (overlay) {
                 imageCache.current.delete(overlay.src);
+                decodedGifCache.current.delete(overlay.id);
             }
             return prev.filter((_, i) => i !== index);
         });
@@ -1598,31 +1705,41 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, [transformText, MIN_FONT_SIZE]);
 
     const waitForFont = useCallback(async (font: string) => {
-        try {
-            if (document.fonts && document.fonts.load) {
-                const fontVariations = [
-                    `bold 20px "${font}"`,
-                    `normal 20px "${font}"`,
-                    `900 20px "${font}"`,
-                    `800 20px "${font}"`,
-                    `700 20px "${font}"`,
-                ];
-
-                await Promise.all(fontVariations.map(async (fontStyle) => {
-                    try {
-                        await document.fonts.load(fontStyle);
-                    } catch (error) {
-                        console.warn(`Failed to load font style: ${fontStyle}`, error);
-                    }
-                }));
-
-                await document.fonts.ready;
-
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-        } catch (error) {
-            console.warn(`Font loading error for ${font}:`, error);
+        const cached = fontLoadCache.current.get(font);
+        if (cached) {
+            await cached;
+            return;
         }
+
+        const loadPromise = (async () => {
+            try {
+                if (document.fonts && document.fonts.load) {
+                    const fontVariations = [
+                        `bold 20px "${font}"`,
+                        `normal 20px "${font}"`,
+                        `900 20px "${font}"`,
+                        `800 20px "${font}"`,
+                        `700 20px "${font}"`,
+                    ];
+
+                    await Promise.all(fontVariations.map(async (fontStyle) => {
+                        try {
+                            await document.fonts.load(fontStyle);
+                        } catch (error) {
+                            console.warn(`Failed to load font style: ${fontStyle}`, error);
+                        }
+                    }));
+
+                    await document.fonts.ready;
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            } catch (error) {
+                console.warn(`Font loading error for ${font}:`, error);
+            }
+        })();
+
+        fontLoadCache.current.set(font, loadPromise);
+        await loadPromise;
     }, []);
 
     const drawText = useCallback((rotation: number = 0) => (
@@ -1793,35 +1910,23 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const isImageInteracting = isDraggingImage || isResizingImage || isRotatingImage;
     const isElementInteracting = isTextInteracting || isImageInteracting || isShapeInteracting;
 
-    const draw = useCallback(async () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+    const renderScene = useCallback(async (canvas: HTMLCanvasElement, options: SceneRenderOptions) => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-
-        const now = Date.now();
-        const isActivelyDragging = isElementInteracting;
-
-        if (isActivelyDragging && isOptimizedDrawing.current && (now - lastDrawTime.current) < 16) {
-            return;
-        }
-
-        lastDrawTime.current = now;
-        isOptimizedDrawing.current = isActivelyDragging;
 
         const fontsToLoad = [...new Set(textSettings.map(setting => setting.fontFamily))];
         await Promise.all(fontsToLoad.map(font => waitForFont(font)));
 
-        const img = new window.Image();
-        img.crossOrigin = "anonymous";
-        img.src = template.image;
-
-        img.onload = async () => {
+        const img = await loadAndCacheImage(template.image);
+        if (canvas.width !== img.width) {
             canvas.width = img.width;
+        }
+        if (canvas.height !== img.height) {
             canvas.height = img.height;
+        }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
 
             const watermarkText = "memehub.mom";
             const watermarkFontSize = Math.max(12, Math.min(canvas.width, canvas.height) * 0.02);
@@ -1847,7 +1952,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 drawStrokes(ctx);
             }
 
-            const imagePromises = imageOverlays.map(overlay => loadAndCacheImage(overlay.src));
+            const imagePromises = imageOverlays
+                .filter(overlay => !overlay.animated || !decodedGifCache.current.has(overlay.id))
+                .map(overlay => loadAndCacheImage(overlay.src));
 
             try {
                 await Promise.all(imagePromises);
@@ -1857,7 +1964,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             for (const overlay of imageOverlays) {
                 try {
-                    const overlayImg = imageCache.current.get(overlay.src);
+                    const decodedGif = overlay.animated ? decodedGifCache.current.get(overlay.id) : null;
+                    const animationTime = options.resetAnimations
+                        ? options.timeMs
+                        : options.timeMs - (overlay.animationStartMs ?? 0);
+                    const overlayImg = decodedGif
+                        ? getGifFrameCanvas(decodedGif, animationTime)
+                        : imageCache.current.get(overlay.src);
                     if (!overlayImg) continue;
 
                     // Check if this image has erase strokes
@@ -1944,10 +2057,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 }
             }
 
-            drawShapesLayer(ctx);
+            drawShapesLayer(ctx, options.includeEditorControls);
 
             // Only show selection handles if not in erase mode
-            if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length && !isImageEraseMode && !isImageInteracting) {
+            if (options.includeEditorControls && selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length && !isImageEraseMode && !isImageInteracting) {
                 const selectedImg = imageOverlays[selectedImageIndex];
 
                 const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -2030,7 +2143,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 drawText(rotation)(ctx, texts[i], box, textSettings[i]);
             });
 
-            if (selectedTextIndex !== -1 && selectedTextIndex < textBoxes.length && texts[selectedTextIndex] && !isTextInteracting) {
+            if (options.includeEditorControls && selectedTextIndex !== -1 && selectedTextIndex < textBoxes.length && texts[selectedTextIndex] && !isTextInteracting) {
                 const selectedBox = textBoxes[selectedTextIndex];
                 const rotation = textBoxRotations[selectedTextIndex] || 0;
                 const isMobile = isMobileDevice();
@@ -2263,8 +2376,30 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
                 ctx.restore();
             }
-        };
-    }, [template, textSettings, drawText, waitForFont, isElementInteracting, isImageInteracting, isTextInteracting, imageOverlays, shapeOverlays, selectedImageIndex, selectedShapeIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer]);
+    }, [template, textSettings, drawText, waitForFont, isImageInteracting, isTextInteracting, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer, isMobileDevice]);
+
+    const draw = useCallback(async () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const now = Date.now();
+        const isActivelyDragging = isElementInteracting;
+
+        if (isActivelyDragging && isOptimizedDrawing.current && (now - lastDrawTime.current) < 16) {
+            return;
+        }
+
+        lastDrawTime.current = now;
+        isOptimizedDrawing.current = isActivelyDragging;
+
+        const timeMs = getAnimationNow();
+        currentAnimationTimeRef.current = timeMs;
+        await renderScene(canvas, {
+            timeMs,
+            includeEditorControls: true,
+            resetAnimations: false,
+        });
+    }, [getAnimationNow, isElementInteracting, renderScene]);
 
 
 
@@ -2450,35 +2585,99 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     }, [isUploadDialogOpen, uploadMethod]);
 
-    const downloadMeme = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const link = document.createElement('a');
-        link.download = 'meme.png';
-        link.href = canvas.toDataURL();
-        link.click();
+    const getExportTimeMs = useCallback(() => {
+        return currentAnimationTimeRef.current || getAnimationNow();
+    }, [getAnimationNow]);
+
+    const getAnimatedSceneExportDurationMs = useCallback(() => {
+        const overlayDurations = imageOverlays.map((overlay) => {
+            if (!overlay.animated) return 0;
+            return decodedGifCache.current.get(overlay.id)?.durationMs ?? 0;
+        });
+
+        return getAnimatedExportDurationMs(overlayDurations);
+    }, [imageOverlays]);
+
+    const showExportError = useCallback((error: unknown, fallback = 'Export failed') => {
+        console.error(fallback, error);
+        const message = error instanceof Error ? error.message : fallback;
+        const corsMessage = /taint|cors|security/i.test(message)
+            ? 'Export blocked by image CORS. Try uploading the image directly or choose another source.'
+            : message;
+        toast.error(corsMessage);
+    }, []);
+
+    const downloadMeme = async () => {
+        setIsExporting(true);
+        setExportStatus('Preparing PNG...');
+        try {
+            const blob = await renderSceneToPngBlob(renderScene, getExportTimeMs());
+            downloadBlob(blob, 'meme.png');
+        } catch (error) {
+            showExportError(error, 'PNG export failed');
+        } finally {
+            setIsExporting(false);
+            setExportStatus(null);
+        }
     };
 
     const copyMeme = async () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
+        setIsExporting(true);
+        setExportStatus('Copying...');
         try {
-            const blob = await new Promise<Blob>((resolve) => {
-                canvas.toBlob((blob) => {
-                    if (blob) resolve(blob);
-                }, 'image/png');
-            });
+            const blob = await renderSceneToPngBlob(renderScene, getExportTimeMs());
 
             const data = new ClipboardItem({
-                'image/png': blob
+                [getStillExportMimeType()]: blob
             });
 
             await navigator.clipboard.write([data]);
             toast.success("meme copied to clipboard")
         } catch (err) {
-            console.error('Failed to copy meme:', err);
-            toast.error("Failed to copy meme :(")
+            showExportError(err, 'Failed to copy meme');
+        } finally {
+            setIsExporting(false);
+            setExportStatus(null);
+        }
+    }
+
+    const downloadAnimatedMeme = async () => {
+        setIsExporting(true);
+        const exportDurationMs = getAnimatedSceneExportDurationMs();
+        const exportDurationSeconds = Math.ceil(exportDurationMs / 1000);
+        setExportStatus(`Exporting ${exportDurationSeconds}s video...`);
+        try {
+            const capability = getAnimatedExportCapability();
+            let blob: Blob;
+            let filename: string;
+
+            if (capability.format === 'webm') {
+                try {
+                    blob = await recordSceneToWebmBlob(
+                        renderScene,
+                        capability,
+                        { durationMs: exportDurationMs, fps: 30 }
+                    );
+                    filename = 'meme.webm';
+                } catch (error) {
+                    console.warn('WebM export failed; falling back to animated GIF.', error);
+                    toast.error('WebM export failed. Creating animated GIF instead.');
+                    setExportStatus(`Exporting ${exportDurationSeconds}s GIF...`);
+                    blob = await encodeSceneToGifBlob(renderScene, { durationMs: exportDurationMs, fps: 15 });
+                    filename = 'meme.gif';
+                }
+            } else {
+                setExportStatus(`Exporting ${exportDurationSeconds}s GIF...`);
+                blob = await encodeSceneToGifBlob(renderScene, { durationMs: exportDurationMs, fps: 15 });
+                filename = 'meme.gif';
+            }
+
+            downloadBlob(blob, filename);
+        } catch (error) {
+            showExportError(error, 'Animated export failed');
+        } finally {
+            setIsExporting(false);
+            setExportStatus(null);
         }
     }
 
@@ -2753,6 +2952,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             window.removeEventListener('touchend', touchEnd);
         };
     }, [isDrawingMode, isImageEraseMode, isEraser, drawColor, drawSize, currentStroke, isDrawing, imageEraseTargetIndex, eraseBrushSize, eraseBrushOpacity, currentEraseStroke, isErasing, imageOverlays]);
+
+    const animatedExportCapability = getAnimatedExportCapability();
+    const animatedExportLabel =
+        animatedExportCapability.format === 'webm' ? 'Video WebM' : 'Animated GIF';
+    const exportButtonLabel = exportStatus ?? 'Download';
 
     return (
         <motion.section
@@ -3644,25 +3848,84 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     )}
 
                     <div className="flex w-full space-x-2 mt-4">
+                        {hasAnimatedOverlays ? (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <motion.button
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.3, delay: 0.5 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        disabled={isExporting}
+                                        className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium border border-white/20 text-sm text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                                    >
+                                        {isExporting ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Download className="h-4 w-4" />
+                                        )}
+                                        {exportButtonLabel}
+                                        {!isExporting && <ChevronDown className="h-3.5 w-3.5" />}
+                                    </motion.button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-black border-white/20 text-white min-w-44">
+                                    <DropdownMenuLabel className="text-xs text-white/50">Export</DropdownMenuLabel>
+                                    <DropdownMenuItem
+                                        disabled={isExporting}
+                                        onSelect={(event) => {
+                                            event.preventDefault();
+                                            downloadMeme();
+                                        }}
+                                        className="cursor-pointer focus:bg-white/10 focus:text-white"
+                                    >
+                                        <ImageIcon className="h-4 w-4" />
+                                        Image PNG
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-white/10" />
+                                    <DropdownMenuItem
+                                        disabled={isExporting}
+                                        onSelect={(event) => {
+                                            event.preventDefault();
+                                            downloadAnimatedMeme();
+                                        }}
+                                        className="cursor-pointer focus:bg-white/10 focus:text-white"
+                                    >
+                                        <Video className="h-4 w-4" />
+                                        {animatedExportLabel}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        ) : (
+                            <motion.button
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3, delay: 0.5 }}
+                                whileTap={{ scale: 0.98 }}
+                                disabled={isExporting}
+                                className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium border border-white/20 text-sm text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                onClick={downloadMeme}
+                            >
+                                <span className="flex items-center justify-center gap-1.5">
+                                    {isExporting && <Loader2 className="h-4 w-4 animate-spin" />}
+                                    {exportButtonLabel}
+                                </span>
+                            </motion.button>
+                        )}
                         <motion.button
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.5 }}
                             whileTap={{ scale: 0.98 }}
-                            className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium border border-white/20 text-sm text-white rounded-md transition-colors"
-                            onClick={downloadMeme}
-                        >
-                            Download
-                        </motion.button>
-                        <motion.button
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3, delay: 0.5 }}
-                            whileTap={{ scale: 0.98 }}
-                            className="px-4 py-2 w-full bg-transparent text-black hover:bg-gray-100/50 dark:hover:bg-white/5 font-medium  border border-[#6a7bd1] text-sm dark:text-white rounded-md transition-colors"
+                            disabled={isExporting}
+                            className="px-4 py-2 w-full bg-transparent text-black hover:bg-gray-100/50 dark:hover:bg-white/5 font-medium  border border-[#6a7bd1] text-sm dark:text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                             onClick={copyMeme}
                         >
-                            Copy
+                            <span className="flex items-center justify-center gap-1.5">
+                                {isExporting && exportStatus === 'Copying...' && (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                )}
+                                {exportStatus === 'Copying...' ? exportStatus : 'Copy'}
+                            </span>
                         </motion.button>
                     </div>
                 </motion.div>

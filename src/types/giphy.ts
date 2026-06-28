@@ -10,8 +10,12 @@ export type GiphyItem = {
     images: {
         fixed_height?: GiphyImageRendition;
         fixed_height_small?: GiphyImageRendition;
+        fixed_height_still?: GiphyImageRendition;
+        fixed_height_small_still?: GiphyImageRendition;
         downsized?: GiphyImageRendition;
+        downsized_still?: GiphyImageRendition;
         original?: GiphyImageRendition;
+        original_still?: GiphyImageRendition;
     };
 };
 
@@ -32,4 +36,7 @@ export type GiphyMediaItem = {
     url: string;
     width: number;
     height: number;
+    animated: boolean;
+    mimeHint: string;
+    stillUrl?: string;
 };

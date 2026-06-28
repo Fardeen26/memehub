@@ -10,9 +10,10 @@ import {
 } from '@/data/meme-elements';
 import { useGiphyMedia } from '@/hooks/useGiphyMedia';
 import type { ShapeType } from '@/types/editor';
+import type { GiphyMediaItem } from '@/types/giphy';
 
 type ElementsPanelProps = {
-    onAddMedia: (src: string, label: string, animated: boolean) => void;
+    onAddMedia: (item: GiphyMediaItem) => void;
     onAddShape: (type: ShapeType) => void;
     disabled?: boolean;
 };
@@ -33,7 +34,7 @@ function MediaGrid({
     error: string | null;
     hasMore: boolean;
     onLoadMore: () => void;
-    onSelect: (url: string, title: string) => void;
+    onSelect: (item: GiphyMediaItem) => void;
     disabled: boolean;
 }) {
     if (error && items.length === 0) {
@@ -67,7 +68,7 @@ function MediaGrid({
                         disabled={disabled}
                         whileTap={{ scale: 0.92 }}
                         title={item.title}
-                        onClick={() => onSelect(item.url, item.title)}
+                        onClick={() => onSelect(item)}
                         className="aspect-square rounded-md border border-white/15 bg-white/5 hover:bg-white/15 hover:border-[#6a7bd1]/60 overflow-hidden disabled:opacity-50"
                     >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -209,9 +210,7 @@ export default function ElementsPanel({
                         hasMore={active.hasMore}
                         onLoadMore={active.loadMore}
                         disabled={disabled}
-                        onSelect={(url, title) =>
-                            onAddMedia(url, title, tab === 'gifs' || url.includes('.gif'))
-                        }
+                        onSelect={onAddMedia}
                     />
 
                     <p className="text-[9px] text-white/35 text-right">Powered by GIPHY</p>
