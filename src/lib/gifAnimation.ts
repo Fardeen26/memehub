@@ -4,6 +4,7 @@ export const GIF_MAX_BYTES = 10 * 1024 * 1024;
 export const GIF_MAX_DECODED_FRAMES = 150;
 export const GIF_MIN_FRAME_DELAY_MS = 20;
 export const ANIMATED_EXPORT_MIN_DURATION_MS = 5000;
+export const ANIMATED_EXPORT_MAX_DURATION_MS = 5000;
 
 export type GifDecodeLimits = {
     maxBytes?: number;
@@ -84,7 +85,8 @@ export function getGifFrameCanvas(decodedGif: DecodedGif, timeMs: number): HTMLC
 
 export function getAnimatedExportDurationMs(
     durationsMs: Array<number | null | undefined>,
-    minDurationMs = ANIMATED_EXPORT_MIN_DURATION_MS
+    minDurationMs = ANIMATED_EXPORT_MIN_DURATION_MS,
+    maxDurationMs = ANIMATED_EXPORT_MAX_DURATION_MS
 ): number {
     const longestDurationMs = durationsMs.reduce<number>((longest, durationMs) => {
         const duration = typeof durationMs === 'number' ? durationMs : 0;
@@ -94,7 +96,7 @@ export function getAnimatedExportDurationMs(
         return Math.max(longest, duration);
     }, 0);
 
-    return Math.max(minDurationMs, longestDurationMs);
+    return Math.min(maxDurationMs, Math.max(minDurationMs, longestDurationMs));
 }
 
 export function isGifSource(src: string, mimeType?: string | null): boolean {

@@ -2,6 +2,8 @@ import { applyPalette, GIFEncoder, quantize } from 'gifenc';
 import { PNG_EXPORT_MIME_TYPE, type AnimatedExportCapability } from '@/lib/exportCapabilities';
 import { ANIMATED_EXPORT_MIN_DURATION_MS } from '@/lib/gifAnimation';
 
+export const ANIMATED_VIDEO_EXPORT_MAX_DIMENSION = 1080;
+
 export type SceneRenderOptions = {
     timeMs: number;
     includeEditorControls: boolean;
@@ -56,42 +58,83 @@ export async function renderSceneToPngBlob(
     return canvasToBlob(canvas, PNG_EXPORT_MIME_TYPE);
 }
 
-export async function recordSceneToWebmBlob(
+export function getContainedEvenDimensions(
+    width: number,
+    height: number,
+    maxDimension = ANIMATED_VIDEO_EXPORT_MAX_DIMENSION
+): { width: number; height: number } {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+        return { width: 2, height: 2 };
+    }
+
+    const scale = Math.min(1, maxDimension / Math.max(width, height));
+    const makeEven = (value: number) => Math.max(2, Math.floor(value / 2) * 2);
+
+    return {
+        width: makeEven(width * scale),
+        height: makeEven(height * scale),
+    };
+}
+
+function copyFrameToCaptureCanvas(source: HTMLCanvasElement, target: HTMLCanvasElement): void {
+    const ctx = target.getContext('2d');
+    if (!ctx) throw new Error('Video export failed.');
+
+    ctx.clearRect(0, 0, target.width, target.height);
+    ctx.drawImage(source, 0, 0, target.width, target.height);
+}
+
+export async function recordSceneToVideoBlob(
     renderScene: SceneRenderer,
-    capability: Extract<AnimatedExportCapability, { format: 'webm' }>,
-    options: { durationMs?: number; fps?: number } = {}
+    capability: Extract<AnimatedExportCapability, { format: 'mp4' }>,
+    options: {
+        durationMs?: number;
+        fps?: number;
+        maxDimension?: number;
+        onProgress?: (progress: { completedFrames: number; totalFrames: number }) => void;
+    } = {}
 ): Promise<Blob> {
     const durationMs = options.durationMs ?? ANIMATED_EXPORT_MIN_DURATION_MS;
     const fps = options.fps ?? 30;
     const frameDurationMs = 1000 / fps;
     const totalFrames = Math.ceil(durationMs / frameDurationMs);
-    const canvas = document.createElement('canvas');
+    const renderCanvas = document.createElement('canvas');
+    const captureCanvas = document.createElement('canvas');
 
-    await renderScene(canvas, {
+    await renderScene(renderCanvas, {
         timeMs: 0,
         includeEditorControls: false,
         resetAnimations: true,
     });
 
-    if (typeof canvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
-        throw new Error('WebM recording is not supported in this browser.');
+    const targetDimensions = getContainedEvenDimensions(
+        renderCanvas.width,
+        renderCanvas.height,
+        options.maxDimension
+    );
+    captureCanvas.width = targetDimensions.width;
+    captureCanvas.height = targetDimensions.height;
+    copyFrameToCaptureCanvas(renderCanvas, captureCanvas);
+
+    if (typeof captureCanvas.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+        throw new Error('Video recording is not supported in this browser.');
     }
 
-    let stream = canvas.captureStream(0);
+    let stream = captureCanvas.captureStream(0);
     let videoTrack = stream.getVideoTracks()[0] as MediaStreamTrack & {
         requestFrame?: () => void;
     };
 
     if (typeof videoTrack?.requestFrame !== 'function') {
         stream.getTracks().forEach((track) => track.stop());
-        stream = canvas.captureStream(fps);
+        stream = captureCanvas.captureStream(fps);
         videoTrack = stream.getVideoTracks()[0] as MediaStreamTrack & {
             requestFrame?: () => void;
         };
     }
 
     const chunks: BlobPart[] = [];
-    const recorder = new MediaRecorder(stream, { mimeType: capability.mimeType });
+    const recorder = new MediaRecorder(stream, { mimeType: capability.captureMimeType });
 
     const done = new Promise<Blob>((resolve, reject) => {
         recorder.ondataavailable = (event) => {
@@ -103,8 +146,8 @@ export async function recordSceneToWebmBlob(
         };
         recorder.onstop = () => {
             stream.getTracks().forEach((track) => track.stop());
-            const blob = new Blob(chunks, { type: capability.mimeType });
-            if (blob.size === 0) reject(new Error('WebM export produced an empty file.'));
+            const blob = new Blob(chunks, { type: capability.captureMimeType });
+            if (blob.size === 0) reject(new Error('Video export produced an empty file.'));
             else resolve(blob);
         };
     });
@@ -113,17 +156,21 @@ export async function recordSceneToWebmBlob(
     const startedAt = performance.now();
 
     for (let frame = 0; frame < totalFrames; frame += 1) {
-        await renderScene(canvas, {
+        await renderScene(renderCanvas, {
             timeMs: frame * frameDurationMs,
             includeEditorControls: false,
             resetAnimations: true,
         });
+        copyFrameToCaptureCanvas(renderCanvas, captureCanvas);
         videoTrack?.requestFrame?.();
+        options.onProgress?.({ completedFrames: frame + 1, totalFrames });
 
         const nextFrameAt = startedAt + (frame + 1) * frameDurationMs;
         const waitMs = Math.max(0, nextFrameAt - performance.now());
         if (waitMs > 0) {
             await new Promise((resolve) => window.setTimeout(resolve, waitMs));
+        } else if (frame % 5 === 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
     }
 

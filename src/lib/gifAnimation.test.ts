@@ -42,8 +42,8 @@ describe('gifAnimation', () => {
         ).toThrow(GifDecodeLimitError);
     });
 
-    it('uses at least 5 seconds and otherwise the longest animated overlay duration', () => {
+    it('uses a 5 second animated export loop', () => {
         expect(getAnimatedExportDurationMs([1200, 2500])).toBe(5000);
-        expect(getAnimatedExportDurationMs([1200, 6500, 3000])).toBe(6500);
+        expect(getAnimatedExportDurationMs([1200, 6500, 3000])).toBe(5000);
     });
 });

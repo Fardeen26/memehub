@@ -55,10 +55,16 @@ import {
 import {
     downloadBlob,
     encodeSceneToGifBlob,
-    recordSceneToWebmBlob,
+    recordSceneToVideoBlob,
     renderSceneToPngBlob,
     type SceneRenderOptions,
 } from '@/lib/canvasExport';
+import {
+    buildCloudinaryMp4Url,
+    downloadRemoteUrl,
+    uploadVideoCaptureToCloudinary,
+    waitForCloudinaryMp4,
+} from '@/lib/cloudinaryVideoExport';
 
 export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -2645,34 +2651,48 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsExporting(true);
         const exportDurationMs = getAnimatedSceneExportDurationMs();
         const exportDurationSeconds = Math.ceil(exportDurationMs / 1000);
-        setExportStatus(`Exporting ${exportDurationSeconds}s video...`);
+        setExportStatus(`Exporting ${exportDurationSeconds}s MP4...`);
         try {
             const capability = getAnimatedExportCapability();
-            let blob: Blob;
-            let filename: string;
 
-            if (capability.format === 'webm') {
+            if (capability.format === 'mp4') {
                 try {
-                    blob = await recordSceneToWebmBlob(
+                    const captureBlob = await recordSceneToVideoBlob(
                         renderScene,
                         capability,
-                        { durationMs: exportDurationMs, fps: 30 }
+                        {
+                            durationMs: exportDurationMs,
+                            fps: 30,
+                            onProgress: ({ completedFrames, totalFrames }) => {
+                                const percent = Math.round((completedFrames / totalFrames) * 100);
+                                setExportStatus(`Rendering MP4 ${percent}%...`);
+                            },
+                        }
                     );
-                    filename = 'meme.webm';
+                    setExportStatus('Uploading MP4...');
+                    const upload = await uploadVideoCaptureToCloudinary(captureBlob);
+                    const playbackUrl = buildCloudinaryMp4Url(upload);
+                    const downloadUrl = buildCloudinaryMp4Url(upload, {
+                        attachment: true,
+                        filename: 'meme',
+                    });
+
+                    setExportStatus('Converting MP4...');
+                    await waitForCloudinaryMp4(playbackUrl);
+                    setExportStatus('Downloading MP4...');
+                    downloadRemoteUrl(downloadUrl, 'meme.mp4');
                 } catch (error) {
-                    console.warn('WebM export failed; falling back to animated GIF.', error);
-                    toast.error('WebM export failed. Creating animated GIF instead.');
+                    console.warn('MP4 export failed; falling back to animated GIF.', error);
+                    toast.error('MP4 export failed. Creating animated GIF instead.');
                     setExportStatus(`Exporting ${exportDurationSeconds}s GIF...`);
-                    blob = await encodeSceneToGifBlob(renderScene, { durationMs: exportDurationMs, fps: 15 });
-                    filename = 'meme.gif';
+                    const blob = await encodeSceneToGifBlob(renderScene, { durationMs: exportDurationMs, fps: 15 });
+                    downloadBlob(blob, 'meme.gif');
                 }
             } else {
                 setExportStatus(`Exporting ${exportDurationSeconds}s GIF...`);
-                blob = await encodeSceneToGifBlob(renderScene, { durationMs: exportDurationMs, fps: 15 });
-                filename = 'meme.gif';
+                const blob = await encodeSceneToGifBlob(renderScene, { durationMs: exportDurationMs, fps: 15 });
+                downloadBlob(blob, 'meme.gif');
             }
-
-            downloadBlob(blob, filename);
         } catch (error) {
             showExportError(error, 'Animated export failed');
         } finally {
@@ -2955,7 +2975,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const animatedExportCapability = getAnimatedExportCapability();
     const animatedExportLabel =
-        animatedExportCapability.format === 'webm' ? 'Video WebM' : 'Animated GIF';
+        animatedExportCapability.format === 'mp4' ? 'Video MP4' : 'Animated GIF';
     const exportButtonLabel = exportStatus ?? 'Download';
 
     return (

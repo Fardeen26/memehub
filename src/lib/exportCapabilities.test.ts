@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+    MP4_EXPORT_MIME_TYPE,
     PNG_EXPORT_MIME_TYPE,
     getAnimatedExportCapability,
     getStillExportMimeType,
 } from '@/lib/exportCapabilities';
 
 describe('exportCapabilities', () => {
-    it('uses WebM when canvas capture and MediaRecorder support it', () => {
+    it('uses MP4 export when browser video capture is available', () => {
         const capability = getAnimatedExportCapability({
             hasCaptureStream: true,
             hasMediaRecorder: true,
@@ -14,12 +15,27 @@ describe('exportCapabilities', () => {
         });
 
         expect(capability).toEqual({
-            format: 'webm',
-            mimeType: 'video/webm;codecs=vp8',
+            format: 'mp4',
+            mimeType: MP4_EXPORT_MIME_TYPE,
+            captureMimeType: 'video/webm;codecs=vp8',
         });
     });
 
-    it('falls back to GIF when WebM recording is unavailable', () => {
+    it('prefers native MP4 capture when the browser supports it', () => {
+        const capability = getAnimatedExportCapability({
+            hasCaptureStream: true,
+            hasMediaRecorder: true,
+            isTypeSupported: (mimeType) => mimeType === 'video/mp4',
+        });
+
+        expect(capability).toEqual({
+            format: 'mp4',
+            mimeType: MP4_EXPORT_MIME_TYPE,
+            captureMimeType: 'video/mp4',
+        });
+    });
+
+    it('falls back to GIF when video recording is unavailable', () => {
         expect(
             getAnimatedExportCapability({
                 hasCaptureStream: false,
