@@ -161,6 +161,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [currentEraseStroke, setCurrentEraseStroke] = useState<EraseStroke | null>(null);
     const [isErasing, setIsErasing] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
+    const [showLayerPanel, setShowLayerPanel] = useState(true);
+    const [showMediaLayers, setShowMediaLayers] = useState(true);
+    const [showShapeLayers, setShowShapeLayers] = useState(true);
 
     const loadAndCacheImage = useCallback(async (src: string): Promise<HTMLImageElement> => {
         if (imageCache.current.has(src)) {
@@ -788,6 +791,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 eraseStrokes: []
             };
 
+            setShowLayerPanel(true);
+            setShowMediaLayers(true);
             setImageOverlays(prev => {
                 setSelectedImageIndex(prev.length);
                 setSelectedShapeIndex(-1);
@@ -2527,6 +2532,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, [isUploadDialogOpen, handlePaste]);
 
     useEffect(() => {
+        if (selectedImageIndex === -1) return;
+        setShowLayerPanel(true);
+        setShowMediaLayers(true);
+    }, [selectedImageIndex]);
+
+    useEffect(() => {
+        if (selectedShapeIndex === -1) return;
+        setShowLayerPanel(true);
+        setShowShapeLayers(true);
+    }, [selectedShapeIndex]);
+
+    useEffect(() => {
         const isEditableTarget = (target: EventTarget | null) => {
             if (!(target instanceof HTMLElement)) return false;
             const tag = target.tagName;
@@ -3607,274 +3624,424 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         </motion.div>
                     )}
 
-                    {/* Shapes List */}
-                    {shapeOverlays.length > 0 && (
+                    {/* Canvas Layers */}
+                    {(imageOverlays.length > 0 || shapeOverlays.length > 0) && (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="mt-4 space-y-2"
+                            transition={{ duration: 0.3, delay: 0.5 }}
+                            className="mt-4 overflow-hidden rounded-md border border-white/15 bg-black/60"
                         >
-                            <div className="flex items-center gap-1.5 text-xs text-white/60 mb-1">
-                                <Shapes className="h-3.5 w-3.5" />
-                                Shapes on canvas
-                            </div>
-                            <div className="space-y-1">
-                                {shapeOverlays.map((shape, index) => (
-                                    <motion.div
-                                        key={shape.id}
-                                        className={`flex flex-col p-2 rounded-md border transition-colors ${
-                                            selectedShapeIndex === index
-                                                ? 'dark:bg-black dark:border-white/15 bg-[#0f0f0f] border-white/20'
-                                                : 'dark:bg-white/5 dark:border-white/10 bg-black/80 border-white/20'
-                                        }`}
-                                        onClick={() => {
-                                            setSelectedShapeIndex(index);
-                                            setSelectedImageIndex(-1);
-                                        }}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-white/80 capitalize">
-                                                {shape.type.replace('-', ' ')}
-                                            </span>
-                                            <motion.button
-                                                whileTap={{ scale: 0.9 }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removeShape(index);
-                                                }}
-                                                className="p-1 rounded-full hover:scale-110"
-                                            >
-                                                <Trash2 className="h-4 w-4 text-white" />
-                                            </motion.button>
-                                        </div>
-                                        {selectedShapeIndex === index && (
-                                            <div
-                                                className="mt-2 pt-2 border-t border-white/10 grid grid-cols-2 gap-2"
-                                                onClick={(e) => e.stopPropagation()}
-                                            >
-                                                <div>
-                                                    <label className="block text-[10px] text-white/50 mb-0.5">Stroke</label>
-                                                    <input
-                                                        type="color"
-                                                        value={shape.strokeColor}
-                                                        onChange={(e) =>
-                                                            updateShape(index, { strokeColor: e.target.value })
-                                                        }
-                                                        className="w-full h-7 rounded border border-white/20 cursor-pointer"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[10px] text-white/50 mb-0.5">Fill</label>
-                                                    <input
-                                                        type="color"
-                                                        value={shape.fillColor}
-                                                        onChange={(e) =>
-                                                            updateShape(index, { fillColor: e.target.value })
-                                                        }
-                                                        className="w-full h-7 rounded border border-white/20 cursor-pointer"
-                                                        disabled={shape.type === 'line'}
-                                                    />
-                                                </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-[10px] text-white/50 mb-0.5">
-                                                        Stroke width: {shape.strokeWidth}px
-                                                    </label>
-                                                    <input
-                                                        type="range"
-                                                        min="1"
-                                                        max="24"
-                                                        value={shape.strokeWidth}
-                                                        onChange={(e) =>
-                                                            updateShape(index, {
-                                                                strokeWidth: Number(e.target.value),
-                                                            })
-                                                        }
-                                                        className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                                    />
-                                                </div>
-                                                {shape.type !== 'line' && (
-                                                    <label className="col-span-2 flex items-center gap-2 text-xs text-white/70 cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={shape.filled}
-                                                            onChange={(e) =>
-                                                                updateShape(index, { filled: e.target.checked })
-                                                            }
-                                                            className="rounded"
-                                                        />
-                                                        Filled shape
-                                                    </label>
-                                                )}
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div>
-                    )}
+                            <button
+                                type="button"
+                                onClick={() => setShowLayerPanel((value) => !value)}
+                                aria-expanded={showLayerPanel}
+                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-white transition-colors hover:bg-white/5"
+                            >
+                                <span className="flex min-w-0 items-center gap-2">
+                                    <Layers className="h-3.5 w-3.5 shrink-0 text-white/70" />
+                                    <span className="truncate">Canvas layers</span>
+                                </span>
+                                <span className="flex shrink-0 items-center gap-2 text-white/50">
+                                    <span>{imageOverlays.length + shapeOverlays.length} items</span>
+                                    {showLayerPanel ? (
+                                        <ChevronUp className="h-3.5 w-3.5" />
+                                    ) : (
+                                        <ChevronDown className="h-3.5 w-3.5" />
+                                    )}
+                                </span>
+                            </button>
 
-                    {/* Images List */}
-                    {imageOverlays.length > 0 && (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3, delay: 0.7 }}
-                            className="mt-4 space-y-2"
-                        >
-                            <div className="space-y-1">
-                                {imageOverlays.map((overlay, index) => (
-                                    <motion.div
-                                        key={overlay.id}
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -10 }}
-                                        transition={{ duration: 0.2, delay: index * 0.05 }}
-                                        className={`flex flex-col p-2 rounded-md border transition-colors ${selectedImageIndex === index
-                                            ? 'dark:bg-black dark:border-white/15 bg-[#0f0f0f] border-white/20'
-                                            : 'dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 bg-black/80 border-white/20'
-                                            }`}
-                                        onClick={() => setSelectedImageIndex(index)}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center space-x-2 cursor-pointer flex-1">
-                                                <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center">
-                                                    <ImageIcon className="h-4 w-4 text-white/60 dark:text-white/60" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-xs text-white/80 dark:text-white/80 truncate">
-                                                        {overlay.label || 'Image'}
-                                                    </div>
-                                                    <div className="text-xs text-white/40 dark:text-white/40 flex items-center gap-1">
-                                                        {overlay.animated && (
-                                                            <span className="text-[9px] px-1 rounded bg-[#6a7bd1]/40 text-white/90">GIF</span>
-                                                        )}
-                                                        {Math.round(overlay.width)}×{Math.round(overlay.height)}px
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <motion.button
-                                                whileTap={{ scale: 0.9 }}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removeImageOverlay(index);
-                                                    if (selectedImageIndex === index) {
-                                                        setSelectedImageIndex(-1);
-                                                    } else if (selectedImageIndex > index) {
-                                                        setSelectedImageIndex(selectedImageIndex - 1);
-                                                    }
-                                                }}
-                                                className="p-1 rounded-full hover:scale-110 transition-colors"
+                            {showLayerPanel && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    transition={{ duration: 0.18 }}
+                                    className="border-t border-white/10"
+                                >
+                                    {imageOverlays.length > 0 && (
+                                        <div className="border-b border-white/10 last:border-b-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowMediaLayers((value) => !value)}
+                                                aria-expanded={showMediaLayers}
+                                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-white/70 transition-colors hover:bg-white/5"
                                             >
-                                                <Trash2 className="h-4 w-4 text-white" />
-                                            </motion.button>
-                                        </div>
-                                        {/* Opacity Control */}
-                                        <div className="mt-2 pt-2 border-t border-white/10" onClick={(e) => e.stopPropagation()}>
-                                            <label className="block text-xs text-white/60 mb-1">
-                                                Opacity: {Math.round(overlay.opacity * 100)}%
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="1"
-                                                step="0.01"
-                                                value={overlay.opacity}
-                                                onChange={(e) => handleImageOpacityChange(index, parseFloat(e.target.value))}
-                                                className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                                style={{
-                                                    background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${overlay.opacity * 100}%, rgba(255,255,255,0.2) ${overlay.opacity * 100}%, rgba(255,255,255,0.2) 100%)`
-                                                }}
-                                            />
-                                        </div>
-                                        {/* Erase Controls */}
-                                        <div className="mt-2 pt-2 border-t border-white/10 space-y-2" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex items-center space-x-2">
-                                                <motion.button
-                                                    whileTap={{ scale: 0.98 }}
-                                                    className={`flex-1 px-2 py-1.5 text-xs rounded-md border transition-colors ${
-                                                        isImageEraseMode && imageEraseTargetIndex === index
-                                                            ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]'
-                                                            : 'bg-black/70 dark:bg-white/15 border-white/20 text-white hover:bg-white/10'
-                                                    }`}
-                                                    onClick={() => {
-                                                        if (isImageEraseMode && imageEraseTargetIndex === index) {
-                                                            setIsImageEraseMode(false);
-                                                            setImageEraseTargetIndex(-1);
-                                                            setSelectedImageIndex(index); // Re-select the image when exiting erase mode
-                                                        } else {
-                                                            setIsImageEraseMode(true);
-                                                            setImageEraseTargetIndex(index);
-                                                            setSelectedImageIndex(index); // Select the image when entering erase mode
-                                                            setIsDrawingMode(false);
-                                                        }
-                                                    }}
-                                                >
-                                                    {isImageEraseMode && imageEraseTargetIndex === index ? 'Exit Erase' : 'Erase'}
-                                                </motion.button>
-                                                {isImageEraseMode && imageEraseTargetIndex === index && (
-                                                    <>
-                                                        <motion.button
-                                                            whileTap={{ scale: 0.98 }}
-                                                            className="px-2 py-1.5 text-xs rounded-md border bg-black/70 dark:bg-white/15 border-white/20 text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            onClick={() => undoImageErase(index)}
-                                                            disabled={overlay.eraseStrokes.length === 0}
-                                                            title="Undo Last Erase"
-                                                        >
-                                                            <Undo2 className="h-3 w-3" />
-                                                        </motion.button>
-                                                        <motion.button
-                                                            whileTap={{ scale: 0.98 }}
-                                                            className="px-2 py-1.5 text-xs rounded-md border bg-black/70 dark:bg-white/15 border-white/20 text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            onClick={() => clearImageErase(index)}
-                                                            disabled={overlay.eraseStrokes.length === 0}
-                                                            title="Clear All Erase"
-                                                        >
-                                                            <Trash className="h-3 w-3" />
-                                                        </motion.button>
-                                                    </>
+                                                <span className="flex min-w-0 items-center gap-2">
+                                                    <ImageIcon className="h-3.5 w-3.5 shrink-0" />
+                                                    <span className="truncate">Media</span>
+                                                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">
+                                                        {imageOverlays.length}
+                                                    </span>
+                                                </span>
+                                                {showMediaLayers ? (
+                                                    <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                                                ) : (
+                                                    <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                                                 )}
-                                            </div>
-                                            {isImageEraseMode && imageEraseTargetIndex === index && (
-                                                <div className="space-y-2">
-                                                    <div>
-                                                        <label className="block text-xs text-white/60 mb-1">
-                                                            Brush Size: {eraseBrushSize}px
-                                                        </label>
-                                                        <input
-                                                            type="range"
-                                                            min="5"
-                                                            max="100"
-                                                            value={eraseBrushSize}
-                                                            onChange={(e) => setEraseBrushSize(Number(e.target.value))}
-                                                            className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                                            style={{
-                                                                background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((eraseBrushSize - 5) / 95) * 100}%, rgba(255,255,255,0.2) ${((eraseBrushSize - 5) / 95) * 100}%, rgba(255,255,255,0.2) 100%)`
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs text-white/60 mb-1">
-                                                            Brush Opacity: {Math.round(eraseBrushOpacity * 100)}%
-                                                        </label>
-                                                        <input
-                                                            type="range"
-                                                            min="0.1"
-                                                            max="1"
-                                                            step="0.1"
-                                                            value={eraseBrushOpacity}
-                                                            onChange={(e) => setEraseBrushOpacity(Number(e.target.value))}
-                                                            className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
-                                                            style={{
-                                                                background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${eraseBrushOpacity * 100}%, rgba(255,255,255,0.2) ${eraseBrushOpacity * 100}%, rgba(255,255,255,0.2) 100%)`
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
+                                            </button>
+
+                                            {showMediaLayers && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    transition={{ duration: 0.18 }}
+                                                    className="max-h-72 overflow-y-auto px-2 pb-2"
+                                                >
+                                                    {imageOverlays.map((overlay, index) => {
+                                                        const isActiveImageLayer =
+                                                            selectedImageIndex === index ||
+                                                            (isImageEraseMode && imageEraseTargetIndex === index);
+                                                        const selectImageLayer = () => {
+                                                            if (isImageEraseMode && imageEraseTargetIndex !== index) {
+                                                                setIsImageEraseMode(false);
+                                                                setImageEraseTargetIndex(-1);
+                                                            }
+                                                            setSelectedImageIndex(index);
+                                                            setSelectedShapeIndex(-1);
+                                                        };
+
+                                                        return (
+                                                            <motion.div
+                                                                key={overlay.id}
+                                                                initial={{ opacity: 0, x: -10 }}
+                                                                animate={{ opacity: 1, x: 0 }}
+                                                                exit={{ opacity: 0, x: -10 }}
+                                                                transition={{ duration: 0.16 }}
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                aria-pressed={isActiveImageLayer}
+                                                                className={`border-t border-white/10 first:border-t-0 px-1.5 transition-colors ${
+                                                                    isActiveImageLayer
+                                                                        ? 'bg-[#0f0f0f]'
+                                                                        : 'hover:bg-white/5'
+                                                                }`}
+                                                                onClick={selectImageLayer}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                                        e.preventDefault();
+                                                                        selectImageLayer();
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center justify-between gap-2 py-2">
+                                                                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white/10">
+                                                                            <ImageIcon className="h-4 w-4 text-white/60" />
+                                                                        </div>
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="truncate text-xs text-white/80">
+                                                                                {overlay.label || 'Image'}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-1 text-[11px] text-white/40">
+                                                                                <span className="rounded bg-[#6a7bd1]/30 px-1 text-[9px] text-white/80">
+                                                                                    {overlay.animated ? 'GIF' : 'IMG'}
+                                                                                </span>
+                                                                                <span>
+                                                                                    {Math.round(overlay.width)}×{Math.round(overlay.height)}px
+                                                                                </span>
+                                                                                <span>{Math.round(overlay.opacity * 100)}%</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <motion.button
+                                                                        type="button"
+                                                                        whileTap={{ scale: 0.9 }}
+                                                                        aria-label={`Delete ${overlay.label || 'media layer'}`}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            removeImageOverlay(index);
+                                                                            if (selectedImageIndex === index) {
+                                                                                setSelectedImageIndex(-1);
+                                                                            } else if (selectedImageIndex > index) {
+                                                                                setSelectedImageIndex(selectedImageIndex - 1);
+                                                                            }
+                                                                        }}
+                                                                        className="shrink-0 rounded-md p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </motion.button>
+                                                                </div>
+
+                                                                {isActiveImageLayer && (
+                                                                    <div
+                                                                        className="border-t border-white/10 pb-2 pt-2"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <label className="mb-1 block text-xs text-white/60">
+                                                                            Opacity: {Math.round(overlay.opacity * 100)}%
+                                                                        </label>
+                                                                        <input
+                                                                            type="range"
+                                                                            min="0"
+                                                                            max="1"
+                                                                            step="0.01"
+                                                                            value={overlay.opacity}
+                                                                            onChange={(e) => handleImageOpacityChange(index, parseFloat(e.target.value))}
+                                                                            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
+                                                                            style={{
+                                                                                background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${overlay.opacity * 100}%, rgba(255,255,255,0.2) ${overlay.opacity * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                                            }}
+                                                                        />
+
+                                                                        <div className="mt-2 space-y-2 border-t border-white/10 pt-2">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <motion.button
+                                                                                    type="button"
+                                                                                    whileTap={{ scale: 0.98 }}
+                                                                                    className={`flex-1 rounded-md border px-2 py-1.5 text-xs transition-colors ${
+                                                                                        isImageEraseMode && imageEraseTargetIndex === index
+                                                                                            ? 'border-[#6a7bd1] bg-[#6a7bd1] text-white'
+                                                                                            : 'border-white/20 bg-black/70 text-white hover:bg-white/10 dark:bg-white/15'
+                                                                                    }`}
+                                                                                    onClick={() => {
+                                                                                        if (isImageEraseMode && imageEraseTargetIndex === index) {
+                                                                                            setIsImageEraseMode(false);
+                                                                                            setImageEraseTargetIndex(-1);
+                                                                                            setSelectedImageIndex(index);
+                                                                                        } else {
+                                                                                            setIsImageEraseMode(true);
+                                                                                            setImageEraseTargetIndex(index);
+                                                                                            setSelectedImageIndex(index);
+                                                                                            setSelectedShapeIndex(-1);
+                                                                                            setIsDrawingMode(false);
+                                                                                        }
+                                                                                    }}
+                                                                                >
+                                                                                    {isImageEraseMode && imageEraseTargetIndex === index ? 'Exit Erase' : 'Erase'}
+                                                                                </motion.button>
+                                                                                {isImageEraseMode && imageEraseTargetIndex === index && (
+                                                                                    <>
+                                                                                        <motion.button
+                                                                                            type="button"
+                                                                                            whileTap={{ scale: 0.98 }}
+                                                                                            className="rounded-md border border-white/20 bg-black/70 px-2 py-1.5 text-xs text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/15"
+                                                                                            onClick={() => undoImageErase(index)}
+                                                                                            disabled={overlay.eraseStrokes.length === 0}
+                                                                                            title="Undo Last Erase"
+                                                                                            aria-label="Undo last erase"
+                                                                                        >
+                                                                                            <Undo2 className="h-3 w-3" />
+                                                                                        </motion.button>
+                                                                                        <motion.button
+                                                                                            type="button"
+                                                                                            whileTap={{ scale: 0.98 }}
+                                                                                            className="rounded-md border border-white/20 bg-black/70 px-2 py-1.5 text-xs text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white/15"
+                                                                                            onClick={() => clearImageErase(index)}
+                                                                                            disabled={overlay.eraseStrokes.length === 0}
+                                                                                            title="Clear All Erase"
+                                                                                            aria-label="Clear all erase"
+                                                                                        >
+                                                                                            <Trash className="h-3 w-3" />
+                                                                                        </motion.button>
+                                                                                    </>
+                                                                                )}
+                                                                            </div>
+                                                                            {isImageEraseMode && imageEraseTargetIndex === index && (
+                                                                                <div className="space-y-2">
+                                                                                    <div>
+                                                                                        <label className="mb-1 block text-xs text-white/60">
+                                                                                            Brush Size: {eraseBrushSize}px
+                                                                                        </label>
+                                                                                        <input
+                                                                                            type="range"
+                                                                                            min="5"
+                                                                                            max="100"
+                                                                                            value={eraseBrushSize}
+                                                                                            onChange={(e) => setEraseBrushSize(Number(e.target.value))}
+                                                                                            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
+                                                                                            style={{
+                                                                                                background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((eraseBrushSize - 5) / 95) * 100}%, rgba(255,255,255,0.2) ${((eraseBrushSize - 5) / 95) * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                                                            }}
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <label className="mb-1 block text-xs text-white/60">
+                                                                                            Brush Opacity: {Math.round(eraseBrushOpacity * 100)}%
+                                                                                        </label>
+                                                                                        <input
+                                                                                            type="range"
+                                                                                            min="0.1"
+                                                                                            max="1"
+                                                                                            step="0.1"
+                                                                                            value={eraseBrushOpacity}
+                                                                                            onChange={(e) => setEraseBrushOpacity(Number(e.target.value))}
+                                                                                            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
+                                                                                            style={{
+                                                                                                background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${eraseBrushOpacity * 100}%, rgba(255,255,255,0.2) ${eraseBrushOpacity * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                                                            }}
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </motion.div>
                                             )}
                                         </div>
-                                    </motion.div>
-                                ))}
-                            </div>
+                                    )}
+
+                                    {shapeOverlays.length > 0 && (
+                                        <div className="border-b border-white/10 last:border-b-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowShapeLayers((value) => !value)}
+                                                aria-expanded={showShapeLayers}
+                                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs text-white/70 transition-colors hover:bg-white/5"
+                                            >
+                                                <span className="flex min-w-0 items-center gap-2">
+                                                    <Shapes className="h-3.5 w-3.5 shrink-0" />
+                                                    <span className="truncate">Shapes</span>
+                                                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">
+                                                        {shapeOverlays.length}
+                                                    </span>
+                                                </span>
+                                                {showShapeLayers ? (
+                                                    <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                                                ) : (
+                                                    <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                                                )}
+                                            </button>
+
+                                            {showShapeLayers && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    transition={{ duration: 0.18 }}
+                                                    className="max-h-72 overflow-y-auto px-2 pb-2"
+                                                >
+                                                    {shapeOverlays.map((shape, index) => {
+                                                        const isActiveShapeLayer = selectedShapeIndex === index;
+                                                        const selectShapeLayer = () => {
+                                                            setSelectedShapeIndex(index);
+                                                            setSelectedImageIndex(-1);
+                                                            setIsImageEraseMode(false);
+                                                            setImageEraseTargetIndex(-1);
+                                                        };
+
+                                                        return (
+                                                            <motion.div
+                                                                key={shape.id}
+                                                                role="button"
+                                                                tabIndex={0}
+                                                                aria-pressed={isActiveShapeLayer}
+                                                                className={`border-t border-white/10 first:border-t-0 px-1.5 transition-colors ${
+                                                                    isActiveShapeLayer
+                                                                        ? 'bg-[#0f0f0f]'
+                                                                        : 'hover:bg-white/5'
+                                                                }`}
+                                                                onClick={selectShapeLayer}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                                        e.preventDefault();
+                                                                        selectShapeLayer();
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center justify-between gap-2 py-2">
+                                                                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white/10">
+                                                                            <Shapes className="h-4 w-4 text-white/60" />
+                                                                        </div>
+                                                                        <div className="min-w-0 flex-1">
+                                                                            <div className="truncate text-xs capitalize text-white/80">
+                                                                                {shape.type.replace('-', ' ')}
+                                                                            </div>
+                                                                            <div className="flex items-center gap-2 text-[11px] text-white/40">
+                                                                                <span>
+                                                                                    {Math.round(shape.width)}×{Math.round(shape.height)}px
+                                                                                </span>
+                                                                                <span>Stroke {shape.strokeWidth}px</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    <motion.button
+                                                                        type="button"
+                                                                        whileTap={{ scale: 0.9 }}
+                                                                        aria-label={`Delete ${shape.type.replace('-', ' ')}`}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            removeShape(index);
+                                                                        }}
+                                                                        className="shrink-0 rounded-md p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </motion.button>
+                                                                </div>
+
+                                                                {isActiveShapeLayer && (
+                                                                    <div
+                                                                        className="grid grid-cols-2 gap-2 border-t border-white/10 pb-2 pt-2"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <div>
+                                                                            <label className="mb-0.5 block text-[10px] text-white/50">Stroke</label>
+                                                                            <input
+                                                                                type="color"
+                                                                                value={shape.strokeColor}
+                                                                                onChange={(e) =>
+                                                                                    updateShape(index, { strokeColor: e.target.value })
+                                                                                }
+                                                                                className="h-7 w-full cursor-pointer rounded border border-white/20"
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="mb-0.5 block text-[10px] text-white/50">Fill</label>
+                                                                            <input
+                                                                                type="color"
+                                                                                value={shape.fillColor}
+                                                                                onChange={(e) =>
+                                                                                    updateShape(index, { fillColor: e.target.value })
+                                                                                }
+                                                                                className="h-7 w-full cursor-pointer rounded border border-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                                                                disabled={shape.type === 'line'}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="col-span-2">
+                                                                            <label className="mb-0.5 block text-[10px] text-white/50">
+                                                                                Stroke width: {shape.strokeWidth}px
+                                                                            </label>
+                                                                            <input
+                                                                                type="range"
+                                                                                min="1"
+                                                                                max="24"
+                                                                                value={shape.strokeWidth}
+                                                                                onChange={(e) =>
+                                                                                    updateShape(index, {
+                                                                                        strokeWidth: Number(e.target.value),
+                                                                                    })
+                                                                                }
+                                                                                className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
+                                                                            />
+                                                                        </div>
+                                                                        {shape.type !== 'line' && (
+                                                                            <label className="col-span-2 flex cursor-pointer items-center gap-2 text-xs text-white/70">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={shape.filled}
+                                                                                    onChange={(e) =>
+                                                                                        updateShape(index, { filled: e.target.checked })
+                                                                                    }
+                                                                                    className="rounded"
+                                                                                />
+                                                                                Filled shape
+                                                                            </label>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </motion.div>
+                                                        );
+                                                    })}
+                                                </motion.div>
+                                            )}
+                                        </div>
+                                    )}
+                                </motion.div>
+                            )}
                         </motion.div>
                     )}
 
