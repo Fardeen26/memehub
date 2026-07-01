@@ -23,6 +23,7 @@ export function pickGiphyUrl(item: GiphyItem): { url: string; width: number; hei
 export function pickGiphyPreviewUrl(item: GiphyItem): string {
     return (
         item.images.fixed_height_small?.url ||
+        item.images.fixed_height_small_still?.url ||
         item.images.fixed_height?.url ||
         item.images.downsized?.url ||
         item.images.original?.url ||
@@ -30,25 +31,40 @@ export function pickGiphyPreviewUrl(item: GiphyItem): string {
     );
 }
 
+export function pickGiphyStillUrl(item: GiphyItem): string | undefined {
+    return (
+        item.images.fixed_height_small_still?.url ||
+        item.images.fixed_height_still?.url ||
+        item.images.downsized_still?.url ||
+        item.images.original_still?.url
+    );
+}
+
 export function mapGiphyItems(items: GiphyItem[]): GiphyMediaItem[] {
-    return items
-        .map((item) => {
-            try {
-                const { url, width, height } = pickGiphyUrl(item);
-                const previewUrl = pickGiphyPreviewUrl(item) || url;
-                return {
-                    id: item.id,
-                    title: item.title || 'Untitled',
-                    previewUrl,
-                    url,
-                    width,
-                    height,
-                };
-            } catch {
-                return null;
-            }
-        })
-        .filter((item): item is GiphyMediaItem => item !== null);
+    const mapped: GiphyMediaItem[] = [];
+
+    for (const item of items) {
+        try {
+            const { url, width, height } = pickGiphyUrl(item);
+            const previewUrl = pickGiphyPreviewUrl(item) || url;
+            const stillUrl = pickGiphyStillUrl(item);
+            mapped.push({
+                id: item.id,
+                title: item.title || 'Untitled',
+                previewUrl,
+                url,
+                width,
+                height,
+                animated: true,
+                mimeHint: 'image/gif',
+                stillUrl,
+            });
+        } catch {
+            continue;
+        }
+    }
+
+    return mapped;
 }
 
 export async function fetchGiphy(

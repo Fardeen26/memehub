@@ -34,8 +34,10 @@ export type ImageOverlay = {
     id: string;
     src: string;
     label?: string;
-    /** GIF / animated SVG — canvas redraws each frame */
+    /** Animated GIF overlays are decoded into a ref/cache outside React state. */
     animated?: boolean;
+    mimeType?: string;
+    animationStartMs?: number;
     x: number;
     y: number;
     width: number;

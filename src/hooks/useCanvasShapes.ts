@@ -201,11 +201,12 @@ export function useCanvasShapes(canvasRef: RefObject<HTMLCanvasElement | null>) 
         isDraggingShape || isResizingShape || isRotatingShape;
 
     const drawShapesLayer = useCallback(
-        (ctx: CanvasRenderingContext2D) => {
+        (ctx: CanvasRenderingContext2D, includeEditorControls = true) => {
             for (const shape of shapeOverlays) {
                 drawShape(ctx, shape);
             }
             if (
+                includeEditorControls &&
                 !isShapeInteracting &&
                 selectedShapeIndex >= 0 &&
                 selectedShapeIndex < shapeOverlays.length
