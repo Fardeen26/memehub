@@ -14,6 +14,7 @@ export type CloudinaryVideoUploadSignature = {
     signature: string;
     tags: string;
     timestamp: number;
+    uploadPreset?: string;
     uploadUrl: string;
 };
 
@@ -79,6 +80,12 @@ export async function uploadVideoCaptureToCloudinary(
     blob: Blob
 ): Promise<CloudinaryVideoUploadResult> {
     const signature = await getCloudinaryVideoUploadSignature();
+    const maxFileSize = Number(signature.maxFileSize);
+
+    if (Number.isFinite(maxFileSize) && maxFileSize > 0 && blob.size > maxFileSize) {
+        throw new Error('Video export is too large to upload. Try a smaller template or fewer animated elements.');
+    }
+
     const formData = new FormData();
 
     formData.append('file', blob, getCaptureFilename(blob));
@@ -91,6 +98,9 @@ export async function uploadVideoCaptureToCloudinary(
     formData.append('public_id', signature.publicId);
     formData.append('tags', signature.tags);
     formData.append('overwrite', signature.overwrite);
+    if (signature.uploadPreset) {
+        formData.append('upload_preset', signature.uploadPreset);
+    }
 
     const response = await fetch(signature.uploadUrl, {
         method: 'POST',

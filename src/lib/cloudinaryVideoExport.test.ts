@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     buildCloudinaryMp4Url,
+    uploadVideoCaptureToCloudinary,
     waitForCloudinaryMp4,
 } from '@/lib/cloudinaryVideoExport';
 
@@ -39,5 +40,32 @@ describe('cloudinaryVideoExport', () => {
         ).resolves.toBeUndefined();
 
         expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects captures larger than the signed upload limit before uploading', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                allowedFormats: 'mp4,webm,mov',
+                apiKey: 'key',
+                cloudName: 'demo',
+                deliveryBaseUrl: 'https://res.cloudinary.com',
+                folder: 'memehub/generated-exports',
+                maxFileSize: '1',
+                overwrite: 'false',
+                publicId: 'meme-123',
+                signature: 'signature',
+                tags: 'memehub-export,temp-export',
+                timestamp: 1,
+                uploadUrl: 'https://api.cloudinary.com/v1_1/demo/video/upload',
+            }),
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(uploadVideoCaptureToCloudinary(new Blob(['too-large']))).rejects.toThrow(
+            'Video export is too large to upload.'
+        );
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 });

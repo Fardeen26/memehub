@@ -6,6 +6,8 @@ export const dynamic = 'force-dynamic';
 
 const EXPORT_PREFIX = 'memehub/generated-exports';
 const DEFAULT_MAX_AGE_HOURS = 24;
+const MIN_MAX_AGE_HOURS = 1;
+const MAX_MAX_AGE_HOURS = 24 * 30;
 const CLOUDINARY_PAGE_SIZE = 100;
 const CLOUDINARY_DELETE_BATCH_SIZE = 100;
 
@@ -25,6 +27,21 @@ function isAuthorized(request: NextRequest): boolean {
 
     const header = request.headers.get('authorization') || '';
     return header === `Bearer ${secret}`;
+}
+
+function parseMaxAgeHours(value: string | null): number | null {
+    if (value === null) return DEFAULT_MAX_AGE_HOURS;
+
+    const maxAgeHours = Number(value);
+    if (
+        !Number.isFinite(maxAgeHours) ||
+        maxAgeHours < MIN_MAX_AGE_HOURS ||
+        maxAgeHours > MAX_MAX_AGE_HOURS
+    ) {
+        return null;
+    }
+
+    return maxAgeHours;
 }
 
 export async function POST(request: NextRequest) {
@@ -49,7 +66,14 @@ export async function POST(request: NextRequest) {
         api_secret: apiSecret,
     });
 
-    const maxAgeHours = Number(request.nextUrl.searchParams.get('maxAgeHours')) || DEFAULT_MAX_AGE_HOURS;
+    const maxAgeHours = parseMaxAgeHours(request.nextUrl.searchParams.get('maxAgeHours'));
+    if (maxAgeHours === null) {
+        return NextResponse.json(
+            { error: `maxAgeHours must be between ${MIN_MAX_AGE_HOURS} and ${MAX_MAX_AGE_HOURS}.` },
+            { status: 400 }
+        );
+    }
+
     const cutoffMs = Date.now() - maxAgeHours * 60 * 60 * 1000;
     const publicIds: string[] = [];
     let nextCursor: string | undefined;

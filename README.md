@@ -54,6 +54,20 @@ cp .env.example .env.local
 # Set GIPHY_API_KEY=your_key
 ```
 
+For MP4 export in production, configure Cloudinary and shared rate limiting:
+
+```bash
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+CLOUDINARY_VIDEO_EXPORT_UPLOAD_PRESET=your_signed_video_preset
+UPSTASH_REDIS_REST_URL=your_upstash_rest_url
+UPSTASH_REDIS_REST_TOKEN=your_upstash_rest_token
+CLOUDINARY_CLEANUP_SECRET=your_cleanup_secret
+```
+
+The Cloudinary upload preset should restrict video formats and file size. Local development can use the in-memory signature limiter; production requires the shared limiter unless `CLOUDINARY_VIDEO_EXPORT_ALLOW_MEMORY_RATE_LIMIT=true` is set intentionally.
+
 4. Run the development server:
 ```bash
 bun dev

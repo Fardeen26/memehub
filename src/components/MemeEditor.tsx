@@ -473,7 +473,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const addImageOverlay = useCallback(async (
         input: File | string,
         options?: { isDataUrl?: boolean; label?: string; animated?: boolean; mimeType?: string; stillUrl?: string }
-    ) => {
+    ): Promise<boolean> => {
         try {
             const fileInput = input instanceof File ? input : undefined;
             const imageSrc = await resolveImageSrc(input, options?.isDataUrl);
@@ -492,7 +492,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }
 
             const canvas = canvasRef.current;
-            if (!canvas) return;
+            if (!canvas) return false;
 
             const overlayId = generateImageId();
             let decodedGif: DecodedGif | null = null;
@@ -566,10 +566,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 return [...prev, newOverlay];
             });
 
+            return true;
         } catch (error) {
             console.error('Error adding image overlay:', error);
             const message = error instanceof Error ? error.message : 'Failed to add image';
             toast.error(message);
+            return false;
         }
     }, [decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setSelectedShapeIndex]);
 
@@ -627,12 +629,17 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const handleUploadConfirm = async () => {
         try {
+            let added = false;
             if (uploadMethod === 'file' && selectedFile) {
-                await addImageOverlay(selectedFile);
+                added = await addImageOverlay(selectedFile);
             } else if (uploadMethod === 'paste' && pastedImageData) {
-                await addImageOverlay(pastedImageData, { isDataUrl: true });
+                added = await addImageOverlay(pastedImageData, { isDataUrl: true });
             } else {
                 toast.error('Please select a file or paste an image');
+                return;
+            }
+
+            if (!added) {
                 return;
             }
 
