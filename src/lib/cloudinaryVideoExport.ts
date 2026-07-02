@@ -94,7 +94,6 @@ export async function uploadVideoCaptureToCloudinary(
     formData.append('timestamp', String(signature.timestamp));
     formData.append('signature', signature.signature);
     formData.append('folder', signature.folder);
-    formData.append('max_file_size', signature.maxFileSize);
     formData.append('public_id', signature.publicId);
     formData.append('tags', signature.tags);
     formData.append('overwrite', signature.overwrite);

@@ -9,15 +9,21 @@ const EXPORT_FOLDER = 'memehub/generated-exports';
 const EXPORT_TAGS = 'memehub-export,temp-export';
 const EXPORT_ALLOWED_FORMATS = 'mp4,webm,mov';
 const EXPORT_MAX_FILE_SIZE = String(25 * 1024 * 1024);
-const EXPORT_UPLOAD_PRESET = process.env.CLOUDINARY_VIDEO_EXPORT_UPLOAD_PRESET;
+
+function getEnv(name: string): string | undefined {
+    const value = process.env[name]?.trim();
+    return value || undefined;
+}
+
+const EXPORT_UPLOAD_PRESET = getEnv('CLOUDINARY_VIDEO_EXPORT_UPLOAD_PRESET');
 const REQUIRE_UPLOAD_PRESET =
     process.env.NODE_ENV === 'production' &&
     process.env.CLOUDINARY_VIDEO_EXPORT_REQUIRE_UPLOAD_PRESET !== 'false';
 const SIGNATURE_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const SIGNATURE_RATE_LIMIT_MAX_REQUESTS = 10;
 const SIGNATURE_GLOBAL_RATE_LIMIT_MAX_REQUESTS = 200;
-const RATE_LIMIT_REDIS_URL = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, '');
-const RATE_LIMIT_REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+const RATE_LIMIT_REDIS_URL = getEnv('UPSTASH_REDIS_REST_URL')?.replace(/\/$/, '');
+const RATE_LIMIT_REDIS_TOKEN = getEnv('UPSTASH_REDIS_REST_TOKEN');
 const ALLOW_MEMORY_RATE_LIMIT =
     process.env.NODE_ENV !== 'production' ||
     process.env.CLOUDINARY_VIDEO_EXPORT_ALLOW_MEMORY_RATE_LIMIT === 'true';
@@ -227,10 +233,10 @@ export async function POST(request: NextRequest) {
         return rateLimitUnavailableResponse();
     }
 
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-    const apiKey = process.env.CLOUDINARY_API_KEY;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
-    const deliveryBaseUrl = process.env.NEXT_PUBLIC_CLOUDINARY_BASE_URL || 'https://res.cloudinary.com';
+    const cloudName = getEnv('NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME');
+    const apiKey = getEnv('CLOUDINARY_API_KEY');
+    const apiSecret = getEnv('CLOUDINARY_API_SECRET');
+    const deliveryBaseUrl = getEnv('NEXT_PUBLIC_CLOUDINARY_BASE_URL') || 'https://res.cloudinary.com';
 
     if (!cloudName || !apiKey || !apiSecret) {
         return NextResponse.json(
@@ -251,7 +257,6 @@ export async function POST(request: NextRequest) {
     const uploadParams: Record<string, string | number> = {
         allowed_formats: EXPORT_ALLOWED_FORMATS,
         folder: EXPORT_FOLDER,
-        max_file_size: EXPORT_MAX_FILE_SIZE,
         overwrite: 'false',
         public_id: publicId,
         tags: EXPORT_TAGS,

@@ -7,6 +7,11 @@ export const GIF_MAX_CANVAS_PIXELS = 1920 * 1080;
 export const GIF_MIN_FRAME_DELAY_MS = 20;
 export const ANIMATED_EXPORT_MIN_DURATION_MS = 5000;
 export const ANIMATED_EXPORT_MAX_DURATION_MS = 5000;
+export const GIPHY_GIF_FETCH_TIMEOUT_MS = 5000;
+export const GIPHY_GIF_MAX_BYTES = 4 * 1024 * 1024;
+export const GIPHY_GIF_MAX_DECODED_FRAMES = 80;
+export const GIPHY_GIF_MAX_DIMENSION = 640;
+export const GIPHY_GIF_MAX_CANVAS_PIXELS = 640 * 640;
 
 export type GifDecodeLimits = {
     maxBytes?: number;
@@ -15,6 +20,15 @@ export type GifDecodeLimits = {
     maxFrames?: number;
     maxHeight?: number;
     maxWidth?: number;
+};
+
+export const GIPHY_GIF_DECODE_LIMITS: GifDecodeLimits = {
+    maxBytes: GIPHY_GIF_MAX_BYTES,
+    maxCanvasPixels: GIPHY_GIF_MAX_CANVAS_PIXELS,
+    maxFramePixels: GIPHY_GIF_MAX_CANVAS_PIXELS,
+    maxFrames: GIPHY_GIF_MAX_DECODED_FRAMES,
+    maxHeight: GIPHY_GIF_MAX_DIMENSION,
+    maxWidth: GIPHY_GIF_MAX_DIMENSION,
 };
 
 export type DecodedGifFrame = {
@@ -192,8 +206,16 @@ export function isGifSource(src: string, mimeType?: string | null): boolean {
     );
 }
 
-export async function fetchGifArrayBuffer(src: string, limits: GifDecodeLimits = {}): Promise<ArrayBuffer> {
-    const response = await fetch(src, { credentials: 'omit', mode: 'cors' });
+export async function fetchGifArrayBuffer(
+    src: string,
+    limits: GifDecodeLimits = {},
+    options: { signal?: AbortSignal } = {}
+): Promise<ArrayBuffer> {
+    const response = await fetch(src, {
+        credentials: 'omit',
+        mode: 'cors',
+        signal: options.signal,
+    });
     if (!response.ok) {
         throw new Error(`Failed to load GIF (${response.status})`);
     }

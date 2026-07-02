@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { getMediaPerfNow, logMediaDebug } from '@/lib/mediaDebug';
 import type { GiphyMediaItem } from '@/types/giphy';
 
 type GiphyMediaType = 'gif' | 'sticker';
@@ -29,6 +30,7 @@ export function useGiphyMedia(type: GiphyMediaType, enabled: boolean): UseGiphyM
             const id = ++requestId.current;
             setLoading(true);
             setError(null);
+            const startedAt = getMediaPerfNow();
 
             try {
                 const params = new URLSearchParams({
@@ -55,11 +57,27 @@ export function useGiphyMedia(type: GiphyMediaType, enabled: boolean): UseGiphyM
                 setItems((prev) => (append ? [...prev, ...newItems] : newItems));
                 setHasMore(pagination.offset + pagination.count < pagination.total_count);
                 setOffset(pageOffset + pagination.count);
+                logMediaDebug('giphy-page-loaded', {
+                    append,
+                    count: newItems.length,
+                    offset: pageOffset,
+                    query: searchQuery,
+                    totalMs: Math.round(getMediaPerfNow() - startedAt),
+                    type,
+                });
             } catch (err) {
                 if (id !== requestId.current) return;
                 setError(err instanceof Error ? err.message : 'Failed to load media');
                 if (!append) setItems([]);
                 setHasMore(false);
+                logMediaDebug('giphy-page-failed', {
+                    append,
+                    error: err instanceof Error ? err.message : 'Failed to load media',
+                    offset: pageOffset,
+                    query: searchQuery,
+                    totalMs: Math.round(getMediaPerfNow() - startedAt),
+                    type,
+                });
             } finally {
                 if (id === requestId.current) setLoading(false);
             }

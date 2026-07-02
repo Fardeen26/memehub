@@ -84,9 +84,11 @@ function MediaGrid({
                         >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                                src={item.previewUrl}
+                                src={item.previewUrl || item.stillUrl || item.url}
                                 alt=""
-                                className={`w-full h-full object-cover pointer-events-none transition-transform duration-300 ${
+                                loading="lazy"
+                                decoding="async"
+                                className={`w-full h-full object-contain bg-black/20 pointer-events-none transition-transform duration-300 ${
                                     isAdding ? 'scale-110 opacity-45 blur-[1px]' : 'group-hover:scale-105'
                                 }`}
                             />

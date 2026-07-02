@@ -68,4 +68,42 @@ describe('cloudinaryVideoExport', () => {
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
+
+    it('does not send max_file_size as a signed Cloudinary upload parameter', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    allowedFormats: 'mp4,webm,mov',
+                    apiKey: 'key',
+                    cloudName: 'demo',
+                    deliveryBaseUrl: 'https://res.cloudinary.com',
+                    folder: 'memehub/generated-exports',
+                    maxFileSize: String(25 * 1024 * 1024),
+                    overwrite: 'false',
+                    publicId: 'meme-123',
+                    signature: 'signature',
+                    tags: 'memehub-export,temp-export',
+                    timestamp: 1,
+                    uploadPreset: 'ml_default',
+                    uploadUrl: 'https://api.cloudinary.com/v1_1/demo/video/upload',
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    public_id: 'memehub/generated-exports/meme-123',
+                    secure_url: 'https://res.cloudinary.com/demo/video/upload/memehub/generated-exports/meme-123',
+                }),
+            });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await uploadVideoCaptureToCloudinary(new Blob(['ok'], { type: 'video/mp4' }));
+
+        const uploadBody = fetchMock.mock.calls[1]?.[1]?.body;
+        expect(uploadBody).toBeInstanceOf(FormData);
+        expect((uploadBody as FormData).get('max_file_size')).toBeNull();
+        expect((uploadBody as FormData).get('upload_preset')).toBe('ml_default');
+    });
 });
