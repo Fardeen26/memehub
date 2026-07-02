@@ -156,10 +156,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
     const decodedGifCache = useRef<Map<string, DecodedGif>>(new Map());
     const backgroundGifDecodeQueue = useRef<Promise<void>>(Promise.resolve());
+    const pendingGifDecodeIds = useRef<Set<string>>(new Set());
     const fontLoadCache = useRef<Map<string, Promise<void>>>(new Map());
     const currentAnimationTimeRef = useRef<number>(0);
     const [isExporting, setIsExporting] = useState<boolean>(false);
     const [exportStatus, setExportStatus] = useState<string | null>(null);
+    const [pendingGifDecodeCount, setPendingGifDecodeCount] = useState(0);
 
     const {
         shapeOverlays,
@@ -252,6 +254,29 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         return backgroundGifDecodeQueue.current;
     }, []);
 
+    const setGifDecodePending = useCallback((overlayId: string, isPending: boolean) => {
+        const pendingIds = pendingGifDecodeIds.current;
+        const wasPending = pendingIds.has(overlayId);
+        if (wasPending === isPending) return;
+
+        if (isPending) {
+            pendingIds.add(overlayId);
+        } else {
+            pendingIds.delete(overlayId);
+        }
+
+        setPendingGifDecodeCount(pendingIds.size);
+    }, []);
+
+    const clearOverlayGifDecodePending = useCallback((overlayId: string) => {
+        setGifDecodePending(overlayId, false);
+        setImageOverlays((prev) => prev.map((overlay) => (
+            overlay.id === overlayId
+                ? { ...overlay, animationDecodePending: false }
+                : overlay
+        )));
+    }, [setGifDecodePending]);
+
     const startBackgroundGifDecode = useCallback((options: {
         label?: string;
         limits?: GifDecodeLimits;
@@ -294,6 +319,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             ? {
                                 ...overlay,
                                 animated: true,
+                                animationDecodePending: false,
                                 animationStartMs: getAnimationNow(),
                                 mimeType: 'image/gif',
                                 originalHeight: decodedGif.height,
@@ -324,9 +350,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 if (timeoutId !== null) {
                     window.clearTimeout(timeoutId);
                 }
+                clearOverlayGifDecodePending(options.overlayId);
             }
         });
-    }, [decodeGifForOverlay, getAnimationNow, queueBackgroundGifDecode]);
+    }, [clearOverlayGifDecodePending, decodeGifForOverlay, getAnimationNow, queueBackgroundGifDecode]);
 
     const isUnsupportedAnimatedUploadCandidate = useCallback((file: File) => {
         const lowerName = file.name.toLowerCase();
@@ -1005,6 +1032,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 src: staticSrc,
                 label: options?.label || 'Image',
                 animated: Boolean(decodedGif),
+                animationDecodePending: shouldDeferAnimationDecode,
                 mimeType,
                 animationStartMs: decodedGif ? getAnimationNow() : undefined,
                 x: (canvas.width - width) / 2,
@@ -1017,6 +1045,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 rotation: 0,
                 eraseStrokes: []
             };
+
+            if (shouldDeferAnimationDecode) {
+                setGifDecodePending(overlayId, true);
+            }
 
             setShowLayerPanel(true);
             setShowMediaLayers(true);
@@ -1053,7 +1085,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             toast.error(message);
             return false;
         }
-    }, [decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setSelectedShapeIndex, startBackgroundGifDecode]);
+    }, [decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setGifDecodePending, setSelectedShapeIndex, startBackgroundGifDecode]);
 
     const addMediaFromLibrary = useCallback(
         async (item: GiphyMediaItem) => {
@@ -1203,14 +1235,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, [isUploadDialogOpen, addImageOverlay]);
 
     const removeImageOverlay = (index: number) => {
-        setImageOverlays(prev => {
-            const overlay = prev[index];
-            if (overlay) {
-                imageCache.current.delete(overlay.src);
-                decodedGifCache.current.delete(overlay.id);
-            }
-            return prev.filter((_, i) => i !== index);
-        });
+        const overlay = imageOverlays[index];
+        if (overlay) {
+            imageCache.current.delete(overlay.src);
+            decodedGifCache.current.delete(overlay.id);
+            setGifDecodePending(overlay.id, false);
+        }
+        setImageOverlays(prev => prev.filter((_, i) => i !== index));
         if (imageEraseTargetIndex === index) {
             setIsImageEraseMode(false);
             setImageEraseTargetIndex(-1);
@@ -2795,6 +2826,9 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, [draw, texts, textBoxes, textSettings, textBoxRotations, imageOverlays, shapeOverlays, selectedImageIndex, selectedShapeIndex, selectedTextIndex, strokes, currentStroke]);
 
     const hasAnimatedOverlays = imageOverlays.some((o) => o.animated);
+    const hasPendingAnimatedOverlays =
+        pendingGifDecodeCount > 0 || imageOverlays.some((o) => o.animationDecodePending);
+    const hasAnimatedExportOverlays = hasAnimatedOverlays || hasPendingAnimatedOverlays;
     useEffect(() => {
         if (!hasAnimatedOverlays) return;
         let raf = 0;
@@ -3007,6 +3041,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, []);
 
     const downloadMeme = async () => {
+        if (pendingGifDecodeIds.current.size > 0) {
+            toast.info('GIF is still preparing. Try exporting again in a moment.');
+            return;
+        }
+
         setIsExporting(true);
         setExportStatus('Preparing PNG...');
         try {
@@ -3041,6 +3080,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }
 
     const downloadAnimatedMeme = async () => {
+        if (pendingGifDecodeIds.current.size > 0) {
+            toast.info('GIF is still preparing. Try exporting again in a moment.');
+            return;
+        }
+
         setIsExporting(true);
         const exportDurationMs = getAnimatedSceneExportDurationMs();
         const exportDurationSeconds = Math.ceil(exportDurationMs / 1000);
@@ -3388,7 +3432,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const animatedExportCapability = getAnimatedExportCapability();
     const animatedExportLabel =
         animatedExportCapability.format === 'mp4' ? 'Video MP4' : 'Animated GIF';
-    const exportButtonLabel = exportStatus ?? 'Download';
+    const exportButtonLabel = exportStatus ?? (hasPendingAnimatedOverlays ? 'Preparing GIF...' : 'Download');
 
     return (
         <motion.section
@@ -4119,7 +4163,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                                             </div>
                                                                             <div className="flex items-center gap-1 text-[11px] text-white/40">
                                                                                 <span className="rounded bg-[#6a7bd1]/30 px-1 text-[9px] text-white/80">
-                                                                                    {overlay.animated ? 'GIF' : 'IMG'}
+                                                                                    {overlay.animated || overlay.animationDecodePending ? 'GIF' : 'IMG'}
                                                                                 </span>
                                                                                 <span>
                                                                                     {Math.round(overlay.width)}×{Math.round(overlay.height)}px
@@ -4430,7 +4474,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     )}
 
                     <div className="flex w-full space-x-2 mt-4">
-                        {hasAnimatedOverlays ? (
+                        {hasAnimatedExportOverlays ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <motion.button
@@ -4438,22 +4482,22 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.3, delay: 0.5 }}
                                         whileTap={{ scale: 0.98 }}
-                                        disabled={isExporting}
+                                        disabled={isExporting || hasPendingAnimatedOverlays}
                                         className="px-4 py-2 w-full bg-[#6a7bd1] hover:bg-[#6975b3] font-medium border border-white/20 text-sm text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                                     >
-                                        {isExporting ? (
+                                        {isExporting || hasPendingAnimatedOverlays ? (
                                             <Loader2 className="h-4 w-4 animate-spin" />
                                         ) : (
                                             <Download className="h-4 w-4" />
                                         )}
                                         {exportButtonLabel}
-                                        {!isExporting && <ChevronDown className="h-3.5 w-3.5" />}
+                                        {!isExporting && !hasPendingAnimatedOverlays && <ChevronDown className="h-3.5 w-3.5" />}
                                     </motion.button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="bg-black border-white/20 text-white min-w-44">
                                     <DropdownMenuLabel className="text-xs text-white/50">Export</DropdownMenuLabel>
                                     <DropdownMenuItem
-                                        disabled={isExporting}
+                                        disabled={isExporting || hasPendingAnimatedOverlays}
                                         onSelect={(event) => {
                                             event.preventDefault();
                                             downloadMeme();
@@ -4465,7 +4509,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-white/10" />
                                     <DropdownMenuItem
-                                        disabled={isExporting}
+                                        disabled={isExporting || hasPendingAnimatedOverlays}
                                         onSelect={(event) => {
                                             event.preventDefault();
                                             downloadAnimatedMeme();

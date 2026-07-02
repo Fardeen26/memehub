@@ -36,6 +36,8 @@ export type ImageOverlay = {
     label?: string;
     /** Animated GIF overlays are decoded into a ref/cache outside React state. */
     animated?: boolean;
+    /** True while an intended animated GIF is decoding in the background. */
+    animationDecodePending?: boolean;
     mimeType?: string;
     animationStartMs?: number;
     x: number;
