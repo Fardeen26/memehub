@@ -1,61 +1,108 @@
 import type { GiphyItem, GiphyMediaItem, GiphySearchResponse } from '@/types/giphy';
 
 const GIPHY_BASE = 'https://api.giphy.com/v1';
+type GiphyMediaType = 'gif' | 'sticker';
+type GiphyImageKey = keyof GiphyItem['images'];
+type PickedGiphyRendition = { url: string; width: number; height: number };
 
-export function pickGiphyUrl(item: GiphyItem): { url: string; width: number; height: number } {
+const FALLBACK_RENDITION_SIZE = 200;
+
+const STILL_PREVIEW_KEYS: GiphyImageKey[] = [
+    'fixed_height_small_still',
+    'fixed_width_small_still',
+    'fixed_height_still',
+    'fixed_width_still',
+    'downsized_still',
+    'original_still',
+];
+
+const STILL_EDITOR_KEYS: GiphyImageKey[] = [
+    'fixed_height_still',
+    'fixed_width_still',
+    'fixed_height_small_still',
+    'fixed_width_small_still',
+    'downsized_still',
+    'original_still',
+];
+
+const BOUNDED_ANIMATED_KEYS: GiphyImageKey[] = [
+    'fixed_height',
+    'fixed_width',
+    'fixed_height_small',
+    'fixed_width_small',
+    'downsized',
+    'original',
+];
+
+const SMALL_ANIMATED_FALLBACK_KEYS: GiphyImageKey[] = [
+    'fixed_height_small',
+    'fixed_width_small',
+    'fixed_height',
+    'fixed_width',
+    'downsized',
+    'original',
+];
+
+function parseRenditionDimension(value: string | undefined): number {
+    const parsed = parseInt(value ?? '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : FALLBACK_RENDITION_SIZE;
+}
+
+function pickRendition(item: GiphyItem, keys: GiphyImageKey[]): PickedGiphyRendition | undefined {
+    for (const key of keys) {
+        const img = item.images[key];
+        if (!img?.url) continue;
+
+        return {
+            url: img.url,
+            width: parseRenditionDimension(img.width),
+            height: parseRenditionDimension(img.height),
+        };
+    }
+
+    return undefined;
+}
+
+export function pickGiphyUrl(item: GiphyItem, type: GiphyMediaType = 'gif'): PickedGiphyRendition {
     const img =
-        item.images.downsized ||
-        item.images.fixed_height ||
-        item.images.fixed_height_small ||
-        item.images.original;
+        type === 'sticker'
+            ? pickRendition(item, [...STILL_EDITOR_KEYS, ...SMALL_ANIMATED_FALLBACK_KEYS])
+            : pickRendition(item, BOUNDED_ANIMATED_KEYS);
 
-    if (!img?.url) {
+    if (!img) {
         throw new Error('Giphy item has no usable image URL');
     }
 
-    return {
-        url: img.url,
-        width: parseInt(img.width, 10) || 200,
-        height: parseInt(img.height, 10) || 200,
-    };
+    return img;
 }
 
 export function pickGiphyPreviewUrl(item: GiphyItem): string {
-    return (
-        item.images.fixed_height_small?.url ||
-        item.images.fixed_height_small_still?.url ||
-        item.images.fixed_height?.url ||
-        item.images.downsized?.url ||
-        item.images.original?.url ||
-        ''
-    );
+    return pickRendition(item, [...STILL_PREVIEW_KEYS, ...SMALL_ANIMATED_FALLBACK_KEYS])?.url || '';
 }
 
 export function pickGiphyStillUrl(item: GiphyItem): string | undefined {
-    return (
-        item.images.fixed_height_small_still?.url ||
-        item.images.fixed_height_still?.url ||
-        item.images.downsized_still?.url ||
-        item.images.original_still?.url
-    );
+    return pickRendition(item, STILL_EDITOR_KEYS)?.url;
 }
 
-export function mapGiphyItems(items: GiphyItem[]): GiphyMediaItem[] {
+export function mapGiphyItems(items: GiphyItem[], type: GiphyMediaType): GiphyMediaItem[] {
     const mapped: GiphyMediaItem[] = [];
 
     for (const item of items) {
         try {
-            const { url, width, height } = pickGiphyUrl(item);
+            const { url, width, height } = pickGiphyUrl(item, type);
             const previewUrl = pickGiphyPreviewUrl(item) || url;
             const stillUrl = pickGiphyStillUrl(item);
+            const animated = type === 'gif';
+
             mapped.push({
                 id: item.id,
+                mediaType: type,
                 title: item.title || 'Untitled',
                 previewUrl,
                 url,
                 width,
                 height,
-                animated: true,
+                animated,
                 mimeHint: 'image/gif',
                 stillUrl,
             });
@@ -106,7 +153,7 @@ export async function fetchGiphy(
     }
 
     return {
-        items: mapGiphyItems(data.data ?? []),
+        items: mapGiphyItems(data.data ?? [], type),
         pagination: data.pagination ?? { total_count: 0, count: 0, offset: 0 },
     };
 }

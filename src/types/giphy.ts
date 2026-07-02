@@ -8,6 +8,10 @@ export type GiphyItem = {
     id: string;
     title: string;
     images: {
+        fixed_width?: GiphyImageRendition;
+        fixed_width_small?: GiphyImageRendition;
+        fixed_width_still?: GiphyImageRendition;
+        fixed_width_small_still?: GiphyImageRendition;
         fixed_height?: GiphyImageRendition;
         fixed_height_small?: GiphyImageRendition;
         fixed_height_still?: GiphyImageRendition;
@@ -31,6 +35,7 @@ export type GiphySearchResponse = {
 
 export type GiphyMediaItem = {
     id: string;
+    mediaType: 'gif' | 'sticker';
     title: string;
     previewUrl: string;
     url: string;

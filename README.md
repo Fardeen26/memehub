@@ -68,6 +68,8 @@ CLOUDINARY_CLEANUP_SECRET=your_cleanup_secret
 
 The Cloudinary upload preset should restrict video formats and file size. Local development can use the in-memory signature limiter; production requires the shared limiter unless `CLOUDINARY_VIDEO_EXPORT_ALLOW_MEMORY_RATE_LIMIT=true` is set intentionally.
 
+Create `CLOUDINARY_VIDEO_EXPORT_UPLOAD_PRESET` in the same Cloudinary product environment as `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`. The preset name is case-sensitive and must match the deployed environment variable exactly. Use a signed upload preset for the production MP4 export flow. If Cloudinary returns `Upload preset not found`, the deployed preset name is missing, misspelled, set on a different Cloudinary cloud, or still set to a placeholder value.
+
 4. Run the development server:
 ```bash
 bun dev

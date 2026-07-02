@@ -4,6 +4,10 @@ import {
     GIF_MAX_CANVAS_PIXELS,
     GIF_MAX_DECODED_FRAMES,
     GIF_MAX_DIMENSION,
+    GIPHY_GIF_DECODE_LIMITS,
+    GIPHY_GIF_MAX_BYTES,
+    GIPHY_GIF_MAX_DECODED_FRAMES,
+    GIPHY_GIF_MAX_DIMENSION,
     GifDecodeLimitError,
     assertGifDecodeLimits,
     assertGifDimensionLimits,
@@ -75,6 +79,29 @@ describe('gifAnimation', () => {
                     maxHeight: Number.MAX_SAFE_INTEGER,
                 }
             )
+        ).toThrow(GifDecodeLimitError);
+    });
+
+    it('uses stricter limits for remote Giphy GIF overlays', () => {
+        expect(() =>
+            assertGifDecodeLimits({
+                byteLength: GIPHY_GIF_MAX_BYTES + 1,
+                frameCount: 1,
+            }, GIPHY_GIF_DECODE_LIMITS)
+        ).toThrow(GifDecodeLimitError);
+
+        expect(() =>
+            assertGifDecodeLimits({
+                byteLength: 1024,
+                frameCount: GIPHY_GIF_MAX_DECODED_FRAMES + 1,
+            }, GIPHY_GIF_DECODE_LIMITS)
+        ).toThrow(GifDecodeLimitError);
+
+        expect(() =>
+            assertGifDimensionLimits({
+                height: 100,
+                width: GIPHY_GIF_MAX_DIMENSION + 1,
+            }, GIPHY_GIF_DECODE_LIMITS)
         ).toThrow(GifDecodeLimitError);
     });
 

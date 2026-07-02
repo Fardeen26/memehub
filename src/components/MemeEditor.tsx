@@ -40,6 +40,8 @@ import { resolveImageSrc } from '@/lib/resolveImageSrc';
 import type { GiphyMediaItem } from '@/types/giphy';
 import {
     GIF_MAX_BYTES,
+    GIPHY_GIF_DECODE_LIMITS,
+    GIPHY_GIF_FETCH_TIMEOUT_MS,
     GifDecodeLimitError,
     decodeGifFromArrayBuffer,
     fetchGifArrayBuffer,
@@ -47,7 +49,9 @@ import {
     getGifFrameCanvas,
     isGifSource,
     type DecodedGif,
+    type GifDecodeLimits,
 } from '@/lib/gifAnimation';
+import { getMediaPerfNow, logMediaDebug } from '@/lib/mediaDebug';
 import {
     getAnimatedExportCapability,
     getStillExportMimeType,
@@ -151,6 +155,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const imageCache = useRef<Map<string, HTMLImageElement>>(new Map());
     const decodedGifCache = useRef<Map<string, DecodedGif>>(new Map());
+    const backgroundGifDecodeQueue = useRef<Promise<void>>(Promise.resolve());
     const fontLoadCache = useRef<Map<string, Promise<void>>>(new Map());
     const currentAnimationTimeRef = useRef<number>(0);
     const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -222,12 +227,106 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         return Date.now();
     }, []);
 
-    const decodeGifForOverlay = useCallback(async (overlayId: string, src: string, file?: File) => {
-        const buffer = file ? await file.arrayBuffer() : await fetchGifArrayBuffer(src);
-        const decodedGif = decodeGifFromArrayBuffer(buffer);
+    const decodeGifForOverlay = useCallback(async (
+        overlayId: string,
+        src: string,
+        file?: File,
+        options: { limits?: GifDecodeLimits; signal?: AbortSignal } = {}
+    ) => {
+        const buffer = file
+            ? await file.arrayBuffer()
+            : await fetchGifArrayBuffer(src, options.limits, { signal: options.signal });
+        const decodedGif = decodeGifFromArrayBuffer(buffer, options.limits);
         decodedGifCache.current.set(overlayId, decodedGif);
         return decodedGif;
     }, []);
+
+    const queueBackgroundGifDecode = useCallback((task: () => Promise<void>) => {
+        backgroundGifDecodeQueue.current = backgroundGifDecodeQueue.current
+            .catch(() => undefined)
+            .then(task)
+            .catch((error) => {
+                console.warn('Background GIF decode failed:', error);
+            });
+
+        return backgroundGifDecodeQueue.current;
+    }, []);
+
+    const startBackgroundGifDecode = useCallback((options: {
+        label?: string;
+        limits?: GifDecodeLimits;
+        overlayId: string;
+        src: string;
+        startedAt: number;
+        timeoutMs?: number;
+    }) => {
+        queueBackgroundGifDecode(async () => {
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timeoutId = controller
+                ? window.setTimeout(() => controller.abort(), options.timeoutMs ?? GIPHY_GIF_FETCH_TIMEOUT_MS)
+                : null;
+
+            try {
+                const decodedGif = await decodeGifForOverlay(options.overlayId, options.src, undefined, {
+                    limits: options.limits,
+                    signal: controller?.signal,
+                });
+
+                if (decodedGif.frameCount <= 1) {
+                    decodedGifCache.current.delete(options.overlayId);
+                    logMediaDebug('gif-decode-skipped-static', {
+                        label: options.label,
+                        overlayId: options.overlayId,
+                        totalMs: Math.round(getMediaPerfNow() - options.startedAt),
+                    });
+                    return;
+                }
+
+                setImageOverlays((prev) => {
+                    const overlayExists = prev.some((overlay) => overlay.id === options.overlayId);
+                    if (!overlayExists) {
+                        decodedGifCache.current.delete(options.overlayId);
+                        return prev;
+                    }
+
+                    return prev.map((overlay) => (
+                        overlay.id === options.overlayId
+                            ? {
+                                ...overlay,
+                                animated: true,
+                                animationStartMs: getAnimationNow(),
+                                mimeType: 'image/gif',
+                                originalHeight: decodedGif.height,
+                                originalWidth: decodedGif.width,
+                                src: options.src,
+                            }
+                            : overlay
+                    ));
+                });
+
+                logMediaDebug('gif-decode-upgraded-overlay', {
+                    byteLength: decodedGif.byteLength,
+                    durationMs: decodedGif.durationMs,
+                    frameCount: decodedGif.frameCount,
+                    label: options.label,
+                    overlayId: options.overlayId,
+                    totalMs: Math.round(getMediaPerfNow() - options.startedAt),
+                });
+            } catch (error) {
+                decodedGifCache.current.delete(options.overlayId);
+                logMediaDebug('gif-decode-kept-static', {
+                    error: error instanceof Error ? error.message : 'GIF decode failed',
+                    label: options.label,
+                    overlayId: options.overlayId,
+                    totalMs: Math.round(getMediaPerfNow() - options.startedAt),
+                });
+            } finally {
+                if (timeoutId !== null) {
+                    window.clearTimeout(timeoutId);
+                }
+            }
+        });
+    }, [decodeGifForOverlay, getAnimationNow, queueBackgroundGifDecode]);
 
     const isUnsupportedAnimatedUploadCandidate = useCallback((file: File) => {
         const lowerName = file.name.toLowerCase();
@@ -804,8 +903,20 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const addImageOverlay = useCallback(async (
         input: File | string,
-        options?: { isDataUrl?: boolean; label?: string; animated?: boolean; mimeType?: string; stillUrl?: string }
+        options?: {
+            animated?: boolean;
+            animatedSrc?: string;
+            decodeLimits?: GifDecodeLimits;
+            decodeTimeoutMs?: number;
+            deferAnimationDecode?: boolean;
+            isDataUrl?: boolean;
+            label?: string;
+            mimeType?: string;
+            stillUrl?: string;
+        }
     ): Promise<boolean> => {
+        const addStartedAt = getMediaPerfNow();
+
         try {
             const fileInput = input instanceof File ? input : undefined;
             const imageSrc = await resolveImageSrc(input, options?.isDataUrl);
@@ -831,10 +942,25 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             let staticSrc = imageSrc;
             let naturalWidth = 0;
             let naturalHeight = 0;
+            const animatedSrc = options?.animatedSrc || imageSrc;
+            const deferredStaticSrc = options?.stillUrl || imageSrc;
+            const shouldDeferAnimationDecode = Boolean(
+                options?.deferAnimationDecode &&
+                requestedAnimated &&
+                isGif &&
+                animatedSrc &&
+                animatedSrc !== deferredStaticSrc
+            );
 
-            if (requestedAnimated && isGif) {
+            if (shouldDeferAnimationDecode) {
+                staticSrc = deferredStaticSrc;
+            }
+
+            if (requestedAnimated && isGif && !shouldDeferAnimationDecode) {
                 try {
-                    decodedGif = await decodeGifForOverlay(overlayId, imageSrc, fileInput);
+                    decodedGif = await decodeGifForOverlay(overlayId, imageSrc, fileInput, {
+                        limits: options?.decodeLimits,
+                    });
                     if (decodedGif.frameCount <= 1) {
                         decodedGifCache.current.delete(overlayId);
                         decodedGif = null;
@@ -900,6 +1026,26 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 return [...prev, newOverlay];
             });
 
+            const visibleMs = Math.round(getMediaPerfNow() - addStartedAt);
+            logMediaDebug('overlay-added', {
+                animated: Boolean(decodedGif),
+                deferredAnimation: shouldDeferAnimationDecode,
+                label: options?.label,
+                overlayId,
+                totalMs: visibleMs,
+            });
+
+            if (shouldDeferAnimationDecode) {
+                startBackgroundGifDecode({
+                    label: options?.label,
+                    limits: options?.decodeLimits,
+                    overlayId,
+                    src: animatedSrc,
+                    startedAt: addStartedAt,
+                    timeoutMs: options?.decodeTimeoutMs,
+                });
+            }
+
             return true;
         } catch (error) {
             console.error('Error adding image overlay:', error);
@@ -907,15 +1053,22 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             toast.error(message);
             return false;
         }
-    }, [decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setSelectedShapeIndex]);
+    }, [decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setSelectedShapeIndex, startBackgroundGifDecode]);
 
     const addMediaFromLibrary = useCallback(
         async (item: GiphyMediaItem) => {
-            await addImageOverlay(item.url, {
+            const stillSrc = item.stillUrl || item.previewUrl || item.url;
+            const initialSrc = item.animated ? stillSrc : item.url;
+
+            await addImageOverlay(initialSrc, {
                 label: item.title,
                 animated: item.animated,
+                animatedSrc: item.animated ? item.url : undefined,
+                decodeLimits: item.animated ? GIPHY_GIF_DECODE_LIMITS : undefined,
+                decodeTimeoutMs: item.animated ? GIPHY_GIF_FETCH_TIMEOUT_MS : undefined,
+                deferAnimationDecode: item.animated,
                 mimeType: item.mimeHint,
-                stillUrl: item.stillUrl,
+                stillUrl: stillSrc,
             });
         },
         [addImageOverlay]
