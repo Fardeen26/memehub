@@ -257,7 +257,6 @@ export async function POST(request: NextRequest) {
     const uploadParams: Record<string, string | number> = {
         allowed_formats: EXPORT_ALLOWED_FORMATS,
         folder: EXPORT_FOLDER,
-        max_file_size: EXPORT_MAX_FILE_SIZE,
         overwrite: 'false',
         public_id: publicId,
         tags: EXPORT_TAGS,
