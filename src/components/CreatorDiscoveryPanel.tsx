@@ -80,17 +80,14 @@ function TrendSearchChip({
             aria-label={`Find images for ${trend.title}`}
             disabled={disabled}
             onClick={() => onSearch(trend.title)}
-            className="group flex min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.035] p-2 text-left transition-colors hover:border-[#8292eb]/45 hover:bg-[#6a7bd1]/10 disabled:opacity-45"
+            className="group flex min-h-10 min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-left transition-colors hover:border-[#8292eb]/45 hover:bg-[#6a7bd1]/10 disabled:opacity-45"
         >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#6a7bd1]/12 text-[#aeb8ff]">
-                <Search className="h-4 w-4" aria-hidden="true" />
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#6a7bd1]/12 text-[#aeb8ff]">
+                <Search className="h-3.5 w-3.5" aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">
-                <span className="line-clamp-2 block text-xs font-medium leading-snug text-white">
+                <span className="block truncate text-xs font-medium text-white">
                     {trend.title}
-                </span>
-                <span className="mt-1 block text-[9px] text-white/38">
-                    Find reusable images
                 </span>
             </span>
             <Search
@@ -393,7 +390,7 @@ export default function CreatorDiscoveryPanel({
                             loading ||
                             !hasSearchSubject(searchInput)
                         }
-                        className="flex h-10 shrink-0 items-center gap-1.5 rounded-lg bg-[#6a7bd1] px-3 text-xs font-semibold text-white hover:bg-[#7889e8] disabled:opacity-45"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#6a7bd1] text-white hover:bg-[#7889e8] disabled:opacity-45"
                     >
                         {loading ? (
                             <Loader2
@@ -406,7 +403,7 @@ export default function CreatorDiscoveryPanel({
                                 aria-hidden="true"
                             />
                         )}
-                        Search images
+                        <span className="sr-only">Search images</span>
                     </button>
                 </div>
             </form>
@@ -486,7 +483,7 @@ export default function CreatorDiscoveryPanel({
                         )}
 
                     {Boolean(data?.reusableImages.length) && (
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-2">
                             {data?.reusableImages.map((asset) => (
                                 <ImageResultCard
                                     key={asset.id}
@@ -524,7 +521,7 @@ export default function CreatorDiscoveryPanel({
                         </p>
                     </div>
                     {data?.trends.length ? (
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-2">
                             {data.trends.map((trend) => (
                                 <TrendSearchChip
                                     key={trend.id}

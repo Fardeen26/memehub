@@ -7,6 +7,8 @@ import {
     fireEvent,
     render,
     screen,
+    waitFor,
+    within,
 } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import MemeEditor from './MemeEditor';
@@ -323,7 +325,7 @@ afterEach(() => {
 });
 
 describe('MemeEditor accessibility', () => {
-    it('starts with compact tools and expands only the creator tool they choose', () => {
+    it('starts with the canvas tool panel open and switches to the chosen tool', async () => {
         render(
             <MemeEditor
                 template={{
@@ -347,14 +349,62 @@ describe('MemeEditor accessibility', () => {
         expect(
             screen.getByRole('tablist', { name: 'Creator workspace' })
         ).toBeInTheDocument();
+        expect(
+            screen.getByRole('region', { name: 'Meme canvas' })
+        ).not.toHaveClass('lg:h-[calc(100dvh-8.5rem)]');
+        expect(
+            screen.getByRole('complementary', {
+                name: 'Properties inspector',
+            })
+        ).toHaveClass('lg:self-start');
+        expect(
+            within(
+                screen.getByRole('toolbar', {
+                    name: 'Canvas quick tools',
+                })
+            ).getByRole('button', { name: 'Add Text' })
+        ).toBeInTheDocument();
+        expect(
+            within(
+                screen.getByRole('complementary', {
+                    name: 'Properties inspector',
+                })
+            ).queryByRole('button', { name: 'Add Text' })
+        ).not.toBeInTheDocument();
+        const quickUpload = within(
+            screen.getByRole('toolbar', {
+                name: 'Canvas quick tools',
+            })
+        ).getByRole('button', { name: 'Upload' });
+        quickUpload.focus();
+        fireEvent.click(quickUpload);
+        expect(
+            screen.getByRole('dialog', { name: 'Upload Image' })
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        await waitFor(() => expect(quickUpload).toHaveFocus());
+        const quickDraw = within(
+            screen.getByRole('toolbar', {
+                name: 'Canvas quick tools',
+            })
+        ).getByRole('button', { name: 'Draw' });
+        fireEvent.click(quickDraw);
+        expect(
+            screen.getByTitle('Stroke Size').closest('div')
+        ).toHaveClass('flex-wrap');
+        fireEvent.click(quickDraw);
         expect(screen.getByRole('tab', { name: 'Images' })).toHaveAttribute(
             'aria-selected',
             'true'
         );
         expect(
-            screen.getByRole('button', { name: 'Expand tools' })
-        ).toHaveAttribute('aria-expanded', 'false');
-        expect(screen.getByText('Test India discovery')).not.toBeVisible();
+            screen.getByRole('button', { name: 'Collapse tools' })
+        ).toHaveAttribute('aria-expanded', 'true');
+        expect(
+            screen
+                .getByText('Test India discovery')
+                .closest('[role="tabpanel"]')
+        ).not.toHaveAttribute('hidden');
         expect(screen.getByRole('tab', { name: 'Text' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'My assets' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Layers' })).toBeInTheDocument();

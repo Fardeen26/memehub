@@ -31,7 +31,6 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from 'sonner';
 import { MemeEditorProps, TextSettings, ImageOverlay, EraseStroke } from '@/types/editor';
@@ -131,6 +130,12 @@ import CreatorDiscoveryPanel from '@/components/CreatorDiscoveryPanel';
 import type { ReusableImageAsset } from '@/types/creatorDiscovery';
 import { settleSceneImageLoads } from '@/lib/sceneImageLoading';
 import { materializeReusableImage } from '@/lib/reusableImagePersistence';
+import {
+    EditorCanvasLayout,
+    EditorCanvasStage,
+    EditorInspectorPanel,
+    EditorToolsPanel,
+} from '@/components/EditorCanvasLayout';
 
 const STATIC_IMAGE_LOAD_TIMEOUT_MS = 12_000;
 const IMAGE_CACHE_MAX_ENTRIES = 32;
@@ -273,6 +278,7 @@ export default function MemeEditor({
     const [rotateStartAngle, setRotateStartAngle] = useState<number>(0);
     const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const quickUploadButtonRef = useRef<HTMLButtonElement>(null);
 
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState<boolean>(false);
     const [uploadMethod, setUploadMethod] = useState<'file' | 'paste'>('file');
@@ -339,7 +345,7 @@ export default function MemeEditor({
     const [creatorWorkspaceTab, setCreatorWorkspaceTab] =
         useState<CreatorWorkspaceTab>('discover');
     const [creatorWorkspaceCollapsed, setCreatorWorkspaceCollapsed] =
-        useState(true);
+        useState(false);
 
     const restoreDraftState = useCallback((draft: MemeEditorDraftState) => {
         setCanvasTemplate(draft.canvasTemplate);
@@ -4801,6 +4807,14 @@ export default function MemeEditor({
         saved: 'Draft saved',
         error: 'Draft not saved',
     }[draftStatus];
+    const toggleDrawingMode = () => {
+        const nextDrawingMode = !isDrawingMode;
+        if (nextDrawingMode) {
+            setIsImageEraseMode(false);
+            setImageEraseTargetIndex(-1);
+        }
+        setIsDrawingMode(nextDrawingMode);
+    };
 
     return (
         <>
@@ -4831,7 +4845,7 @@ export default function MemeEditor({
             <motion.section
                 aria-busy={!isDraftReady}
                 inert={!editorCanEdit}
-                className={`space-y-4 min-h-[65vh] max-sm:min-h-[75vh] ${
+                className={`min-h-[65vh] space-y-3 max-sm:min-h-[75vh] ${
                     editorCanEdit ? '' : 'pointer-events-none opacity-60'
                 }`}
                 initial={{ opacity: 0 }}
@@ -4860,16 +4874,25 @@ export default function MemeEditor({
                     {draftStatusLabel}
                 </span>
             </div>
-            <div className="grid w-full items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,390px)] lg:gap-6">
+            <EditorCanvasLayout toolsCollapsed={creatorWorkspaceCollapsed}>
+                <EditorCanvasStage className="self-start rounded-xl border border-white/10 bg-[#101016] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_36px_rgba(0,0,0,0.2)] lg:sticky lg:top-4">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.1 }}
-                    className="flex w-full flex-col items-center lg:sticky lg:top-4"
+                    className="flex w-full flex-col items-center"
                 >
+                    <div className="mb-3 flex w-full items-center justify-between gap-3 text-xs text-white/45">
+                        <span className="font-semibold uppercase tracking-[0.16em]">
+                            Canvas
+                        </span>
+                        <span>{effectiveTemplate.displayName || 'Untitled meme'}</span>
+                    </div>
+                    <div className="flex w-full items-center justify-center rounded-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.075)_1px,transparent_1px)] bg-[length:18px_18px] p-2 sm:p-3">
                     <canvas
                         ref={canvasRef}
-                        className="h-auto w-full max-w-[760px] select-none border border-gray-300 bg-white shadow-[0_18px_55px_rgba(0,0,0,0.2)] dark:border-gray-700"
+                        aria-label="Editable meme canvas"
+                        className="h-auto max-h-[calc(100dvh-16rem)] w-auto max-w-full select-none border border-white/15 bg-white shadow-[0_20px_70px_rgba(0,0,0,0.45)]"
                         onMouseDown={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawStart(e.nativeEvent) : handleMouseDown}
                         onMouseMove={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawMove(e.nativeEvent) : handleMouseMove}
                         onMouseUp={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
@@ -4879,8 +4902,13 @@ export default function MemeEditor({
                         onTouchEnd={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleTouchEnd}
                         style={{ touchAction: 'none' }}
                     />
+                    </div>
 
-                    <div className={`flex items-center space-x-2 mt-3 ${isDrawingMode ? '' : 'hidden'}`}>
+                    <div
+                        className={`mt-3 flex w-full flex-wrap items-center justify-center gap-2 ${
+                            isDrawingMode ? '' : 'hidden'
+                        }`}
+                    >
                         <input
                             type="color"
                             value={drawColor}
@@ -4896,7 +4924,7 @@ export default function MemeEditor({
                             value={drawSize}
                             onChange={e => setDrawSize(Number(e.target.value))}
                             disabled={!isDrawingMode}
-                            className="w-24 mx-2"
+                            className="min-w-24 max-w-48 flex-1"
                             title="Stroke Size"
                         />
                         <span className="text-xs dark:text-white/60">{drawSize}px</span>
@@ -4928,14 +4956,90 @@ export default function MemeEditor({
                             <Trash className="h-4 w-4" /> <span>Erase All</span>
                         </motion.button>
                     </div>
+                    <div
+                        role="toolbar"
+                        aria-label="Canvas quick tools"
+                        className="mt-2 flex w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/30 p-1"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsDrawingMode(false);
+                                setIsImageEraseMode(false);
+                                setImageEraseTargetIndex(-1);
+                                setCreatorWorkspaceTab('discover');
+                                setCreatorWorkspaceCollapsed(false);
+                            }}
+                            className="editor-quick-tool"
+                        >
+                            <ImageIcon className="h-4 w-4" />
+                            Images
+                        </button>
+                        <button
+                            ref={quickUploadButtonRef}
+                            type="button"
+                            onClick={() => {
+                                setIsDrawingMode(false);
+                                setIsImageEraseMode(false);
+                                setImageEraseTargetIndex(-1);
+                                setIsUploadDialogOpen(true);
+                            }}
+                            className="editor-quick-tool"
+                        >
+                            <Upload className="h-4 w-4" />
+                            Upload
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsDrawingMode(false);
+                                setIsImageEraseMode(false);
+                                setImageEraseTargetIndex(-1);
+                                addTextBox();
+                            }}
+                            className="editor-quick-tool"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add Text
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={isDrawingMode}
+                            onClick={toggleDrawingMode}
+                            className={`editor-quick-tool ${
+                                isDrawingMode
+                                    ? 'border-[#7c8cff]/60 bg-[#6a7bd1]/30 text-white'
+                                    : ''
+                            }`}
+                        >
+                            <Pencil className="h-4 w-4" />
+                            Draw
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsDrawingMode(false);
+                                setIsImageEraseMode(false);
+                                setImageEraseTargetIndex(-1);
+                                setCreatorWorkspaceTab('layers');
+                                setCreatorWorkspaceCollapsed(false);
+                            }}
+                            className="editor-quick-tool"
+                        >
+                            <Layers className="h-4 w-4" />
+                            Layers
+                        </button>
+                    </div>
                 </motion.div>
+                </EditorCanvasStage>
 
                 <motion.div
-                    className="w-full min-w-0 space-y-2 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pr-1"
+                    className="contents"
                     initial={{ opacity: 0, x: 0 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.2 }}
                 >
+                    <EditorToolsPanel className="lg:sticky lg:top-4 lg:max-h-[calc(100dvh-7rem)]">
                     <CreatorWorkspace
                         activeTab={creatorWorkspaceTab}
                         onTabChange={setCreatorWorkspaceTab}
@@ -5129,7 +5233,20 @@ export default function MemeEditor({
                             />
                         }
                     />
+                    </EditorToolsPanel>
 
+                    <EditorInspectorPanel className="rounded-xl border border-white/10 bg-[#15151c] p-3 shadow-[0_14px_36px_rgba(0,0,0,0.2)] lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:overscroll-contain">
+                    <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
+                                Captions
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-white/40">
+                                Type your text; use the gear for styling
+                            </p>
+                        </div>
+                        <Settings className="h-4 w-4 text-white/35" />
+                    </div>
                     {/* Text inputs — primary */}
                     {texts.map((txt, i) => (
                         <motion.div
@@ -5452,24 +5569,23 @@ export default function MemeEditor({
                     ))}
 
                     {/* Action Buttons Row */}
-                    <div className="flex space-x-2">
-                        <Dialog open={isUploadDialogOpen} onOpenChange={(open) => {
-                            setIsUploadDialogOpen(open);
-                            if (!open) {
-                                resetDialogState();
-                            }
-                        }}>
-                            <DialogTrigger asChild>
-                                <motion.button
-                                    whileTap={{ scale: 0.98 }}
-                                    className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-black/70 dark:bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full text-center"
-                                    onClick={() => setIsUploadDialogOpen(true)}
-                                >
-                                    <Upload className="h-3 w-3" />
-                                    <span>Upload Image</span>
-                                </motion.button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-md bg-[#0f0f0f] border-white/20">
+                    <div className="hidden" aria-hidden="true">
+                        <Dialog
+                            open={isUploadDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsUploadDialogOpen(open);
+                                if (!open) {
+                                    resetDialogState();
+                                }
+                            }}
+                        >
+                            <DialogContent
+                                className="sm:max-w-md bg-[#0f0f0f] border-white/20"
+                                onCloseAutoFocus={(event) => {
+                                    event.preventDefault();
+                                    quickUploadButtonRef.current?.focus();
+                                }}
+                            >
                                 <DialogHeader>
                                     <DialogTitle className="text-white">Upload Image</DialogTitle>
                                     <DialogDescription className="text-white/60">
@@ -5618,7 +5734,7 @@ export default function MemeEditor({
                         <motion.button
                             whileTap={{ scale: 0.98 }}
                             className={`p-2 rounded-md border text-xs flex items-center space-x-1 ${isDrawingMode ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]' : ' bg-black/70 dark:bg-white/15 border border-white/20 text-white'}`}
-                            onClick={() => setIsDrawingMode((v) => !v)}
+                            onClick={toggleDrawingMode}
                             title="Draw Mode"
                         >
                             <Pencil className="h-4 w-4" /> <span>Draw</span>
@@ -6236,8 +6352,9 @@ export default function MemeEditor({
                         </motion.button>
                     </div>
                     </div>
+                    </EditorInspectorPanel>
                 </motion.div>
-            </div>
+            </EditorCanvasLayout>
             </motion.section>
         </>
     );

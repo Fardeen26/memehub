@@ -121,9 +121,11 @@ describe('CreatorDiscoveryPanel', () => {
         });
         expect(trendButton).toBeInTheDocument();
         expect(trendButton.parentElement).toHaveClass(
-            'grid-cols-1',
-            'sm:grid-cols-2'
+            'grid-cols-1'
         );
+        expect(trendButton.parentElement).not.toHaveClass('sm:grid-cols-2');
+        expect(trendButton).toHaveClass('min-h-10');
+        expect(trendButton).not.toHaveClass('p-2');
         expect(
             screen.getByRole('heading', { name: 'Find a meme image' })
         ).toBeInTheDocument();
@@ -202,9 +204,9 @@ describe('CreatorDiscoveryPanel', () => {
             .getByRole('img', { name: 'Dharmendra Pradhan portrait' })
             .closest('article');
         expect(resultCard?.parentElement).toHaveClass(
-            'grid-cols-1',
-            'sm:grid-cols-2'
+            'grid-cols-1'
         );
+        expect(resultCard?.parentElement).not.toHaveClass('sm:grid-cols-2');
         const storageWrite = vi.spyOn(Storage.prototype, 'setItem');
 
         fireEvent.click(

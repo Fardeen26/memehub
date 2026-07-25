@@ -300,7 +300,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                             duration: 0.4,
                             ease: [0.22, 1, 0.36, 1]
                         }}
-                        className="w-full max-w-[1400px]"
+                        className="w-full max-w-[1680px]"
                     >
                         {isCustomTemplate && customTemplate ? (
                             <DynamicMemeEditor
