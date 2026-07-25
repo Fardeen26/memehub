@@ -154,27 +154,31 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
             <section className="grid grid-cols-6 max-sm:grid-cols-2 max-md:grid-cols-3 max-lg:grid-cols-4 gap-6 grid-flow-dense w-full max-sm:-mt-3">
                 {paginatedTemplates.map(([key, tpl], index) => {
                         const isPriority = index < 6 && currentPage === 1;
+                        const templateName = tpl.displayName || key.replace(/-/g, ' ').replace(/^imgflip /i, '');
                         return (
-                            <div
+                            <button
                                 key={key}
+                                type="button"
+                                aria-label={`Use ${templateName} template`}
                                 onClick={() => onSelect(key)}
+                                className="w-full rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6a7bd1] focus-visible:ring-offset-2"
                             >
                                 <div className="relative aspect-square cursor-pointer">
                                     <Image
                                         src={tpl.image}
-                                        alt={tpl.displayName || key}
+                                        alt={templateName}
                                         fill
                                         className="object-cover rounded-2xl shadow"
                                         loading={isPriority ? 'eager' : 'lazy'}
                                         priority={isPriority}
-                                        quality={100}
+                                        quality={85}
                                         sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 16.67vw"
                                     />
                                 </div>
                                 <p className="text-center text-base font-medium mt-2 capitalize line-clamp-2">
-                                    {tpl.displayName || key.replace(/-/g, ' ').replace(/^imgflip /i, '')}
+                                    {templateName}
                                 </p>
-                            </div>
+                            </button>
                         );
                     })}
             </section>

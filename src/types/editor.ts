@@ -1,11 +1,18 @@
+import type { GifDecodePolicy } from '@/lib/gifAnimation';
 import { Template } from "./template";
 
 export type MemeEditorProps = {
     template: Template;
     onReset: () => void;
+    /** Only true after the creator explicitly chooses to open a local draft. */
+    restoreSavedDraft?: boolean;
+    /** Optimistic revision token captured when the creator chose Resume. */
+    expectedDraftUpdatedAt?: number;
 };
 
 export type TextSettings = {
+    /** Hidden layers stay in the project and can be revealed from the layer panel. */
+    visible?: boolean;
     fontSize: number;
     color: string;
     fontFamily: string;
@@ -30,15 +37,36 @@ export type EraseStroke = {
     opacity: number;
 };
 
+export type ImageSourceAttribution = {
+    provider: 'Wikimedia Commons';
+    url: string;
+    creator: string;
+    creditLine?: string;
+    licenseName: string;
+    licenseUrl?: string;
+    rights: 'editable' | 'attribution' | 'share-alike';
+    attributionRequired?: boolean;
+    usageTerms?: string;
+    restrictions?: string;
+};
+
 export type ImageOverlay = {
     id: string;
     src: string;
     label?: string;
+    /** Missing means visible for backward compatibility with existing drafts. */
+    visible?: boolean;
     /** Animated GIF overlays are decoded into a ref/cache outside React state. */
     animated?: boolean;
+    /** Original GIF source retained while a deferred decode shows a still preview. */
+    animatedSrc?: string;
+    /** Persisted safety policy used again if an animation is decoded after recovery. */
+    animationDecodePolicy?: GifDecodePolicy;
     /** True while an intended animated GIF is decoding in the background. */
     animationDecodePending?: boolean;
     mimeType?: string;
+    /** Original file page and license retained through draft recovery. */
+    source?: ImageSourceAttribution;
     animationStartMs?: number;
     x: number;
     y: number;
@@ -63,6 +91,8 @@ export type ShapeType =
 export type ShapeOverlay = {
     id: string;
     type: ShapeType;
+    /** Missing means visible for backward compatibility with existing drafts. */
+    visible?: boolean;
     x: number;
     y: number;
     width: number;

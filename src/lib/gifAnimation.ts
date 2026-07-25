@@ -13,6 +13,34 @@ export const GIPHY_GIF_MAX_DECODED_FRAMES = 80;
 export const GIPHY_GIF_MAX_DIMENSION = 640;
 export const GIPHY_GIF_MAX_CANVAS_PIXELS = 640 * 640;
 
+export function getAnimatedOverlayIdsToRehydrate(
+    overlays: ReadonlyArray<{
+        id: string;
+        animated?: boolean;
+        animatedSrc?: string;
+        animationDecodePending?: boolean;
+    }>,
+    decodedOverlayIds: ReadonlySet<string>,
+    pendingOverlayIds: ReadonlySet<string>
+): string[] {
+    return overlays
+        .filter(
+            ({ animated, animatedSrc, animationDecodePending, id }) =>
+                (animated || animationDecodePending || Boolean(animatedSrc)) &&
+                !decodedOverlayIds.has(id) &&
+                !pendingOverlayIds.has(id)
+        )
+        .map(({ id }) => id);
+}
+
+export function copyGifPatchToOwnedPixels(
+    patch: Uint8ClampedArray<ArrayBufferLike>
+): Uint8ClampedArray<ArrayBuffer> {
+    const ownedPixels = new Uint8ClampedArray(patch.length);
+    ownedPixels.set(patch);
+    return ownedPixels;
+}
+
 export type GifDecodeLimits = {
     maxBytes?: number;
     maxCanvasPixels?: number;
@@ -22,6 +50,8 @@ export type GifDecodeLimits = {
     maxWidth?: number;
 };
 
+export type GifDecodePolicy = 'giphy';
+
 export const GIPHY_GIF_DECODE_LIMITS: GifDecodeLimits = {
     maxBytes: GIPHY_GIF_MAX_BYTES,
     maxCanvasPixels: GIPHY_GIF_MAX_CANVAS_PIXELS,
@@ -30,6 +60,12 @@ export const GIPHY_GIF_DECODE_LIMITS: GifDecodeLimits = {
     maxHeight: GIPHY_GIF_MAX_DIMENSION,
     maxWidth: GIPHY_GIF_MAX_DIMENSION,
 };
+
+export function getGifDecodeLimitsForPolicy(
+    policy: GifDecodePolicy | undefined
+): GifDecodeLimits | undefined {
+    return policy === 'giphy' ? GIPHY_GIF_DECODE_LIMITS : undefined;
+}
 
 export type DecodedGifFrame = {
     canvas: HTMLCanvasElement;
@@ -292,7 +328,15 @@ export function decodeGifFromArrayBuffer(
         patchCanvas.width = frame.dims.width;
         patchCanvas.height = frame.dims.height;
         patchCtx.clearRect(0, 0, patchCanvas.width, patchCanvas.height);
-        patchCtx.putImageData(new ImageData(frame.patch, frame.dims.width, frame.dims.height), 0, 0);
+        patchCtx.putImageData(
+            new ImageData(
+                copyGifPatchToOwnedPixels(frame.patch),
+                frame.dims.width,
+                frame.dims.height
+            ),
+            0,
+            0
+        );
         composedCtx.drawImage(patchCanvas, frame.dims.left, frame.dims.top);
 
         const frameCanvas = makeCanvas();

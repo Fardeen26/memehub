@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-interface FontConfig {
+export interface FontConfig {
     name: string;
     weights: string[];
     display?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional';
@@ -18,11 +18,60 @@ const GOOGLE_FONTS_BASE_URL = 'https://fonts.googleapis.com/css2';
 const loadedFonts = new Set<string>();
 const fontLoadPromises = new Map<string, Promise<void>>();
 
+export function getGoogleFontStylesheetUrl({
+    name,
+    weights,
+    display = 'swap',
+}: FontConfig): string {
+    const familyParam = weights.length > 1
+        ? `${name.replace(/\s+/g, '+')}:wght@${weights.join(';')}`
+        : `${name.replace(/\s+/g, '+')}:wght@${weights[0]}`;
+
+    return `${GOOGLE_FONTS_BASE_URL}?family=${familyParam}&display=${display}`;
+}
+
+function waitForFontStylesheet(fontUrl: string): Promise<void> {
+    const existingLink = document.querySelector<HTMLLinkElement>(
+        `link[href="${fontUrl}"]`
+    );
+
+    if (
+        existingLink?.dataset.memehubFontLoaded === 'true' ||
+        existingLink?.sheet
+    ) {
+        if (existingLink) existingLink.dataset.memehubFontLoaded = 'true';
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve, reject) => {
+        const link = existingLink ?? document.createElement('link');
+        const handleLoad = () => {
+            link.dataset.memehubFontLoaded = 'true';
+            resolve();
+        };
+        const handleError = () => {
+            if (!existingLink) link.remove();
+            reject(new Error(`Failed to load font stylesheet: ${fontUrl}`));
+        };
+
+        link.addEventListener('load', handleLoad, { once: true });
+        link.addEventListener('error', handleError, { once: true });
+
+        if (!existingLink) {
+            link.rel = 'stylesheet';
+            link.href = fontUrl;
+            link.crossOrigin = 'anonymous';
+            link.dataset.memehubFontStylesheet = 'true';
+            document.head.appendChild(link);
+        }
+    });
+}
+
 export function useFontLoader() {
     const [fontStates, setFontStates] = useState<Record<string, FontLoadState>>({});
 
     const loadFont = useCallback(async (fontConfig: FontConfig): Promise<void> => {
-        const { name, weights, display = 'swap' } = fontConfig;
+        const { name, weights } = fontConfig;
         const fontKey = `${name}-${weights.join('-')}`;
 
         // Return early if already loaded
@@ -41,76 +90,35 @@ export function useFontLoader() {
             [fontKey]: { loaded: false, loading: true, error: false }
         }));
 
-        const loadPromise = new Promise<void>((resolve, reject) => {
+        const loadPromise = (async () => {
             try {
-                // Create font URL
-                const familyParam = weights.length > 1
-                    ? `${name.replace(/\s+/g, '+')}:wght@${weights.join(';')}`
-                    : `${name.replace(/\s+/g, '+')}:wght@${weights[0]}`;
+                await waitForFontStylesheet(
+                    getGoogleFontStylesheetUrl(fontConfig)
+                );
 
-                const fontUrl = `${GOOGLE_FONTS_BASE_URL}?family=${familyParam}&display=${display}`;
-
-                // Check if link already exists
-                const existingLink = document.querySelector(`link[href="${fontUrl}"]`);
-                if (existingLink) {
-                    loadedFonts.add(fontKey);
-                    setFontStates(prev => ({
-                        ...prev,
-                        [fontKey]: { loaded: true, loading: false, error: false }
-                    }));
-                    resolve();
-                    return;
-                }
-
-                // Create and append link element
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = fontUrl;
-                link.crossOrigin = 'anonymous';
-
-                link.onload = () => {
-                    loadedFonts.add(fontKey);
-                    setFontStates(prev => ({
-                        ...prev,
-                        [fontKey]: { loaded: true, loading: false, error: false }
-                    }));
-                    resolve();
-                };
-
-                link.onerror = () => {
-                    setFontStates(prev => ({
-                        ...prev,
-                        [fontKey]: { loaded: false, loading: false, error: true }
-                    }));
-                    reject(new Error(`Failed to load font: ${name}`));
-                };
-
-                document.head.appendChild(link);
-
-                // Preload the font for better performance
-                if ('fonts' in document) {
-                    const fontFaces = weights.map(weight =>
-                        new FontFace(name, `url(${fontUrl})`, { weight, display })
+                if (document.fonts?.load) {
+                    await Promise.all(
+                        weights.map((weight) =>
+                            document.fonts.load(`${weight} 20px "${name}"`)
+                        )
                     );
-
-                    Promise.all(fontFaces.map(fontFace => {
-                        document.fonts?.add(fontFace);
-                        return fontFace.load();
-                    })).then(() => {
-                        // Font is ready
-                    }).catch(() => {
-                        // Font load failed, but fallback will work
-                    });
+                    await document.fonts.ready;
                 }
 
+                loadedFonts.add(fontKey);
+                setFontStates(prev => ({
+                    ...prev,
+                    [fontKey]: { loaded: true, loading: false, error: false }
+                }));
             } catch (error) {
+                fontLoadPromises.delete(fontKey);
                 setFontStates(prev => ({
                     ...prev,
                     [fontKey]: { loaded: false, loading: false, error: true }
                 }));
-                reject(error);
+                throw error;
             }
-        });
+        })();
 
         fontLoadPromises.set(fontKey, loadPromise);
         return loadPromise;
@@ -140,6 +148,22 @@ export function useFontLoader() {
         isFontReady,
         fontStates
     };
+}
+
+export const INDIAN_SCRIPT_FONT_NAMES = [
+    'Noto Sans Devanagari',
+    'Noto Sans Bengali',
+    'Noto Sans Gurmukhi',
+    'Noto Sans Gujarati',
+    'Noto Sans Tamil',
+    'Noto Sans Telugu',
+    'Noto Sans Kannada',
+    'Noto Sans Malayalam',
+    'Noto Nastaliq Urdu',
+] as const;
+
+export function getCanonicalFontFamily(fontFamily: string): string {
+    return fontFamily === 'Source Sans Pro' ? 'Source Sans 3' : fontFamily;
 }
 
 // Pre-defined font configurations for commonly used fonts
@@ -184,7 +208,7 @@ export const FONT_CONFIGS: Record<string, FontConfig> = {
         weights: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
         display: 'swap'
     },
-    'Source Sans Pro': {
+    'Source Sans 3': {
         name: 'Source Sans 3',
         weights: ['200', '300', '400', '500', '600', '700', '800', '900'],
         display: 'swap'
@@ -208,7 +232,52 @@ export const FONT_CONFIGS: Record<string, FontConfig> = {
         name: 'Roboto Condensed',
         weights: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
         display: 'swap'
+    },
+    'Noto Sans Devanagari': {
+        name: 'Noto Sans Devanagari',
+        weights: ['400', '700'],
+        display: 'swap'
+    },
+    'Noto Sans Bengali': {
+        name: 'Noto Sans Bengali',
+        weights: ['400', '700'],
+        display: 'swap'
+    },
+    'Noto Sans Gurmukhi': {
+        name: 'Noto Sans Gurmukhi',
+        weights: ['400', '700'],
+        display: 'swap'
+    },
+    'Noto Sans Gujarati': {
+        name: 'Noto Sans Gujarati',
+        weights: ['400', '700'],
+        display: 'swap'
+    },
+    'Noto Sans Tamil': {
+        name: 'Noto Sans Tamil',
+        weights: ['400', '700'],
+        display: 'swap'
+    },
+    'Noto Sans Telugu': {
+        name: 'Noto Sans Telugu',
+        weights: ['400', '700'],
+        display: 'swap'
+    },
+    'Noto Sans Kannada': {
+        name: 'Noto Sans Kannada',
+        weights: ['400', '700'],
+        display: 'swap'
+    },
+    'Noto Sans Malayalam': {
+        name: 'Noto Sans Malayalam',
+        weights: ['400', '700'],
+        display: 'swap'
+    },
+    'Noto Nastaliq Urdu': {
+        name: 'Noto Nastaliq Urdu',
+        weights: ['400', '700'],
+        display: 'swap'
     }
 };
 
-export default useFontLoader; 
+export default useFontLoader;

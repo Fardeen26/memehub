@@ -41,6 +41,8 @@ export default function TemplateSearch() {
         setCurrentPage(1);
     }, [searchQuery, setCurrentPage]);
 
+    const hasNoResults = Object.keys(filteredTemplates).length === 0;
+
     return (
         <>
             <motion.div
@@ -54,7 +56,11 @@ export default function TemplateSearch() {
                     whileFocus={{ scale: 1.02 }}
                     transition={{ duration: 0.2 }}
                 >
+                    <label htmlFor="template-search" className="sr-only">
+                        Search meme templates
+                    </label>
                     <motion.input
+                        id="template-search"
                         type="text"
                         placeholder="search templates"
                         value={searchQuery}
@@ -66,6 +72,7 @@ export default function TemplateSearch() {
                         }}
                     />
                     <motion.span
+                        aria-hidden="true"
                         className="bg-white rounded-full p-1 text-black absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center shadow-md"
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.95 }}
@@ -75,13 +82,20 @@ export default function TemplateSearch() {
                 </motion.div>
             </motion.div>
 
-            {Object.keys(filteredTemplates).length === 0 ? (
-                <div className="min-h-[30vh] max-sm:min-h-[50vh]">
+            {!selected && hasNoResults && (
+                <div className="mb-6 flex flex-col items-center gap-3" role="status">
                     <p className="text-center">No templates found</p>
+                    <button
+                        type="button"
+                        onClick={() => setSearchQuery("")}
+                        className="rounded-md border border-white/20 px-3 py-2 text-sm font-semibold transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6a7bd1]"
+                    >
+                        Clear search
+                    </button>
                 </div>
-            ) : (
-                <MainContainer templates={filteredTemplates} />
             )}
+
+            <MainContainer templates={filteredTemplates} />
         </>
     );
 }

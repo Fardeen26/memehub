@@ -11,7 +11,10 @@ import {
     GifDecodeLimitError,
     assertGifDecodeLimits,
     assertGifDimensionLimits,
+    copyGifPatchToOwnedPixels,
     getAnimatedExportDurationMs,
+    getAnimatedOverlayIdsToRehydrate,
+    getGifDecodeLimitsForPolicy,
     normalizeGifDelay,
     selectGifFrameIndex,
 } from '@/lib/gifAnimation';
@@ -83,6 +86,11 @@ describe('gifAnimation', () => {
     });
 
     it('uses stricter limits for remote Giphy GIF overlays', () => {
+        expect(getGifDecodeLimitsForPolicy('giphy')).toEqual(
+            GIPHY_GIF_DECODE_LIMITS
+        );
+        expect(getGifDecodeLimitsForPolicy(undefined)).toBeUndefined();
+
         expect(() =>
             assertGifDecodeLimits({
                 byteLength: GIPHY_GIF_MAX_BYTES + 1,
@@ -108,5 +116,36 @@ describe('gifAnimation', () => {
     it('uses a 5 second animated export loop', () => {
         expect(getAnimatedExportDurationMs([1200, 2500])).toBe(5000);
         expect(getAnimatedExportDurationMs([1200, 6500, 3000])).toBe(5000);
+    });
+
+    it('copies decoded patches into ImageData-compatible owned pixels', () => {
+        const sharedPatch = new Uint8ClampedArray(new SharedArrayBuffer(4));
+        sharedPatch.set([255, 10, 20, 255]);
+
+        const ownedPixels = copyGifPatchToOwnedPixels(sharedPatch);
+
+        expect(ownedPixels.buffer).toBeInstanceOf(ArrayBuffer);
+        expect(Array.from(ownedPixels)).toEqual([255, 10, 20, 255]);
+    });
+
+    it('identifies only restored animated overlays missing a decoded cache entry', () => {
+        expect(
+            getAnimatedOverlayIdsToRehydrate(
+                [
+                    { id: 'static', animated: false },
+                    { id: 'ready', animated: true },
+                    { id: 'pending', animated: true },
+                    { id: 'restored', animated: true },
+                    {
+                        id: 'deferred',
+                        animated: false,
+                        animationDecodePending: true,
+                        animatedSrc: 'https://example.com/animated.gif',
+                    },
+                ],
+                new Set(['ready']),
+                new Set(['pending'])
+            )
+        ).toEqual(['restored', 'deferred']);
     });
 });
