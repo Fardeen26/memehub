@@ -4506,14 +4506,28 @@ export default function MemeEditor({
     ]);
 
     const clearTextBox = useCallback((index: number) => {
-        setTexts(prev => {
-            const updated = [...prev];
-            updated[index] = '';
-            return updated;
+        if (index < originalTextBoxCount) {
+            setTexts(prev => {
+                const updated = [...prev];
+                updated[index] = '';
+                return updated;
+            });
+            setSelectedTextIndex(index);
+            toast.success('Text cleared');
+            return;
+        }
+
+        setTexts((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTextBoxes((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTextBoxRotations((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTextSettings((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTextLayerIds((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setSelectedTextIndex((current) => {
+            if (current === index) return -1;
+            return current > index ? current - 1 : current;
         });
-        setSelectedTextIndex(index);
-        toast.success('Text cleared');
-    }, []);
+        toast.success('Custom text box removed');
+    }, [originalTextBoxCount]);
 
     const toggleTextLayer = useCallback((index: number) => {
         setTextSettings((current) =>
@@ -5017,7 +5031,7 @@ export default function MemeEditor({
                     <canvas
                         ref={canvasRef}
                         aria-label="Editable meme canvas"
-                        className="h-auto max-h-[calc(100dvh-16rem)] w-auto max-w-full select-none border border-white/15 bg-white shadow-[0_20px_70px_rgba(0,0,0,0.45)]"
+                        className="h-auto max-h-[calc(100dvh-16rem)] w-auto max-w-full select-none bg-white shadow-[0_20px_70px_rgba(0,0,0,0.45)]"
                         onMouseDown={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawStart(e.nativeEvent) : handleMouseDown}
                         onMouseMove={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawMove(e.nativeEvent) : handleMouseMove}
                         onMouseUp={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
@@ -5719,7 +5733,8 @@ export default function MemeEditor({
                                         whileTap={{ scale: 0.9 }}
                                         className="p-2 border rounded-md bg-[#0f0f0f] border-white/20 text-white transition-colors"
                                         onClick={() => clearTextBox(i)}
-                                        title="Clear text"
+                                        title="Delete custom text"
+                                        aria-label="Delete custom text"
                                     >
                                         <X className="h-4 w-4" />
                                     </motion.button>

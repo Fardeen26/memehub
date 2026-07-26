@@ -1783,6 +1783,45 @@ describe('MemeEditor accessibility', () => {
         ).toBeInTheDocument();
     });
 
+    it('removes a custom text layer when its cross button is clicked', () => {
+        render(
+            <MemeEditor
+                template={{
+                    image: 'data:image/png;base64,dGVzdA==',
+                    textBoxes: [
+                        {
+                            x: 20,
+                            y: 20,
+                            width: 300,
+                            height: 80,
+                            fontSize: 42,
+                            minFont: 10,
+                            align: 'center',
+                        },
+                    ],
+                }}
+                onReset={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add Text' }));
+
+        expect(
+            screen.getByRole('textbox', { name: 'Custom text 1' })
+        ).toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Delete custom text' })
+        );
+
+        expect(
+            screen.queryByRole('textbox', { name: 'Custom text 1' })
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('textbox', { name: 'text position 1' })
+        ).toBeInTheDocument();
+    });
+
     it('keeps focus on the same custom text through editor-level reordering', async () => {
         render(
             <MemeEditor
