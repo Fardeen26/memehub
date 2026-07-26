@@ -11,27 +11,6 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CreatorDiscoveryPanel from './CreatorDiscoveryPanel';
 
-const trend = {
-    id: 'trend-janta-party',
-    title: 'जनता पार्टी',
-    approximateTraffic: 20_000,
-    trafficLabel: '20000+',
-    publishedAt: '2026-07-25T13:00:00.000Z',
-    imageUrl: 'https://images.example.com/cjp.jpg',
-    imageSource: 'AajTak',
-    sources: [
-        {
-            id: 'news-pradhan',
-            title: 'Dharmendra Pradhan resigns after viral protest',
-            publisher: 'Example News',
-            url: 'https://example.com/pradhan',
-            imageUrl: 'https://images.example.com/pradhan.jpg',
-            publishedAt: '2026-07-25T13:00:00.000Z',
-            kind: 'news' as const,
-        },
-    ],
-};
-
 const reusableImage = {
     id: 'commons-12',
     title: 'Dharmendra Pradhan portrait',
@@ -40,17 +19,53 @@ const reusableImage = {
     sourceUrl: 'https://commons.wikimedia.org/wiki/File:Pradhan.jpg',
     width: 1_200,
     height: 800,
-    mimeType: 'image/jpeg',
+    mimeType: 'image/jpeg' as const,
     creator: 'Government photographer',
     creditLine: 'Photo: Government of India / PIB',
     licenseName: 'CC BY-SA 4.0',
     licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
     attributionRequired: true,
-    usageTerms: 'Creative Commons Attribution-ShareAlike 4.0',
-    restrictions: 'Personality rights may apply',
     provider: 'Wikimedia Commons' as const,
     rights: 'share-alike' as const,
 };
+
+const webImage = {
+    id: 'brave-news-cjp',
+    title: 'Police use lathis during CJP protest',
+    previewUrl:
+        'https://imgs.search.brave.com/example/rs:fit:500:0/g:ce/photo',
+    assetUrl:
+        'https://imgs.search.brave.com/example/rs:fit:500:0/g:ce/photo',
+    sourceUrl: 'https://example-news.test/cjp-protest',
+    sourceDomain: 'example-news.test',
+    width: 500,
+    height: 333,
+    provider: 'SearXNG' as const,
+    kind: 'news' as const,
+    publishedAt: '2026-07-25T10:00:00.000Z',
+    rights: 'unknown' as const,
+};
+
+function discoveryPayload(
+    overrides: Record<string, unknown> = {}
+): Record<string, unknown> {
+    return {
+        fetchedAt: '2026-07-25T13:05:00.000Z',
+        query: 'darmendra pardhan',
+        resolvedQuery: 'Dharmendra Pradhan',
+        intent: 'moment',
+        region: 'IN',
+        trends: [],
+        webImages: [webImage],
+        reusableImages: [reusableImage],
+        videos: [],
+        providers: {
+            web: 'live',
+            commons: 'live',
+        },
+        ...overrides,
+    };
+}
 
 function response(data: unknown) {
     return {
@@ -80,27 +95,9 @@ describe('CreatorDiscoveryPanel', () => {
     const onUseAsTemplate = vi.fn(async () => undefined);
 
     beforeEach(() => {
-        localStorage.clear();
         onAddImage.mockClear();
         onUseAsTemplate.mockClear();
-        vi.stubGlobal(
-            'fetch',
-            vi.fn().mockResolvedValue(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                })
-            )
-        );
+        vi.stubGlobal('fetch', vi.fn());
     });
 
     afterEach(() => {
@@ -108,117 +105,90 @@ describe('CreatorDiscoveryPanel', () => {
         vi.unstubAllGlobals();
     });
 
-    it('keeps news and source details out of the image-finding workflow', async () => {
-        render(
-            <CreatorDiscoveryPanel
-                onAddImage={onAddImage}
-                onUseAsTemplate={onUseAsTemplate}
-            />
-        );
-
-        const trendButton = await screen.findByRole('button', {
-            name: 'Find images for जनता पार्टी',
-        });
-        expect(trendButton).toBeInTheDocument();
-        expect(trendButton.parentElement).toHaveClass(
-            'grid-cols-1'
-        );
-        expect(trendButton.parentElement).not.toHaveClass('sm:grid-cols-2');
-        expect(trendButton).toHaveClass('min-h-10');
-        expect(trendButton).not.toHaveClass('p-2');
-        expect(
-            screen.getByRole('heading', { name: 'Find a meme image' })
-        ).toBeInTheDocument();
-        expect(
-            screen.queryByText(
-                'Dharmendra Pradhan resigns after viral protest'
-            )
-        ).not.toBeInTheDocument();
-        expect(screen.queryByText('20K+ searches')).not.toBeInTheDocument();
-        expect(
-            screen.queryByRole('button', { name: 'Source inbox' })
-        ).not.toBeInTheDocument();
-        expect(
-            document.querySelector(
-                'img[src="https://images.example.com/cjp.jpg"]'
-            )
-        ).toBeNull();
-    });
-
-    it('lets a creator use a result as the template or add it as a layer', async () => {
-        vi.mocked(fetch)
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            )
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:06:00.000Z',
-                    query: 'Dharmendra Pradhan',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [reusableImage],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'live',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            );
-
-        render(
-            <CreatorDiscoveryPanel
-                onAddImage={onAddImage}
-                onUseAsTemplate={onUseAsTemplate}
-            />
-        );
-        await screen.findByRole('button', {
-            name: 'Find images for जनता पार्टी',
-        });
-
+    function searchFor(value: string) {
         fireEvent.change(
             screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
+                name: 'Search people, moments, reactions, and meme material',
             }),
-            { target: { value: 'Dharmendra Pradhan' } }
+            { target: { value } }
         );
         fireEvent.click(screen.getByRole('button', { name: 'Search images' }));
+    }
+
+    it('opens with meme-material intents instead of generic trending searches', () => {
+        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
 
         expect(
-            await screen.findByText('Dharmendra Pradhan portrait')
+            screen.getByRole('heading', { name: 'Find meme material' })
         ).toBeInTheDocument();
-        expect(screen.getByText('CC BY-SA 4.0')).toBeInTheDocument();
-        const resultCard = screen
-            .getByRole('img', { name: 'Dharmendra Pradhan portrait' })
-            .closest('article');
-        expect(resultCard?.parentElement).toHaveClass(
-            'grid-cols-1'
+        expect(
+            screen.getByRole('button', { name: /Breaking moment/ })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /Reaction face/ })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /Clean cutout/ })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /Blank template/ })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: /Social post/ })
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('heading', { name: 'Trending in India' })
+        ).not.toBeInTheDocument();
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('searches the selected creator intent and separates fresh web from reusable results', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            response(discoveryPayload()) as never
         );
-        expect(resultCard?.parentElement).not.toHaveClass('sm:grid-cols-2');
-        const storageWrite = vi.spyOn(Storage.prototype, 'setItem');
+        render(
+            <CreatorDiscoveryPanel
+                onAddImage={onAddImage}
+                onUseAsTemplate={onUseAsTemplate}
+            />
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Breaking moment/ })
+        );
+        searchFor('darmendra pardhan');
+
+        await screen.findByText('Police use lathis during CJP protest');
+        expect(fetch).toHaveBeenCalledWith(
+            '/api/creator-discovery?q=darmendra+pardhan&intent=moment',
+            expect.objectContaining({ signal: expect.any(AbortSignal) })
+        );
+        expect(
+            screen.getByText(/Showing results for “Dharmendra Pradhan”/)
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'Fresh web' })
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'Reusable & licensed' })
+        ).toBeInTheDocument();
+        expect(screen.getByText('Check source rights')).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: /Open source for Police use/ })
+        ).toHaveAttribute(
+            'href',
+            'https://example-news.test/cjp-protest'
+        );
+        expect(screen.getByText('CC BY-SA 4.0')).toBeInTheDocument();
 
         fireEvent.click(
             screen.getByRole('button', {
-                name: 'Use Dharmendra Pradhan portrait as template',
+                name: 'Use Police use lathis during CJP protest as template',
             })
         );
-
         await waitFor(() =>
-            expect(onUseAsTemplate).toHaveBeenCalledWith(reusableImage)
+            expect(onUseAsTemplate).toHaveBeenCalledWith(webImage)
         );
-
         fireEvent.click(
             screen.getByRole('button', {
                 name: 'Add Dharmendra Pradhan portrait as a layer',
@@ -227,478 +197,284 @@ describe('CreatorDiscoveryPanel', () => {
         await waitFor(() =>
             expect(onAddImage).toHaveBeenCalledWith(reusableImage)
         );
-        expect(storageWrite).not.toHaveBeenCalled();
     });
 
-    it('does not claim the template changed when the creator cancels replacement', async () => {
-        vi.mocked(fetch)
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            )
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:06:00.000Z',
-                    query: 'Dharmendra Pradhan',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [reusableImage],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'live',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            );
-        const cancelTemplateChange = vi.fn(async () => false);
-
-        render(
-            <CreatorDiscoveryPanel
-                onAddImage={onAddImage}
-                onUseAsTemplate={cancelTemplateChange}
-            />
+    it('re-runs an existing query when the creator switches material type', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            response(discoveryPayload()) as never
         );
-        await screen.findByRole('button', {
-            name: 'Find images for जनता पार्टी',
-        });
-        fireEvent.change(
-            screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
-            }),
-            { target: { value: 'Dharmendra Pradhan' } }
-        );
-        fireEvent.click(screen.getByRole('button', { name: 'Search images' }));
-        fireEvent.click(
-            await screen.findByRole('button', {
-                name: 'Use Dharmendra Pradhan portrait as template',
-            })
-        );
-
-        await waitFor(() =>
-            expect(cancelTemplateChange).toHaveBeenCalledOnce()
-        );
-        expect(
-            screen.queryByText('Template ready. Add your text and publish.')
-        ).not.toBeInTheDocument();
-    });
-
-    it('announces a pending template action without changing its meaning visually', async () => {
-        vi.mocked(fetch)
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            )
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:06:00.000Z',
-                    query: 'Dharmendra Pradhan',
-                    region: 'IN',
-                    trends: [],
-                    reusableImages: [reusableImage],
-                    videos: [],
-                    providers: {
-                        trends: 'idle',
-                        commons: 'live',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            );
-        let finishTemplateAction: (() => void) | undefined;
-        const pendingTemplateAction = vi.fn(
-            () =>
-                new Promise<void>((resolve) => {
-                    finishTemplateAction = resolve;
-                })
-        );
-
-        render(
-            <CreatorDiscoveryPanel
-                onAddImage={onAddImage}
-                onUseAsTemplate={pendingTemplateAction}
-            />
-        );
-        await screen.findByText('जनता पार्टी');
-        fireEvent.change(
-            screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
-            }),
-            { target: { value: 'Dharmendra Pradhan' } }
-        );
-        fireEvent.click(screen.getByRole('button', { name: 'Search images' }));
-        const templateButton = await screen.findByRole('button', {
-            name: 'Use Dharmendra Pradhan portrait as template',
-        });
-        fireEvent.click(templateButton);
-
-        await waitFor(() =>
-            expect(templateButton).toHaveAttribute('aria-busy', 'true')
-        );
-        expect(screen.getByRole('status')).toHaveTextContent(
-            'Preparing Dharmendra Pradhan portrait as your template'
-        );
-
-        finishTemplateAction?.();
-    });
-
-    it('returns from a material search to the live India pulse', async () => {
-        vi.mocked(fetch)
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            )
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:06:00.000Z',
-                    query: 'Dharmendra Pradhan',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [reusableImage],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'live',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            )
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:07:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            );
-
         render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
-        await screen.findByText('जनता पार्टी');
-        fireEvent.change(
-            screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
-            }),
-            { target: { value: 'Dharmendra Pradhan' } }
-        );
-        fireEvent.click(screen.getByRole('button', { name: 'Search images' }));
-        await screen.findByRole('heading', {
-            name: 'Images for “Dharmendra Pradhan”',
-        });
 
+        searchFor('Dharmendra Pradhan');
+        await screen.findByText('Police use lathis during CJP protest');
         fireEvent.click(
-            screen.getByRole('button', { name: 'Show trending searches' })
+            screen.getByRole('button', { name: /Reaction face/ })
         );
 
-        expect(
-            await screen.findByRole('heading', {
-                name: 'Trending in India',
-            })
-        ).toBeInTheDocument();
-        expect(
-            screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
-            })
-        ).toHaveValue('');
+        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+        expect(vi.mocked(fetch).mock.calls[1]?.[0]).toBe(
+            '/api/creator-discovery?q=Dharmendra+Pradhan&intent=reaction'
+        );
     });
 
-    it('stops punctuation-only searches before they spend a provider request', async () => {
+    it('stops punctuation-only searches without spending a request', async () => {
         render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
-        await screen.findByText('जनता पार्टी');
 
-        fireEvent.change(
-            screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
-            }),
-            { target: { value: '!!! ???' } }
-        );
-        fireEvent.submit(screen.getByRole('search'));
+        searchFor('!!! ???');
 
         expect(
             await screen.findByText(
                 'Search for a person, event, phrase, or topic.'
             )
         ).toBeInTheDocument();
-        expect(fetch).toHaveBeenCalledOnce();
+        expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('shows the safe API reason when discovery asks the creator to retry', async () => {
+    it('clears stale results when a newer search fails', async () => {
         vi.mocked(fetch)
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            )
+            .mockResolvedValueOnce(response(discoveryPayload()) as never)
             .mockResolvedValueOnce(
                 errorResponse(
-                    'Too many discovery searches. Try again shortly.',
-                    429
+                    'Live image search is temporarily unavailable.',
+                    503
                 ) as never
             );
-
         render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
-        await screen.findByText('जनता पार्टी');
-        fireEvent.change(
-            screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
-            }),
-            { target: { value: 'Narendra Modi' } }
-        );
-        fireEvent.submit(screen.getByRole('search'));
+
+        searchFor('CJP protest');
+        await screen.findByText('Police use lathis during CJP protest');
+        searchFor('another event');
 
         expect(
             await screen.findByText(
-                'Too many discovery searches. Try again shortly.'
-            )
-        ).toBeInTheDocument();
-    });
-
-    it('explains when licensed image search is unavailable instead of calling it an empty match', async () => {
-        vi.mocked(fetch)
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            )
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:06:00.000Z',
-                    query: 'Dharmendra Pradhan',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'unavailable',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            );
-
-        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
-        await screen.findByText('जनता पार्टी');
-        fireEvent.change(
-            screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
-            }),
-            { target: { value: 'Dharmendra Pradhan' } }
-        );
-        fireEvent.click(screen.getByRole('button', { name: 'Search images' }));
-
-        expect(
-            await screen.findByText(
-                'Image search is temporarily unavailable. Try again shortly.'
+                'Live image search is temporarily unavailable.'
             )
         ).toBeInTheDocument();
         expect(
-            screen.queryByText(/No clearly licensed image match/)
+            screen.queryByText('Police use lathis during CJP protest')
         ).not.toBeInTheDocument();
     });
 
-    it('reports only the image-search failure that affects the creator', async () => {
-        vi.mocked(fetch)
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
+    it('explains partial provider coverage without hiding useful results', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            response(
+                discoveryPayload({
+                    webImages: [],
                     providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
+                        web: 'not-configured',
+                        commons: 'live',
                     },
-                }) as never
-            )
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:06:00.000Z',
-                    query: 'Narendra Modi',
-                    region: 'IN',
-                    trends: [],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'unavailable',
-                        commons: 'unavailable',
-                        youtube: 'rate-limited',
-                    },
-                }) as never
-            );
-
-        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
-        await screen.findByText('जनता पार्टी');
-        fireEvent.change(
-            screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
-            }),
-            { target: { value: 'Narendra Modi' } }
+                })
+            ) as never
         );
-        fireEvent.submit(screen.getByRole('search'));
+        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
+
+        searchFor('Dharmendra Pradhan');
 
         expect(
             await screen.findByText(
-                'Image search is temporarily unavailable. Try again shortly.'
+                'Live web results are unavailable; showing reusable sources.'
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Dharmendra Pradhan portrait')
+        ).toBeInTheDocument();
+    });
+
+    it('warns when one live-web lane failed while keeping returned web images', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            response(
+                discoveryPayload({
+                    providers: {
+                        web: 'degraded',
+                        commons: 'live',
+                    },
+                })
+            ) as never
+        );
+        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
+
+        searchFor('CJP protest');
+
+        expect(
+            await screen.findByText(
+                'Some live web sources are temporarily unavailable; showing the results that responded.'
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Police use lathis during CJP protest')
+        ).toBeInTheDocument();
+    });
+
+    it('does not blame the query when no-key web and failed reusable providers leave no coverage', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            response(
+                discoveryPayload({
+                    webImages: [],
+                    reusableImages: [],
+                    providers: {
+                        web: 'not-configured',
+                        commons: 'unavailable',
+                    },
+                })
+            ) as never
+        );
+        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
+
+        searchFor('CJP protest');
+
+        expect(
+            await screen.findByText(
+                'Live web search is not configured, and reusable image search is temporarily unavailable.'
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/No useful visual yet/)
+        ).not.toBeInTheDocument();
+    });
+
+    it('reports a reusable-provider failure while preserving live web results', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            response(
+                discoveryPayload({
+                    reusableImages: [],
+                    providers: {
+                        web: 'live',
+                        commons: 'unavailable',
+                    },
+                })
+            ) as never
+        );
+        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
+
+        searchFor('CJP protest');
+
+        expect(
+            await screen.findByText(
+                'Reusable image search is temporarily unavailable; showing live web results.'
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Police use lathis during CJP protest')
+        ).toBeInTheDocument();
+    });
+
+    it('reports both lanes when web is degraded and reusable search is down', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            response(
+                discoveryPayload({
+                    reusableImages: [],
+                    providers: {
+                        web: 'degraded',
+                        commons: 'unavailable',
+                    },
+                })
+            ) as never
+        );
+        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
+
+        searchFor('CJP protest');
+
+        expect(
+            await screen.findByText(
+                'Some live web sources are temporarily unavailable; showing the results that responded.'
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Reusable image search is temporarily unavailable; showing live web results.'
             )
         ).toBeInTheDocument();
     });
 
-    it('keeps the newest discovery result when an older request finishes later', async () => {
+    it('provides creator-specific recovery when every provider is empty', async () => {
+        vi.mocked(fetch).mockResolvedValue(
+            response(
+                discoveryPayload({
+                    resolvedQuery: 'cjp protest lathi charge',
+                    webImages: [],
+                    reusableImages: [],
+                })
+            ) as never
+        );
+        render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
+
+        searchFor('cjp protest lathi charge');
+
+        expect(
+            await screen.findByText(/No useful visual yet/)
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(/try Reaction face or Clean cutout/i)
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/Show trending searches/i)
+        ).not.toBeInTheDocument();
+    });
+
+    it('keeps the newest result when an older request resolves later', async () => {
         const olderRequest = deferredResponse();
         const newerRequest = deferredResponse();
         let olderSignal: AbortSignal | null | undefined;
-
         vi.mocked(fetch)
-            .mockResolvedValueOnce(
-                response({
-                    fetchedAt: '2026-07-25T13:05:00.000Z',
-                    query: '',
-                    region: 'IN',
-                    trends: [trend],
-                    reusableImages: [],
-                    videos: [],
-                    providers: {
-                        trends: 'live',
-                        commons: 'idle',
-                        youtube: 'not-configured',
-                    },
-                }) as never
-            )
             .mockImplementationOnce((_input, init) => {
                 olderSignal = init?.signal;
                 return olderRequest.promise as never;
             })
             .mockImplementationOnce(() => newerRequest.promise as never);
-
         render(<CreatorDiscoveryPanel onAddImage={onAddImage} />);
-        await screen.findByText('जनता पार्टी');
 
+        searchFor('older');
+        await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
         fireEvent.change(
             screen.getByRole('searchbox', {
-                name: 'Search viral topics and reusable visuals',
+                name: 'Search people, moments, reactions, and meme material',
             }),
-            { target: { value: 'Dharmendra Pradhan' } }
+            { target: { value: 'newer' } }
         );
-        const searchForm = screen.getByRole('search');
-        fireEvent.submit(searchForm);
-        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-        fireEvent.submit(searchForm);
-        await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+        fireEvent.submit(screen.getByRole('search'));
 
         newerRequest.resolve(
-            response({
-                fetchedAt: '2026-07-25T13:07:00.000Z',
-                query: 'Dharmendra Pradhan',
-                region: 'IN',
-                trends: [],
-                reusableImages: [
-                    {
-                        ...reusableImage,
-                        id: 'commons-newer',
-                        title: 'Newest licensed portrait',
-                    },
-                ],
-                videos: [],
-                providers: {
-                    trends: 'live',
-                    commons: 'live',
-                    youtube: 'not-configured',
-                },
-            })
+            response(
+                discoveryPayload({
+                    query: 'newer',
+                    resolvedQuery: 'newer',
+                    webImages: [
+                        {
+                            ...webImage,
+                            id: 'brave-newer',
+                            title: 'Newest event frame',
+                        },
+                    ],
+                    reusableImages: [],
+                })
+            )
         );
         expect(
-            await screen.findByText('Newest licensed portrait')
+            await screen.findByText('Newest event frame')
         ).toBeInTheDocument();
 
         olderRequest.resolve(
-            response({
-                fetchedAt: '2026-07-25T13:06:00.000Z',
-                query: 'Dharmendra Pradhan',
-                region: 'IN',
-                trends: [],
-                reusableImages: [
-                    {
-                        ...reusableImage,
-                        id: 'commons-older',
-                        title: 'Stale licensed portrait',
-                    },
-                ],
-                videos: [],
-                providers: {
-                    trends: 'live',
-                    commons: 'live',
-                    youtube: 'not-configured',
-                },
-            })
+            response(
+                discoveryPayload({
+                    query: 'older',
+                    resolvedQuery: 'older',
+                    webImages: [
+                        {
+                            ...webImage,
+                            id: 'brave-older',
+                            title: 'Stale event frame',
+                        },
+                    ],
+                })
+            )
         );
 
         await waitFor(() => {
             expect(olderSignal?.aborted).toBe(true);
             expect(
-                screen.queryByText('Stale licensed portrait')
+                screen.queryByText('Stale event frame')
             ).not.toBeInTheDocument();
         });
     });
-
 });

@@ -7,6 +7,7 @@ import {
     Minimize2,
     RotateCw,
     ShieldCheck,
+    TriangleAlert,
     Trash2,
     Undo2,
 } from 'lucide-react';
@@ -75,6 +76,7 @@ export default function ImageLayerTools({
     onClearErase,
 }: ImageLayerToolsProps) {
     const hasEraseHistory = image.eraseStrokes.length > 0;
+    const sourceRightsUnknown = image.source?.rights === 'unknown';
 
     return (
         <section className="space-y-3 rounded-lg border border-[#6a7bd1]/25 bg-[#6a7bd1]/8 p-3">
@@ -90,7 +92,20 @@ export default function ImageLayerTools({
             {image.source && (
                 <div className="rounded-lg border border-amber-400/20 bg-amber-400/8 p-2.5">
                     <div className="flex items-start gap-2">
-                        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200" />
+                        {sourceRightsUnknown ? (
+                            <span
+                                role="img"
+                                aria-label="Rights warning"
+                                className="mt-0.5 shrink-0 text-amber-200"
+                            >
+                                <TriangleAlert
+                                    aria-hidden="true"
+                                    className="h-3.5 w-3.5"
+                                />
+                            </span>
+                        ) : (
+                            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-200" />
+                        )}
                         <div className="min-w-0 flex-1">
                             <p className="text-[10px] font-semibold text-amber-100">
                                 {image.source.licenseName}
@@ -117,9 +132,16 @@ export default function ImageLayerTools({
                         </a>
                     </div>
                     <p className="mt-1.5 text-[9px] leading-relaxed text-white/35">
-                        Source and license stay attached to this layer after
-                        draft recovery.
+                        {sourceRightsUnknown
+                            ? 'Source and rights warning stay attached to this layer after draft recovery.'
+                            : 'Source and license stay attached to this layer after draft recovery.'}
                     </p>
+                    {sourceRightsUnknown && (
+                        <p className="mt-1.5 rounded border border-amber-300/15 bg-black/15 px-2 py-1 text-[9px] leading-relaxed text-amber-100/75">
+                            {image.source.usageTerms ||
+                                'Check the original publisher before reuse.'}
+                        </p>
+                    )}
                     {image.source.restrictions && (
                         <p className="mt-1.5 rounded border border-amber-300/15 bg-black/15 px-2 py-1 text-[9px] leading-relaxed text-amber-100/75">
                             Other rights: {image.source.restrictions}

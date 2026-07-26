@@ -86,6 +86,8 @@ const IMAGE_SOURCE_RIGHTS = [
     'share-alike',
 ] as const;
 const MAX_SOURCE_TEXT_LENGTH = 1_000;
+const WEB_IMAGE_USAGE_TERMS =
+    'Check the original publisher before reuse.';
 
 function isFiniteNumber(value: unknown): value is number {
     return typeof value === 'number' && Number.isFinite(value);
@@ -149,6 +151,25 @@ function isHttpUrl(value: unknown): value is string {
 
 function isImageSourceAttribution(value: unknown): boolean {
     if (!isObjectRecord(value)) return false;
+
+    if (value.provider === 'SearXNG') {
+        return (
+            isHttpUrl(value.url) &&
+            isBoundedString(value.creator, MAX_SOURCE_TEXT_LENGTH) &&
+            value.creator.trim().length > 0 &&
+            value.licenseName === 'Rights not verified' &&
+            value.licenseUrl === undefined &&
+            value.rights === 'unknown' &&
+            (value.creditLine === undefined ||
+                isBoundedString(value.creditLine, MAX_SOURCE_TEXT_LENGTH)) &&
+            (value.attributionRequired === undefined ||
+                value.attributionRequired === false) &&
+            value.usageTerms === WEB_IMAGE_USAGE_TERMS &&
+            (value.restrictions === undefined ||
+                isBoundedString(value.restrictions, MAX_SOURCE_TEXT_LENGTH))
+        );
+    }
+
     const licenseName = value.licenseName;
     const rights = isBoundedString(licenseName, MAX_SOURCE_TEXT_LENGTH)
         ? resolveReusableImageRights(licenseName)

@@ -1,0 +1,21 @@
+use_default_settings: true
+
+general:
+  instance_name: Memehub SearXNG
+  debug: false
+
+search:
+  safe_search: 2
+  default_lang: en
+  formats:
+    - html
+    - json
+
+server:
+  # The compose service is bound to 127.0.0.1; Next.js is its only client.
+  # Do not enable SearXNG's limiter unless limiter.toml is mounted as well.
+  limiter: false
+  image_proxy: true
+
+valkey:
+  url: valkey://valkey:6379/0

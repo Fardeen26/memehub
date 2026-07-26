@@ -7,8 +7,9 @@ An image-first creator workspace for making publish-ready memes quickly. Memehub
 - **Template Library**: Extensive collection of popular meme templates
 - **Custom Uploads**: Upload your own images to create unique memes
 - **Layered Editor**: Position and style text, images, GIFs, drawings, and shapes
-- **India Image Discovery**: Turn live India search topics into one-click reusable-image searches
-- **Licensed Image Search**: Find raster images on Wikimedia Commons and use one as the meme template or add it as a layer
+- **Meme Material Search**: Search current web and news imagery by breaking moment, reaction, cutout, blank-template, or social-post intent
+- **Typo Recovery**: Correct misspelled people and topics before progressively broadening sparse searches
+- **Rights-aware Results**: Keep fresh web imagery visibly separate from reusable Wikimedia media, with source links and license details
 - **Creator Workspace**: Compact Images, Text, My assets, Layers, and Export workflow
 - **Reusable Assets**: Private local shelf for cutouts, logos, and reaction images
 - **Image Tools**: Opacity, fit, fill, rotation, and manual erase controls
@@ -48,18 +49,41 @@ cd meme-generator
 npm ci
 ```
 
-3. Copy environment variables and add a [Giphy API key](https://developers.giphy.com/dashboard/) (powers stickers & GIFs in the editor):
+3. Copy environment variables and add a [Giphy API key](https://developers.giphy.com/dashboard/) for stickers and GIFs:
 
 ```bash
 cp .env.example .env.local
-# Set GIPHY_API_KEY=your_key
+# Set GIPHY_API_KEY=your_giphy_key
 ```
 
-Live India topics and Wikimedia image search work without API keys. Discovery
-is intentionally image-first: trend topics are search shortcuts, while
-separately licensed raster results can become the meme template or a canvas
-layer. Memehub stores a local project copy while keeping its creator, license,
-usage terms, and restrictions attached to the image.
+### Live image search (free, self-hosted)
+
+Memehub uses a self-hosted SearXNG instance for fresh image discovery.
+
+```bash
+cp searxng.env.example .searxng.env
+# Edit .searxng.env and replace SEARXNG_SECRET with `openssl rand -hex 32`
+docker compose --env-file .searxng.env -f docker-compose.searxng.yml up -d
+```
+
+Then keep the default local URL in `.env.local` (or change it to your private
+SearXNG host), copy the same secret from `.searxng.env`, and restart Next.js:
+
+```env
+SEARXNG_URL=http://localhost:8088
+SEARXNG_SECRET=the-same-value-as-SEARXNG_SECRET-in-.searxng.env
+```
+
+The compose setup enables SearXNG JSON responses, strict safe search, and image
+proxying. It is bound to localhost, so do not expose it publicly without adding
+a reverse proxy and SearXNG limiter configuration. Do not use a public SearXNG instance.
+SearXNG aggregates external engines, so an engine can occasionally block or
+rate-limit an instance; Memehub returns the results that are available.
+
+Fresh web results link to the publisher and are marked **Check source rights**:
+finding an image does not grant reuse permission. Wikimedia Commons remains the
+licence-aware reusable-media lane; its results retain creator, licence, usage
+terms, and restrictions in the local draft.
 
 For production discovery search and MP4 export, configure shared rate limiting.
 Cloudinary is additionally required for MP4 export:
@@ -94,7 +118,7 @@ npm run dev
 
 1. **Start a project**: Pick a searchable template or upload your own background.
 2. **Write the joke**: Caption fields stay beside the canvas while secondary tools remain collapsed.
-3. **Find the moment**: Expand Images, choose a trending India search, or search a person, event, dialogue, or reaction.
+3. **Find the material**: Expand Images, choose Breaking moment, Reaction face, Clean cutout, Blank template, or Social post, then search a person, event, dialogue, or reaction.
 4. **Choose the image’s role**: Start a clean meme from a result or add it as a layer to the current scene.
 5. **Apply a recipe**: Use Text for a one-tap meme, headline, subtitle, reaction, or Hindi typography treatment.
 6. **Build and refine**: Add saved assets, stickers, GIFs, shapes, or drawings; use Layers and image tools only when needed.
@@ -124,7 +148,7 @@ src/
 
 - **MemeEditor**: Canvas-centered editor with immediate caption fields
 - **CreatorWorkspace**: Collapsible Images, Text, reusable assets, layers, and publishing tools
-- **CreatorDiscoveryPanel**: Image-first India trend shortcuts and reusable-media search
+- **CreatorDiscoveryPanel**: Creator-intent search across fresh web/news imagery and reusable media
 - **CreatorAssetShelf**: Private browser-local cutouts, logos, and reaction images
 - **CreatorLayersPanel**: Visibility, duplication, deletion, and within-group ordering
 - **CreatorExportPanel**: Platform sizing, fit/crop behavior, and still-image formats

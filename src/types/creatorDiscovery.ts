@@ -1,3 +1,5 @@
+import type { MemeSearchIntent } from '@/lib/memeSearchPlanner';
+
 export type CreatorSourceKind = 'news' | 'video';
 
 export type CreatorSourceReference = {
@@ -48,8 +50,31 @@ export type ReusableImageAsset = {
     rights: ReusableImageRights;
 };
 
+export type WebImageAsset = {
+    id: string;
+    title: string;
+    /** Privacy-preserving image rendition returned by the search provider. */
+    previewUrl: string;
+    /** The same trusted proxy rendition used when adding the result to canvas. */
+    assetUrl: string;
+    /** Publisher page where the image was discovered. */
+    sourceUrl: string;
+    sourceDomain: string;
+    width: number;
+    height: number;
+    provider: 'SearXNG';
+    kind: 'web' | 'news';
+    publishedAt?: string;
+    confidence?: 'low' | 'medium' | 'high';
+    /** Web search discovers media; it does not grant reuse rights. */
+    rights: 'unknown';
+};
+
+export type DiscoveryImageAsset = ReusableImageAsset | WebImageAsset;
+
 export type DiscoveryProviderState =
     | 'live'
+    | 'degraded'
     | 'idle'
     | 'not-configured'
     | 'rate-limited'
@@ -58,13 +83,15 @@ export type DiscoveryProviderState =
 export type CreatorDiscoveryResponse = {
     fetchedAt: string;
     query: string;
+    resolvedQuery: string;
+    intent: MemeSearchIntent;
     region: 'IN';
     trends: IndiaTrendSignal[];
+    webImages: WebImageAsset[];
     reusableImages: ReusableImageAsset[];
     videos: CreatorSourceReference[];
     providers: {
-        trends: DiscoveryProviderState;
+        web: DiscoveryProviderState;
         commons: DiscoveryProviderState;
-        youtube: DiscoveryProviderState;
     };
 };

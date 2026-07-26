@@ -262,6 +262,7 @@ export default function CreatorLayersPanel({
     const backgroundCredit =
         backgroundSource?.creditLine?.trim() ||
         backgroundSource?.creator;
+    const backgroundRightsUnknown = backgroundSource?.rights === 'unknown';
 
     return (
         <div className="space-y-3">
@@ -395,7 +396,13 @@ export default function CreatorLayersPanel({
                         </span>
                         {backgroundSource && (
                             <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[9px] text-white/45">
-                                <span className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-1.5 py-0.5 text-emerald-100">
+                                <span
+                                    className={`rounded-full border px-1.5 py-0.5 ${
+                                        backgroundRightsUnknown
+                                            ? 'border-amber-400/30 bg-amber-400/10 text-amber-100'
+                                            : 'border-emerald-400/25 bg-emerald-400/10 text-emerald-100'
+                                    }`}
+                                >
                                     {backgroundSource.licenseName}
                                 </span>
                                 <span>{backgroundCredit}</span>
@@ -414,9 +421,14 @@ export default function CreatorLayersPanel({
                         {backgroundSource &&
                             (backgroundSource.usageTerms ||
                                 backgroundSource.restrictions) && (
-                                <details className="mt-1 text-[9px] text-white/45">
+                                <details
+                                    open={backgroundRightsUnknown}
+                                    className="mt-1 text-[9px] text-white/45"
+                                >
                                     <summary className="cursor-pointer text-[#aeb8ff]">
-                                        Usage notes
+                                        {backgroundRightsUnknown
+                                            ? 'Rights warning'
+                                            : 'Usage notes'}
                                     </summary>
                                     <div className="mt-1 space-y-1 leading-relaxed">
                                         {backgroundSource.usageTerms && (

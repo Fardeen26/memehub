@@ -75,6 +75,55 @@ describe('ImageLayerTools', () => {
         );
     });
 
+    it('shows a rights warning instead of license assurance for web-discovered media', () => {
+        render(
+            <ImageLayerTools
+                image={{
+                    ...selectedImage,
+                    source: {
+                        provider: 'SearXNG',
+                        url: 'https://publisher.example/current-event',
+                        creator: 'publisher.example',
+                        licenseName: 'Rights not verified',
+                        rights: 'unknown',
+                        usageTerms:
+                            'Check the original publisher before reuse.',
+                    },
+                }}
+                eraseMode={false}
+                eraseBrushSize={20}
+                eraseBrushOpacity={1}
+                onOpacityChange={vi.fn()}
+                onRotate90={vi.fn()}
+                onFit={vi.fn()}
+                onFill={vi.fn()}
+                onToggleErase={vi.fn()}
+                onEraseBrushSizeChange={vi.fn()}
+                onEraseBrushOpacityChange={vi.fn()}
+                onUndoErase={vi.fn()}
+                onClearErase={vi.fn()}
+            />
+        );
+
+        expect(
+            screen.getByRole('img', { name: 'Rights warning' })
+        ).toBeInTheDocument();
+        expect(screen.getByText('Rights not verified')).toBeInTheDocument();
+        expect(
+            screen.getByText('Check the original publisher before reuse.')
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                'Source and rights warning stay attached to this layer after draft recovery.'
+            )
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(
+                'Source and license stay attached to this layer after draft recovery.'
+            )
+        ).not.toBeInTheDocument();
+    });
+
     it('exposes useful image editing controls for the selected layer', () => {
         const onOpacityChange = vi.fn();
         const onRotate90 = vi.fn();

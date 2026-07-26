@@ -33,7 +33,13 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from 'sonner';
-import { MemeEditorProps, TextSettings, ImageOverlay, EraseStroke } from '@/types/editor';
+import {
+    MemeEditorProps,
+    TextSettings,
+    ImageOverlay,
+    EraseStroke,
+    type ImageSourceAttribution,
+} from '@/types/editor';
 import Image from 'next/image';
 import {
     useFontLoader,
@@ -127,9 +133,13 @@ import {
 import ImageLayerTools from '@/components/ImageLayerTools';
 import CreatorBrandPanel from '@/components/CreatorBrandPanel';
 import CreatorDiscoveryPanel from '@/components/CreatorDiscoveryPanel';
-import type { ReusableImageAsset } from '@/types/creatorDiscovery';
+import type { DiscoveryImageAsset } from '@/types/creatorDiscovery';
 import { settleSceneImageLoads } from '@/lib/sceneImageLoading';
 import { materializeReusableImage } from '@/lib/reusableImagePersistence';
+import {
+    getTemplateImageTooSmallMessage,
+    isTemplateImageTooSmall,
+} from '@/lib/discoveryImageQuality';
 import {
     EditorCanvasLayout,
     EditorCanvasStage,
@@ -141,6 +151,47 @@ const STATIC_IMAGE_LOAD_TIMEOUT_MS = 12_000;
 const IMAGE_CACHE_MAX_ENTRIES = 32;
 const EDITOR_IMAGE_LAYER_LIMIT = 24;
 let textLayerIdSequence = 0;
+
+function getDiscoveryImageSource(
+    asset: DiscoveryImageAsset
+): ImageSourceAttribution {
+    if (asset.provider === 'SearXNG') {
+        return {
+            provider: 'SearXNG',
+            url: asset.sourceUrl,
+            creator: asset.sourceDomain,
+            licenseName: 'Rights not verified',
+            rights: 'unknown',
+            usageTerms: 'Check the original publisher before reuse.',
+        };
+    }
+
+    return {
+        provider: asset.provider,
+        url: asset.sourceUrl,
+        creator: asset.creator,
+        creditLine: asset.creditLine,
+        licenseName: asset.licenseName,
+        licenseUrl: asset.licenseUrl,
+        rights: asset.rights,
+        attributionRequired: asset.attributionRequired,
+        usageTerms: asset.usageTerms,
+        restrictions: asset.restrictions,
+    };
+}
+
+function getMaterializedImageMimeType(
+    file: File
+): CanvasTemplate['mimeType'] {
+    if (
+        file.type !== 'image/jpeg' &&
+        file.type !== 'image/png' &&
+        file.type !== 'image/webp'
+    ) {
+        throw new Error('The downloaded image format is not supported.');
+    }
+    return file.type;
+}
 
 function createTextLayerId(): string {
     textLayerIdSequence += 1;
@@ -1588,7 +1639,7 @@ export default function MemeEditor({
     );
 
     const addDiscoveredImageToCanvas = useCallback(
-        async (asset: ReusableImageAsset) => {
+        async (asset: DiscoveryImageAsset) => {
             if (isLeavingRef.current || !canEditDraft) {
                 throw new Error('The editor is leaving. This image was not added.');
             }
@@ -1596,27 +1647,17 @@ export default function MemeEditor({
             pendingDiscoveryImageAdds.current += 1;
             try {
                 const localFile = await materializeReusableImage(asset);
+                const mimeType = getMaterializedImageMimeType(localFile);
                 const added = await addImageOverlay(localFile, {
                     label: asset.title,
-                    mimeType: asset.mimeType,
+                    mimeType,
                     preserveWorkspaceTab: true,
                     continueWhileLeaving: true,
-                    source: {
-                        provider: asset.provider,
-                        url: asset.sourceUrl,
-                        creator: asset.creator,
-                        creditLine: asset.creditLine,
-                        licenseName: asset.licenseName,
-                        licenseUrl: asset.licenseUrl,
-                        rights: asset.rights,
-                        attributionRequired: asset.attributionRequired,
-                        usageTerms: asset.usageTerms,
-                        restrictions: asset.restrictions,
-                    },
+                    source: getDiscoveryImageSource(asset),
                 });
                 if (!added) {
                     throw new Error(
-                        'Could not add this licensed image to the canvas.'
+                        'Could not add this image to the canvas.'
                     );
                 }
             } finally {
@@ -1631,7 +1672,7 @@ export default function MemeEditor({
     );
 
     const startFromDiscoveredImage = useCallback(
-        async (asset: ReusableImageAsset) => {
+        async (asset: DiscoveryImageAsset) => {
             if (isLeavingRef.current || !canEditDraft) {
                 throw new Error(
                     'The editor is leaving. This image was not used.'
@@ -1663,6 +1704,7 @@ export default function MemeEditor({
             const finishPendingImageAdd = beginPendingImageAdd();
             try {
                 const localFile = await materializeReusableImage(asset);
+                const mimeType = getMaterializedImageMimeType(localFile);
                 const localImage = await resolveImageSrc(localFile);
                 candidateLocalImage = localImage;
                 const decodedImage = await loadAndCacheImage(localImage);
@@ -1677,6 +1719,14 @@ export default function MemeEditor({
                 if (!imageWidth || !imageHeight) {
                     throw new Error(
                         'This image has no usable dimensions. Try another image.'
+                    );
+                }
+                if (isTemplateImageTooSmall(imageWidth, imageHeight)) {
+                    throw new Error(
+                        getTemplateImageTooSmallMessage(
+                            imageWidth,
+                            imageHeight
+                        )
                     );
                 }
                 if (draftStateRef.current !== sceneBeforeImageLoad) {
@@ -1761,19 +1811,8 @@ export default function MemeEditor({
                     image: localImage,
                     displayName: asset.title,
                     textBoxes: nextTextBoxes,
-                    mimeType: asset.mimeType,
-                    source: {
-                        provider: asset.provider,
-                        url: asset.sourceUrl,
-                        creator: asset.creator,
-                        creditLine: asset.creditLine,
-                        licenseName: asset.licenseName,
-                        licenseUrl: asset.licenseUrl,
-                        rights: asset.rights,
-                        attributionRequired: asset.attributionRequired,
-                        usageTerms: asset.usageTerms,
-                        restrictions: asset.restrictions,
-                    },
+                    mimeType,
+                    source: getDiscoveryImageSource(asset),
                 };
                 const nextDraftState: MemeEditorDraftState = {
                     ...draftStateRef.current,

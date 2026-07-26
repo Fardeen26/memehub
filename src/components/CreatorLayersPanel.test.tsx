@@ -165,4 +165,54 @@ describe('CreatorLayersPanel', () => {
             'https://commons.wikimedia.org/wiki/File:Reaction.jpg'
         );
     });
+
+    it('marks an unknown-rights web background as a warning and shows its terms', () => {
+        render(
+            <CreatorLayersPanel
+                texts={[]}
+                images={[]}
+                shapes={[]}
+                selectedTextIndex={-1}
+                selectedImageIndex={-1}
+                selectedShapeIndex={-1}
+                originalTextCount={0}
+                backgroundLabel="Current event photo"
+                backgroundSource={{
+                    provider: 'SearXNG',
+                    url: 'https://publisher.example/current-event',
+                    creator: 'publisher.example',
+                    licenseName: 'Rights not verified',
+                    rights: 'unknown',
+                    usageTerms:
+                        'Check the original publisher before reuse.',
+                }}
+                onSelectText={vi.fn()}
+                onSelectImage={vi.fn()}
+                onSelectShape={vi.fn()}
+                onToggleText={vi.fn()}
+                onToggleImage={vi.fn()}
+                onToggleShape={vi.fn()}
+                onDuplicateText={vi.fn()}
+                onDuplicateImage={vi.fn()}
+                onDuplicateShape={vi.fn()}
+                onMoveText={vi.fn()}
+                onMoveImage={vi.fn()}
+                onMoveShape={vi.fn()}
+                onDeleteText={vi.fn()}
+                onDeleteImage={vi.fn()}
+                onDeleteShape={vi.fn()}
+            />
+        );
+
+        const rightsBadge = screen.getByText('Rights not verified');
+        expect(rightsBadge).toHaveClass('border-amber-400/30');
+        expect(rightsBadge).not.toHaveClass('border-emerald-400/25');
+        expect(screen.getByText('Rights warning')).toBeInTheDocument();
+        expect(
+            screen.getByText('Check the original publisher before reuse.')
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText(/licensed/i)
+        ).not.toBeInTheDocument();
+    });
 });

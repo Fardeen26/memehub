@@ -38,13 +38,13 @@ export type EraseStroke = {
 };
 
 export type ImageSourceAttribution = {
-    provider: 'Wikimedia Commons';
+    provider: 'Wikimedia Commons' | 'SearXNG';
     url: string;
     creator: string;
     creditLine?: string;
     licenseName: string;
     licenseUrl?: string;
-    rights: 'editable' | 'attribution' | 'share-alike';
+    rights: 'editable' | 'attribution' | 'share-alike' | 'unknown';
     attributionRequired?: boolean;
     usageTerms?: string;
     restrictions?: string;

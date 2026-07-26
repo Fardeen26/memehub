@@ -269,6 +269,40 @@ describe('editor draft schema', () => {
         expect(isMemeEditorDraftState(animatedSourceFallback)).toBe(false);
     });
 
+    it('preserves honest web-search provenance without pretending the rights are known', () => {
+        const webSourceState = structuredClone(validState) as unknown as {
+            imageOverlays: Array<Record<string, unknown>>;
+        };
+        webSourceState.imageOverlays[0].source = {
+            provider: 'SearXNG',
+            url: 'https://example-news.test/cjp-protest',
+            creator: 'example-news.test',
+            licenseName: 'Rights not verified',
+            rights: 'unknown',
+            usageTerms: 'Check the original publisher before reuse.',
+        };
+
+        expect(isMemeEditorDraftState(webSourceState)).toBe(true);
+
+        const legacyHttpPublisher = structuredClone(webSourceState);
+        (
+            legacyHttpPublisher.imageOverlays[0].source as Record<
+                string,
+                unknown
+            >
+        ).url = 'http://legacy-news.test/cjp-protest';
+        expect(isMemeEditorDraftState(legacyHttpPublisher)).toBe(true);
+
+        const disguisedLicensedCopy = structuredClone(webSourceState);
+        (
+            disguisedLicensedCopy.imageOverlays[0].source as Record<
+                string,
+                unknown
+            >
+        ).rights = 'editable';
+        expect(isMemeEditorDraftState(disguisedLicensedCopy)).toBe(false);
+    });
+
     it('still accepts bounded animated media when it has no licensed-image provenance', () => {
         const animatedState = structuredClone(validState);
         delete animatedState.imageOverlays[0].source;
