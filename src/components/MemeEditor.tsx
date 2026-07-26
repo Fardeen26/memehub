@@ -130,6 +130,11 @@ import {
     resolveCreatorExportDimensions,
     STILL_IMAGE_FORMATS,
 } from '@/lib/creatorExport';
+import {
+    MEME_TRANSLATION_LANGUAGES,
+    translateText,
+    type MemeTranslationLanguageCode,
+} from '@/lib/textTranslation';
 import ImageLayerTools from '@/components/ImageLayerTools';
 import CreatorBrandPanel from '@/components/CreatorBrandPanel';
 import CreatorDiscoveryPanel from '@/components/CreatorDiscoveryPanel';
@@ -214,6 +219,9 @@ export default function MemeEditor({
     canvasTemplateRef.current = canvasTemplate;
     const effectiveTemplate = canvasTemplate ?? template;
     const [texts, setTexts] = useState<string[]>(Array(template.textBoxes.length).fill(''));
+    const [translationSourceTexts, setTranslationSourceTexts] = useState<string[]>(
+        Array(template.textBoxes.length).fill('')
+    );
     const [textLayerIds, setTextLayerIds] = useState<string[]>(() =>
         template.textBoxes.map(() => createTextLayerId())
     );
@@ -255,6 +263,10 @@ export default function MemeEditor({
     const [dragIndex, setDragIndex] = useState<number>(-1);
     const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [selectedTextIndex, setSelectedTextIndex] = useState<number>(-1);
+    const [translationLanguage, setTranslationLanguage] =
+        useState<MemeTranslationLanguageCode>('hi');
+    const [translatingTextIndex, setTranslatingTextIndex] =
+        useState<number>(-1);
     const [isRotatingText, setIsRotatingText] = useState<boolean>(false);
     const [rotateTextIndex, setRotateTextIndex] = useState<number>(-1);
     const [rotateTextStartAngle, setRotateTextStartAngle] = useState<number>(0);
@@ -307,9 +319,11 @@ export default function MemeEditor({
         }))
     );
     const textsRef = useRef(texts);
+    const translationSourceTextsRef = useRef(translationSourceTexts);
     const textLayerIdsRef = useRef(textLayerIds);
     const textSettingsRef = useRef(textSettings);
     textsRef.current = texts;
+    translationSourceTextsRef.current = translationSourceTexts;
     textLayerIdsRef.current = textLayerIds;
     textSettingsRef.current = textSettings;
     const [openDropdown, setOpenDropdown] = useState<number>(-1);
@@ -404,6 +418,7 @@ export default function MemeEditor({
         setCanvasTemplate(draft.canvasTemplate);
         canvasTemplateRef.current = draft.canvasTemplate;
         setTexts(draft.texts);
+        setTranslationSourceTexts(draft.texts);
         setTextLayerIds(draft.texts.map(() => createTextLayerId()));
         setTextBoxes(draft.textBoxes);
         setTextBoxRotations(draft.textBoxRotations);
@@ -999,12 +1014,40 @@ export default function MemeEditor({
             arr[idx] = value;
             return arr;
         });
+        setTranslationSourceTexts(prev => {
+            const arr = [...prev];
+            arr[idx] = value;
+            return arr;
+        });
 
         const settings = textSettings[idx];
         if (settings) {
             updateTextBoxToContent(idx, value, settings);
         }
     }, [textSettings, updateTextBoxToContent]);
+
+    const handleTranslateText = useCallback(async (idx: number) => {
+        const sourceText = translationSourceTextsRef.current[idx]?.trim() ?? '';
+        if (!sourceText) {
+            toast.error('Type some text first, then translate it.');
+            return;
+        }
+
+        setTranslatingTextIndex(idx);
+        try {
+            const translated = await translateText(sourceText, translationLanguage);
+            handleChange(idx, translated);
+            toast.success(`Translated to ${MEME_TRANSLATION_LANGUAGES.find((language) => language.code === translationLanguage)?.label ?? 'selected language'}.`);
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not translate the text.'
+            );
+        } finally {
+            setTranslatingTextIndex(-1);
+        }
+    }, [handleChange, translationLanguage]);
 
     const handleSettingsChange = useCallback((idx: number, setting: keyof TextSettings, value: string | number) => {
         const currentSettings = textSettings[idx];
@@ -1840,6 +1883,7 @@ export default function MemeEditor({
                 previewRenderRevision.current += 1;
                 canvasTemplateRef.current = nextCanvasTemplate;
                 textsRef.current = nextTexts;
+                translationSourceTextsRef.current = nextTexts;
                 textLayerIdsRef.current = nextTextLayerIds;
                 textSettingsRef.current = nextTextSettings;
                 imageOverlaysRef.current = [];
@@ -1847,6 +1891,7 @@ export default function MemeEditor({
 
                 setCanvasTemplate(nextCanvasTemplate);
                 setTexts(nextTexts);
+                setTranslationSourceTexts(nextTexts);
                 setTextLayerIds(nextTextLayerIds);
                 setTextBoxes(nextTextBoxes);
                 setTextBoxRotations([0, 0]);
@@ -4482,6 +4527,7 @@ export default function MemeEditor({
         });
 
         setTexts(prev => [...prev, defaultText]);
+        setTranslationSourceTexts((prev) => [...prev, defaultText]);
         setTextLayerIds((current) => [
             ...current,
             createTextLayerId(),
@@ -4512,12 +4558,20 @@ export default function MemeEditor({
                 updated[index] = '';
                 return updated;
             });
+            setTranslationSourceTexts(prev => {
+                const updated = [...prev];
+                updated[index] = '';
+                return updated;
+            });
             setSelectedTextIndex(index);
             toast.success('Text cleared');
             return;
         }
 
         setTexts((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTranslationSourceTexts((prev) =>
+            prev.filter((_, itemIndex) => itemIndex !== index)
+        );
         setTextBoxes((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
         setTextBoxRotations((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
         setTextSettings((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
@@ -4547,6 +4601,7 @@ export default function MemeEditor({
                 index
             );
             setTexts(duplicated.texts);
+            setTranslationSourceTexts(duplicated.texts);
             setTextBoxes(duplicated.textBoxes);
             setTextBoxRotations(duplicated.rotations);
             setTextSettings(duplicated.settings);
@@ -4615,6 +4670,7 @@ export default function MemeEditor({
                 direction
             );
             setTexts(moved.texts);
+            setTranslationSourceTexts(moved.texts);
             setTextBoxes(moved.textBoxes);
             setTextBoxRotations(moved.rotations);
             setTextSettings(moved.settings);
@@ -5577,6 +5633,51 @@ export default function MemeEditor({
                                                             <SelectItem value="normal">Normal (As Written)</SelectItem>
                                                         </SelectContent>
                                                     </Select>
+                                                </div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className='flex flex-col space-y-2'>
+                                                <div className='w-full' onClick={(e) => e.stopPropagation()}>
+                                                    <label className="block text-xs dark:text-white/60 mb-2">Translate text</label>
+                                                    <div className="grid gap-2">
+                                                        <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                                                            <span className="text-[10px] font-medium text-white/55">
+                                                                Translate to
+                                                            </span>
+                                                            <select
+                                                                value={translationLanguage}
+                                                                onChange={(event) =>
+                                                                    setTranslationLanguage(
+                                                                        event.target.value as MemeTranslationLanguageCode
+                                                                    )
+                                                                }
+                                                                aria-label="Translate to"
+                                                                className="h-8 w-full rounded-md border border-white/20 bg-[#0f0f0f] px-2 text-xs text-white"
+                                                            >
+                                                                {MEME_TRANSLATION_LANGUAGES.map(
+                                                                    (language) => (
+                                                                        <option
+                                                                            key={language.code}
+                                                                            value={language.code}
+                                                                        >
+                                                                            {language.label}
+                                                                        </option>
+                                                                    )
+                                                                )}
+                                                            </select>
+                                                        </div>
+                                                        <motion.button
+                                                            type="button"
+                                                            whileTap={{ scale: 0.98 }}
+                                                            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#6a7bd1] px-3 py-1.5 text-[10px] font-semibold text-white transition-colors hover:bg-[#7889e8] disabled:cursor-not-allowed disabled:opacity-60"
+                                                            onClick={() => handleTranslateText(i)}
+                                                            disabled={translatingTextIndex === i}
+                                                            title="Translate this text layer"
+                                                        >
+                                                            {translatingTextIndex === i
+                                                                ? 'Translating...'
+                                                                : 'Translate'}
+                                                        </motion.button>
+                                                    </div>
                                                 </div>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>

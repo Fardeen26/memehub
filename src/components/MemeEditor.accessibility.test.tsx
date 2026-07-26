@@ -1724,6 +1724,38 @@ describe('MemeEditor accessibility', () => {
         ).toBeInTheDocument();
     });
 
+    it('keeps translation controls inside the text settings menu', async () => {
+        render(
+            <MemeEditor
+                template={{
+                    image: 'data:image/png;base64,dGVzdA==',
+                    textBoxes: [
+                        {
+                            x: 20,
+                            y: 20,
+                            width: 300,
+                            height: 80,
+                            fontSize: 42,
+                            minFont: 10,
+                            align: 'center',
+                        },
+                    ],
+                }}
+                onReset={vi.fn()}
+            />
+        );
+
+        const trigger = screen.getByRole('button', {
+            name: 'Text settings for text position 1',
+        });
+        fireEvent.pointerDown(trigger);
+        fireEvent.click(trigger);
+
+        expect(await screen.findByText('Translate text')).toBeInTheDocument();
+        expect(screen.getByLabelText('Translate to')).toBeInTheDocument();
+        expect(screen.getByTitle('Translate this text layer')).toBeInTheDocument();
+    });
+
     it('clears a predefined text box when the selected layer receives Backspace', () => {
         render(
             <MemeEditor
