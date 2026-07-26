@@ -376,6 +376,7 @@ export async function GET(request: NextRequest) {
         return searchSearxngImages(candidate, {
             baseUrl: searxngUrl!,
             proxySecret: process.env.SEARXNG_SECRET,
+            intent,
             timeRange: intent === 'moment' || intent === 'social'
                 ? 'day'
                 : 'month',

@@ -43,6 +43,8 @@ const validState: MemeEditorDraftState = {
             fontWeight: '900',
             letterSpacing: 0,
             textCase: 'normal',
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: { width: 2, color: '#000000' },
             shadow: {
                 blur: 5,

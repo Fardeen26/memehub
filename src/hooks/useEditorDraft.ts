@@ -5,6 +5,7 @@ import {
     assertMemeEditorDraftLocalMediaCapacity,
     createEditorDraft,
     isMemeEditorDraftState,
+    normalizeMemeEditorDraftState,
     type MemeEditorDraftState,
 } from '@/lib/editorDraft';
 import {
@@ -69,7 +70,7 @@ export function useEditorDraft({
 
                     lastKnownUpdatedAt.current = draft.updatedAt;
                     skipNextAutosave.current = true;
-                    onRestore(draft.state);
+                    onRestore(normalizeMemeEditorDraftState(draft.state));
                 } else {
                     // A draft not explicitly opened by this editor belongs to
                     // another gallery/tab transition. Expecting an empty slot

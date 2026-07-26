@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { extractSearchWords } from './searchText';
+import type { MemeSearchIntent } from './memeSearchPlanner';
 import type {
     WebImageSearchResult,
     WebSearchCandidate,
@@ -19,6 +20,7 @@ export type SearxngImageSearchOptions = {
     baseUrl: string;
     /** Server-only SearXNG secret used to sign image-proxy URLs. */
     proxySecret?: string;
+    intent?: MemeSearchIntent;
     timeRange?: 'day' | 'month' | 'year';
     fetcher?: SearxngImageSearchFetcher;
 };
@@ -132,7 +134,8 @@ function stableId(value: string): string {
 
 function isRelevantCandidate(
     query: string,
-    candidate: Pick<WebSearchCandidate, 'title' | 'sourceDomain' | 'sourceUrl'>
+    candidate: Pick<WebSearchCandidate, 'title' | 'sourceDomain' | 'sourceUrl'>,
+    intent?: MemeSearchIntent
 ): boolean {
     const queryTokens = extractSearchWords(query.toLocaleLowerCase()).filter(
         (token) => token.length > 1
@@ -145,6 +148,14 @@ function isRelevantCandidate(
     const combined = `${title} ${domain} ${sourceUrl}`;
     const matches = queryTokens.filter((token) => combined.includes(token));
 
+    if (intent === 'social') {
+        const socialDomains = ['x.com', 'twitter.com', 'instagram.com', 'reddit.com'];
+        const isSocialSource = socialDomains.some((socialDomain) =>
+            domain === socialDomain || domain.endsWith(`.${socialDomain}`)
+        );
+        return isSocialSource && matches.length > 0;
+    }
+
     return matches.length > 0;
 }
 
@@ -152,7 +163,8 @@ function mapCandidate(
     query: string,
     value: unknown,
     baseUrl: URL,
-    proxySecret: string | undefined
+    proxySecret: string | undefined,
+    intent?: MemeSearchIntent
 ): WebSearchCandidate | undefined {
     const result = asRecord(value);
     const source = safeSourceUrl(result?.url);
@@ -170,7 +182,7 @@ function mapCandidate(
             title: readString(result.title) ?? '',
             sourceDomain: source.sourceDomain,
             sourceUrl: source.sourceUrl,
-        })
+        }, intent)
     ) {
         return undefined;
     }
@@ -221,7 +233,13 @@ export async function searchSearxngImages(
     return {
         candidates: results
             .map((result) =>
-                mapCandidate(query, result, baseUrl, options.proxySecret)
+                mapCandidate(
+                    query,
+                    result,
+                    baseUrl,
+                    options.proxySecret,
+                    options.intent
+                )
             )
             .filter(
                 (candidate): candidate is WebSearchCandidate =>

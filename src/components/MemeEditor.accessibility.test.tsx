@@ -1435,8 +1435,10 @@ describe('MemeEditor accessibility', () => {
         );
         expect(editorDraftMock.beforeSave).toEqual(expect.any(Function));
 
-        const snapshot = await editorDraftMock.beforeSave!();
-        const discoveredSnapshot = snapshot as typeof snapshot & {
+        let discoveredSnapshot: {
+            template: {
+                displayName?: string;
+            };
             canvasTemplate?: {
                 image: string;
                 displayName?: string;
@@ -1448,20 +1450,27 @@ describe('MemeEditor accessibility', () => {
                     rights: string;
                 };
             };
+            texts: string[];
+            imageOverlays: unknown[];
+            shapeOverlays: unknown[];
+            strokes: unknown[];
         };
 
-        expect(discoveredSnapshot.template.displayName).toBe(
-            'Original template'
-        );
-        expect(discoveredSnapshot.canvasTemplate).toMatchObject({
-            image: expect.stringMatching(/^data:image\/jpeg;base64,/),
-            displayName: 'Licensed reaction photo',
-            mimeType: 'image/jpeg',
-            source: {
-                provider: 'Wikimedia Commons',
-                licenseName: 'CC BY-SA 4.0',
-                rights: 'share-alike',
-            },
+        await vi.waitFor(async () => {
+            discoveredSnapshot = (await editorDraftMock.beforeSave!()) as typeof discoveredSnapshot;
+            expect(discoveredSnapshot.template.displayName).toBe(
+                'Original template'
+            );
+            expect(discoveredSnapshot.canvasTemplate).toMatchObject({
+                image: expect.stringMatching(/^data:image\/jpeg;base64,/),
+                displayName: 'Licensed reaction photo',
+                mimeType: 'image/jpeg',
+                source: {
+                    provider: 'Wikimedia Commons',
+                    licenseName: 'CC BY-SA 4.0',
+                    rights: 'share-alike',
+                },
+            });
         });
         expect(discoveredSnapshot.canvasTemplate?.textBoxes).toHaveLength(2);
         expect(discoveredSnapshot.texts).toEqual(['', '']);

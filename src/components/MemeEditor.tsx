@@ -292,6 +292,8 @@ export default function MemeEditor({
             fontWeight: '900',
             letterSpacing: 0,
             textCase: 'uppercase' as const,
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: {
                 width: 1,
                 color: '#000000'
@@ -1789,13 +1791,15 @@ export default function MemeEditor({
                     createTextLayerId()
                 );
                 const nextTextSettings: TextSettings[] =
-                    nextTextBoxes.map((box) => ({
+                nextTextBoxes.map((box) => ({
                         fontSize: box.fontSize,
                         color: '#ffffff',
                         fontFamily: getDefaultFont(),
                         fontWeight: '900',
                         letterSpacing: 0,
                         textCase: 'uppercase',
+                        backgroundColor: 'transparent',
+                        backgroundRadius: 0,
                         outline: {
                             width: 1,
                             color: '#000000',
@@ -3190,6 +3194,90 @@ export default function MemeEditor({
         ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
 
         const isMobile = isMobileDevice();
+        const backgroundPaddingX = Math.max(6, Math.round(fontSize * 0.2));
+        const backgroundPaddingY = Math.max(4, Math.round(fontSize * 0.12));
+        const backgroundRadius = Math.max(0, settings.backgroundRadius || 0);
+        const hasBackground = Boolean(settings.backgroundColor && settings.backgroundColor !== 'transparent');
+        const lineHeight = fontSize * 1.2;
+        const textBlockHeight = Math.max(lineHeight, lines.length * lineHeight);
+        const measuredLineWidths = lines.map((line) => {
+            const transformedText = transformText(line, settings.textCase);
+            return getTextWidthWithSpacing(ctx, transformedText, settings.letterSpacing);
+        });
+        const textBlockWidth = Math.max(
+            box.width,
+            measuredLineWidths.length > 0 ? Math.max(...measuredLineWidths) : 0
+        );
+        const textBlockTop = box.y + Math.max(0, (box.height - textBlockHeight) / 2);
+        const textBlockLeft = box.x + Math.max(0, (box.width - textBlockWidth) / 2);
+
+        const drawBackground = () => {
+            if (!hasBackground) return;
+            const backgroundX = textBlockLeft - backgroundPaddingX;
+            const backgroundY = textBlockTop - backgroundPaddingY;
+            const backgroundWidth = textBlockWidth + backgroundPaddingX * 2;
+            const backgroundHeight = textBlockHeight + backgroundPaddingY * 2;
+            const radius = Math.min(
+                backgroundRadius,
+                Math.max(0, Math.min(backgroundWidth, backgroundHeight) / 2)
+            );
+
+            ctx.save();
+            ctx.fillStyle = settings.backgroundColor;
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            if (radius > 0) {
+                ctx.beginPath();
+                ctx.moveTo(backgroundX + radius, backgroundY);
+                ctx.lineTo(backgroundX + backgroundWidth - radius, backgroundY);
+                ctx.quadraticCurveTo(
+                    backgroundX + backgroundWidth,
+                    backgroundY,
+                    backgroundX + backgroundWidth,
+                    backgroundY + radius
+                );
+                ctx.lineTo(
+                    backgroundX + backgroundWidth,
+                    backgroundY + backgroundHeight - radius
+                );
+                ctx.quadraticCurveTo(
+                    backgroundX + backgroundWidth,
+                    backgroundY + backgroundHeight,
+                    backgroundX + backgroundWidth - radius,
+                    backgroundY + backgroundHeight
+                );
+                ctx.lineTo(backgroundX + radius, backgroundY + backgroundHeight);
+                ctx.quadraticCurveTo(
+                    backgroundX,
+                    backgroundY + backgroundHeight,
+                    backgroundX,
+                    backgroundY + backgroundHeight - radius
+                );
+                ctx.lineTo(backgroundX, backgroundY + radius);
+                ctx.quadraticCurveTo(
+                    backgroundX,
+                    backgroundY,
+                    backgroundX + radius,
+                    backgroundY
+                );
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                ctx.fillRect(
+                    backgroundX,
+                    backgroundY,
+                    backgroundWidth,
+                    backgroundHeight
+                );
+            }
+
+            ctx.restore();
+        };
+
+        drawBackground();
 
         if (isMobile) {
             ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
@@ -3201,9 +3289,7 @@ export default function MemeEditor({
             ctx.lineWidth = settings.outline.width;
             ctx.fillStyle = settings.color;
             ctx.textAlign = box.align || 'center';
-
-            const lineHeight = fontSize * 1.2;
-            let currentY = box.y + fontSize;
+            ctx.textBaseline = 'middle';
 
             const drawTextWithSpacingMobile = (text: string, x: number, y: number) => {
                 const transformedText = transformText(text, settings.textCase);
@@ -3248,14 +3334,14 @@ export default function MemeEditor({
                 ctx.textAlign = originalTextAlign;
             };
 
-            lines.forEach(line => {
-                const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
-                const adjustedY = Math.max(currentY, box.y + fontSize);
-                const maxY = box.y + box.height - 5;
-                if (adjustedY <= maxY) {
-                    drawTextWithSpacingMobile(line, x, adjustedY);
-                }
-                currentY += lineHeight;
+            lines.forEach((line, lineIndex) => {
+                const x = box.align === 'center'
+                    ? textBlockLeft + textBlockWidth / 2
+                    : box.align === 'right'
+                        ? textBlockLeft + textBlockWidth
+                        : textBlockLeft;
+                const y = textBlockTop + lineHeight * lineIndex + lineHeight / 2;
+                drawTextWithSpacingMobile(line, x, y);
             });
         } else {
             ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
@@ -3268,9 +3354,7 @@ export default function MemeEditor({
             ctx.shadowColor = settings.shadow.color;
             ctx.fillStyle = settings.color;
             ctx.textAlign = box.align || 'center';
-
-            const lineHeight = fontSize * 1.2;
-            let currentY = box.y + fontSize;
+            ctx.textBaseline = 'middle';
 
             const drawTextWithSpacing = (text: string, x: number, y: number) => {
                 const transformedText = transformText(text, settings.textCase);
@@ -3315,14 +3399,14 @@ export default function MemeEditor({
                 ctx.textAlign = originalTextAlign;
             };
 
-            lines.forEach(line => {
-                const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
-                const adjustedY = Math.max(currentY, box.y + fontSize);
-                const maxY = box.y + box.height - 5;
-                if (adjustedY <= maxY) {
-                    drawTextWithSpacing(line, x, adjustedY);
-                }
-                currentY += lineHeight;
+            lines.forEach((line, lineIndex) => {
+                const x = box.align === 'center'
+                    ? textBlockLeft + textBlockWidth / 2
+                    : box.align === 'right'
+                        ? textBlockLeft + textBlockWidth
+                        : textBlockLeft;
+                const y = textBlockTop + lineHeight * lineIndex + lineHeight / 2;
+                drawTextWithSpacing(line, x, y);
             });
         }
 
@@ -4365,6 +4449,8 @@ export default function MemeEditor({
             fontWeight: '900',
             letterSpacing: 0,
             textCase: 'uppercase' as const,
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: {
                 width: 1,
                 color: '#000000'
@@ -5408,6 +5494,41 @@ export default function MemeEditor({
                                                             onChange={(e) => handleSettingsChange(i, 'color', e.target.value)}
                                                             className="flex-1 p-1 text-xs border rounded bg-[#0f0f0f] border-white/20 text-white"
                                                         />
+                                                    </div>
+                                                </div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                                <div className='w-full' onClick={(e) => e.stopPropagation()}>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Text Background</label>
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center space-x-2">
+                                                            <input
+                                                                type="color"
+                                                                value={textSettings[i].backgroundColor === 'transparent' ? '#000000' : textSettings[i].backgroundColor}
+                                                                onChange={(e) => handleSettingsChange(i, 'backgroundColor', e.target.value)}
+                                                                className="w-8 h-8 rounded border border-white/20 cursor-pointer"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={textSettings[i].backgroundColor}
+                                                                onChange={(e) => handleSettingsChange(i, 'backgroundColor', e.target.value)}
+                                                                className="flex-1 p-1 text-xs border rounded bg-[#0f0f0f] border-white/20 text-white"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs dark:text-white/40 mb-1">Radius: {textSettings[i].backgroundRadius}px</label>
+                                                            <input
+                                                                type="range"
+                                                                min="0"
+                                                                max="80"
+                                                                value={textSettings[i].backgroundRadius}
+                                                                onChange={(e) => handleSettingsChange(i, 'backgroundRadius', parseInt(e.target.value))}
+                                                                className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                                                style={{
+                                                                    background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${(textSettings[i].backgroundRadius / 80) * 100}%, rgba(255,255,255,0.2) ${(textSettings[i].backgroundRadius / 80) * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                                }}
+                                                            />
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </DropdownMenuItem>

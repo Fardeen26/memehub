@@ -13,6 +13,8 @@ const currentSettings: TextSettings = {
     fontWeight: '500',
     letterSpacing: 3,
     textCase: 'lowercase',
+    backgroundColor: 'transparent',
+    backgroundRadius: 0,
     outline: {
         width: 7,
         color: '#654321',

@@ -49,6 +49,8 @@ function makeState(text: string): MemeEditorDraftState {
                 fontWeight: '900',
                 letterSpacing: 0,
                 textCase: 'normal',
+                backgroundColor: 'transparent',
+                backgroundRadius: 0,
                 outline: { width: 1, color: '#000000' },
                 shadow: {
                     blur: 5,
@@ -325,7 +327,7 @@ describe('useEditorDraft', () => {
         rerender({ state: staleState });
 
         await expect(result.current.saveNow()).rejects.toThrow(
-            'newer draft revision'
+            'A newer draft revision exists in another tab'
         );
         expect((await loadActiveMemeDraft<MemeEditorDraftState>())?.state).toEqual(
             newerState
@@ -352,7 +354,7 @@ describe('useEditorDraft', () => {
         await waitFor(() => expect(result.current.isReady).toBe(true));
 
         await expect(result.current.saveNow()).rejects.toThrow(
-            'newer draft revision'
+            'A newer draft revision exists in another tab'
         );
         expect((await loadActiveMemeDraft<MemeEditorDraftState>())?.state).toEqual(
             otherTemplateState

@@ -159,6 +159,8 @@ describe('creator layer operations', () => {
                         fontWeight: '900',
                         letterSpacing: 0,
                         textCase: 'uppercase',
+                        backgroundColor: 'transparent',
+                        backgroundRadius: 0,
                         outline: { width: 2, color: '#000' },
                         shadow: {
                             blur: 4,
@@ -201,6 +203,8 @@ describe('creator layer operations', () => {
             fontWeight: '900',
             letterSpacing: 0,
             textCase: 'uppercase' as const,
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: { width: 2, color: '#000' },
             shadow: {
                 blur: 4,

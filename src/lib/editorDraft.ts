@@ -40,6 +40,32 @@ export type MemeEditorDraftState = {
     branding?: CreatorBranding;
 };
 
+const DEFAULT_TEXT_BACKGROUND_COLOR = 'transparent';
+const DEFAULT_TEXT_BACKGROUND_RADIUS = 0;
+
+export function normalizeTextSettings(
+    settings: TextSettings
+): TextSettings {
+    return {
+        ...settings,
+        backgroundColor:
+            settings.backgroundColor ?? DEFAULT_TEXT_BACKGROUND_COLOR,
+        backgroundRadius:
+            settings.backgroundRadius ?? DEFAULT_TEXT_BACKGROUND_RADIUS,
+    };
+}
+
+export function normalizeMemeEditorDraftState(
+    state: MemeEditorDraftState
+): MemeEditorDraftState {
+    return {
+        ...state,
+        textSettings: state.textSettings.map((settings) =>
+            normalizeTextSettings(settings)
+        ),
+    };
+}
+
 export function createEditorDraft(
     state: MemeEditorDraftState,
     updatedAt: number
@@ -316,6 +342,10 @@ function isTextSettings(value: unknown): value is TextSettings {
         typeof value.fontWeight === 'string' &&
         isFiniteNumber(value.letterSpacing) &&
         isOneOf(value.textCase, TEXT_CASES) &&
+        (value.backgroundColor === undefined ||
+            typeof value.backgroundColor === 'string') &&
+        (value.backgroundRadius === undefined ||
+            isFiniteNumber(value.backgroundRadius)) &&
         isFiniteNumber(value.outline.width) &&
         typeof value.outline.color === 'string' &&
         isFiniteNumber(value.shadow.blur) &&

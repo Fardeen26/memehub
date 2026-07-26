@@ -19,6 +19,8 @@ export type TextSettings = {
     fontWeight: string;
     letterSpacing: number;
     textCase: 'uppercase' | 'lowercase' | 'normal';
+    backgroundColor: string;
+    backgroundRadius: number;
     outline: {
         width: number;
         color: string;

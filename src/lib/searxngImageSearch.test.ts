@@ -104,4 +104,47 @@ describe('SearXNG image search provider', () => {
             }),
         ]);
     });
+
+    it('keeps only social-domain results that match the query terms', async () => {
+        const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+            jsonResponse({
+                results: [
+                    {
+                        title: 'Smiling Man Wearing Sunglasses Outdoors',
+                        url: 'https://www.instagram.com/p/example/',
+                        thumbnail_src:
+                            'http://localhost:8088/image_proxy?url=https%3A%2F%2Fimages.example.com%2Fthumb.jpg',
+                        img_src: 'https://images.example.com/full.jpg',
+                    },
+                    {
+                        title: 'Kunal Kamra on X',
+                        url: 'https://x.com/kunalkamra/status/123',
+                        thumbnail_src:
+                            'http://localhost:8088/image_proxy?url=https%3A%2F%2Fimages.example.com%2Fthumb2.jpg',
+                        img_src: 'https://images.example.com/full2.jpg',
+                    },
+                    {
+                        title: 'Kunal Kamra post',
+                        url: 'https://news.example.com/kunal-kamra-post',
+                        thumbnail_src:
+                            'http://localhost:8088/image_proxy?url=https%3A%2F%2Fimages.example.com%2Fthumb3.jpg',
+                        img_src: 'https://images.example.com/full3.jpg',
+                    },
+                ],
+            })
+        );
+
+        const result = await searchSearxngImages('Kunal Kamra', {
+            baseUrl: 'http://localhost:8088',
+            fetcher,
+            proxySecret: 'test-proxy-secret',
+            intent: 'social',
+        });
+
+        expect(result.candidates).toEqual([
+            expect.objectContaining({
+                title: 'Kunal Kamra on X',
+            }),
+        ]);
+    });
 });

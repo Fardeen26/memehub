@@ -11,7 +11,9 @@ export const TEXT_STYLE_PRESET_IDS = [
 export type TextStylePresetId = (typeof TEXT_STYLE_PRESET_IDS)[number];
 
 export type TextStylePresetSettings = Readonly<
-    Omit<TextSettings, 'fontSize' | 'outline' | 'shadow'> & {
+    Omit<TextSettings, 'fontSize' | 'outline' | 'shadow' | 'backgroundColor' | 'backgroundRadius'> & {
+        backgroundColor: string;
+        backgroundRadius: number;
         outline: Readonly<TextSettings['outline']>;
         shadow: Readonly<TextSettings['shadow']>;
     }
@@ -35,6 +37,8 @@ export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
             fontWeight: '900',
             letterSpacing: 0,
             textCase: 'uppercase',
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: {
                 width: 4,
                 color: '#000000',
@@ -57,6 +61,8 @@ export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
             fontWeight: '900',
             letterSpacing: 0,
             textCase: 'uppercase',
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: {
                 width: 2,
                 color: '#000000',
@@ -79,6 +85,8 @@ export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
             fontWeight: '700',
             letterSpacing: 0,
             textCase: 'normal',
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: {
                 width: 2,
                 color: '#000000',
@@ -101,6 +109,8 @@ export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
             fontWeight: '400',
             letterSpacing: 1,
             textCase: 'uppercase',
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: {
                 width: 5,
                 color: '#000000',
@@ -123,6 +133,8 @@ export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
             fontWeight: '700',
             letterSpacing: 0,
             textCase: 'normal',
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
             outline: {
                 width: 3,
                 color: '#000000',

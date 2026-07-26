@@ -21,6 +21,8 @@ const settings: TextSettings = {
     fontWeight: '900',
     letterSpacing: 0,
     textCase: 'uppercase',
+    backgroundColor: 'transparent',
+    backgroundRadius: 0,
     outline: { width: 1, color: '#000000' },
     shadow: {
         blur: 5,
