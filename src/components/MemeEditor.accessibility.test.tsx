@@ -1724,6 +1724,43 @@ describe('MemeEditor accessibility', () => {
         ).toBeInTheDocument();
     });
 
+    it('clears a predefined text box when the selected layer receives Backspace', () => {
+        render(
+            <MemeEditor
+                template={{
+                    image: 'data:image/png;base64,dGVzdA==',
+                    textBoxes: [
+                        {
+                            x: 20,
+                            y: 20,
+                            width: 300,
+                            height: 80,
+                            fontSize: 42,
+                            minFont: 10,
+                            align: 'center',
+                        },
+                    ],
+                }}
+                onReset={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Layers' }));
+        fireEvent.click(screen.getAllByRole('button', { name: /Text 1/ })[0]);
+        fireEvent.change(
+            screen.getByRole('textbox', { name: 'text position 1' }),
+            { target: { value: 'hello' } }
+        );
+        fireEvent.keyDown(document, { key: 'Backspace' });
+
+        expect(
+            screen.getByRole('textbox', { name: 'text position 1' })
+        ).toHaveValue('');
+        expect(
+            screen.getAllByRole('button', { name: /Text 1/ })[0]
+        ).toBeInTheDocument();
+    });
+
     it('can add more than one custom text layer in the same project', () => {
         render(
             <MemeEditor

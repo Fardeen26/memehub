@@ -41,7 +41,7 @@ export type MemeEditorDraftState = {
 };
 
 const DEFAULT_TEXT_BACKGROUND_COLOR = 'transparent';
-const DEFAULT_TEXT_BACKGROUND_RADIUS = 0;
+const DEFAULT_TEXT_BACKGROUND_RADIUS = 12;
 
 export function normalizeTextSettings(
     settings: TextSettings

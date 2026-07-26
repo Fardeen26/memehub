@@ -293,7 +293,7 @@ export default function MemeEditor({
             letterSpacing: 0,
             textCase: 'uppercase' as const,
             backgroundColor: 'transparent',
-            backgroundRadius: 0,
+            backgroundRadius: 12,
             outline: {
                 width: 1,
                 color: '#000000'
@@ -1799,7 +1799,7 @@ export default function MemeEditor({
                         letterSpacing: 0,
                         textCase: 'uppercase',
                         backgroundColor: 'transparent',
-                        backgroundRadius: 0,
+                        backgroundRadius: 12,
                         outline: {
                             width: 1,
                             color: '#000000',
@@ -4123,6 +4123,11 @@ export default function MemeEditor({
                     event.preventDefault();
                     return;
                 }
+                if (selectedTextIndex !== -1) {
+                    clearTextBox(selectedTextIndex);
+                    event.preventDefault();
+                    return;
+                }
             }
 
             const step = event.shiftKey ? 10 : 1;
@@ -4450,7 +4455,7 @@ export default function MemeEditor({
             letterSpacing: 0,
             textCase: 'uppercase' as const,
             backgroundColor: 'transparent',
-            backgroundRadius: 0,
+            backgroundRadius: 12,
             outline: {
                 width: 1,
                 color: '#000000'
@@ -4500,20 +4505,15 @@ export default function MemeEditor({
         setSelectedShapeIndex
     ]);
 
-    const removeTextBox = useCallback((index: number) => {
-        if (index < originalTextBoxCount) {
-            toast.error('Cannot remove template text boxes');
-            return;
-        }
-
-        setTexts(prev => prev.filter((_, i) => i !== index));
-        setTextLayerIds(prev => prev.filter((_, i) => i !== index));
-        setTextBoxes(prev => prev.filter((_, i) => i !== index));
-        setTextSettings(prev => prev.filter((_, i) => i !== index));
-        setTextBoxRotations(prev => prev.filter((_, i) => i !== index));
-
-        toast.success('Text box removed');
-    }, [originalTextBoxCount]);
+    const clearTextBox = useCallback((index: number) => {
+        setTexts(prev => {
+            const updated = [...prev];
+            updated[index] = '';
+            return updated;
+        });
+        setSelectedTextIndex(index);
+        toast.success('Text cleared');
+    }, []);
 
     const toggleTextLayer = useCallback((index: number) => {
         setTextSettings((current) =>
@@ -5279,7 +5279,7 @@ export default function MemeEditor({
                                 onMoveText={moveTextLayerAt}
                                 onMoveImage={moveImageLayer}
                                 onMoveShape={moveShapeLayer}
-                                onDeleteText={removeTextBox}
+                                onDeleteText={clearTextBox}
                                 onDeleteImage={(index) => {
                                     removeImageOverlay(index);
                                     setSelectedImageIndex((current) => {
@@ -5718,8 +5718,8 @@ export default function MemeEditor({
                                         type="button"
                                         whileTap={{ scale: 0.9 }}
                                         className="p-2 border rounded-md bg-[#0f0f0f] border-white/20 text-white transition-colors"
-                                        onClick={() => removeTextBox(i)}
-                                        title="Remove text box"
+                                        onClick={() => clearTextBox(i)}
+                                        title="Clear text"
                                     >
                                         <X className="h-4 w-4" />
                                     </motion.button>
