@@ -98,9 +98,10 @@ UPSTASH_REDIS_REST_TOKEN=your_upstash_rest_token
 CLOUDINARY_CLEANUP_SECRET=your_cleanup_secret
 ```
 
-The shared limiter protects public discovery-provider quota as well as video
-export signatures. Local development uses an in-memory limiter; production
-discovery search fails closed if Upstash is missing. The Cloudinary upload
+The shared limiter protects public discovery and translation-provider quota,
+image-relay requests, and video-export signatures. Local development uses an
+in-memory limiter; production provider-backed endpoints fail closed if Upstash
+is missing. The Cloudinary upload
 preset should restrict video formats and file size. Production video export
 also requires the shared limiter unless
 `CLOUDINARY_VIDEO_EXPORT_ALLOW_MEMORY_RATE_LIMIT=true` is set intentionally.

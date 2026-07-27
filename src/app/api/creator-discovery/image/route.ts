@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { consumeDiscoverySearchRateLimit } from '@/lib/discoveryRateLimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,6 +48,25 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         );
     }
 
+    const rateLimit = await consumeDiscoverySearchRateLimit(request);
+    if (!rateLimit.allowed) {
+        return NextResponse.json(
+            {
+                error:
+                    rateLimit.reason === 'unavailable'
+                        ? 'Image relay is temporarily unavailable.'
+                        : 'Too many image requests. Try again shortly.',
+            },
+            {
+                status: rateLimit.reason === 'unavailable' ? 503 : 429,
+                headers: {
+                    'Cache-Control': 'private, no-store',
+                    'Retry-After': String(rateLimit.retryAfterSeconds),
+                },
+            }
+        );
+    }
+
     try {
         const upstream = await fetch(proxyUrl, {
             credentials: 'omit',
@@ -65,10 +85,16 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             .split(';', 1)[0]
             .trim()
             .toLowerCase();
-        const contentLength = Number(upstream.headers.get('content-length'));
+        const contentLengthHeader = upstream.headers.get('content-length');
+        const contentLength = contentLengthHeader
+            ? Number(contentLengthHeader)
+            : undefined;
         if (
             !ALLOWED_IMAGE_TYPES.has(contentType) ||
-            (Number.isSafeInteger(contentLength) && contentLength > MAX_IMAGE_BYTES)
+            (contentLength !== undefined &&
+                (!Number.isSafeInteger(contentLength) ||
+                    contentLength < 0 ||
+                    contentLength > MAX_IMAGE_BYTES))
         ) {
             return NextResponse.json(
                 { error: 'Image is unavailable.' },
@@ -80,7 +106,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             headers: {
                 'Cache-Control': 'private, max-age=300',
                 'Content-Type': contentType,
-                ...(Number.isSafeInteger(contentLength) && contentLength >= 0
+                ...(contentLength !== undefined
                     ? { 'Content-Length': String(contentLength) }
                     : {}),
             },

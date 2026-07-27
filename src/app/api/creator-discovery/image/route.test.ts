@@ -30,6 +30,7 @@ describe('creator discovery image relay', () => {
 
         expect(response.status).toBe(200);
         expect(response.headers.get('Content-Type')).toBe('image/png');
+        expect(response.headers.get('Content-Length')).toBeNull();
         expect(fetcher).toHaveBeenCalledWith(
             imageUrl,
             expect.objectContaining({
@@ -38,6 +39,27 @@ describe('creator discovery image relay', () => {
                 referrerPolicy: 'no-referrer',
             })
         );
+    });
+
+    it('does not invent a zero content length for chunked image responses', async () => {
+        process.env.SEARXNG_URL = 'http://localhost:8088';
+        vi.stubGlobal(
+            'fetch',
+            vi.fn<typeof fetch>().mockResolvedValue(
+                new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47]), {
+                    headers: { 'Content-Type': 'image/png' },
+                })
+            )
+        );
+
+        const response = await GET(
+            new NextRequest(
+                'http://localhost/api/creator-discovery/image?url=http%3A%2F%2Flocalhost%3A8088%2Fimage_proxy%3Furl%3Dhttps%253A%252F%252Fimages.example.com%252Fframe.png'
+            )
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get('Content-Length')).toBeNull();
     });
 
     it('refuses proxy URLs from any other origin', async () => {

@@ -1396,10 +1396,10 @@ describe('MemeEditor accessibility', () => {
 
     it('starts a clean meme from a discovered image instead of adding it as a layer', async () => {
         class LoadedImage {
-            width = 240;
-            height = 180;
-            naturalWidth = 240;
-            naturalHeight = 180;
+            width = 640;
+            height = 480;
+            naturalWidth = 640;
+            naturalHeight = 480;
             crossOrigin = '';
             onload: null | (() => void) = null;
             onerror: null | (() => void) = null;

@@ -21,6 +21,7 @@ export type MemeTranslationLanguageCode =
 
 type TranslateFetcher = typeof fetch;
 export type MemeTranslationSourceLanguage = 'auto' | MemeTranslationLanguageCode;
+const TRANSLATION_TIMEOUT_MS = 10_000;
 
 export function parseTranslatedTextResponse(payload: unknown): string {
     if (!Array.isArray(payload) || !Array.isArray(payload[0])) {
@@ -76,6 +77,7 @@ export async function translateText(
         headers: {
             Accept: 'application/json',
         },
+        signal: AbortSignal.timeout(TRANSLATION_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -84,4 +86,35 @@ export async function translateText(
 
     const payload = await response.json();
     return parseTranslatedTextResponse(payload);
+}
+
+export async function requestTranslation(
+    text: string,
+    to: MemeTranslationLanguageCode,
+    options: {
+        fetcher?: TranslateFetcher;
+        from?: MemeTranslationSourceLanguage;
+    } = {}
+): Promise<string> {
+    const query = new URLSearchParams({ text, to });
+    if (options.from && options.from !== 'auto') query.set('from', options.from);
+
+    const response = await (options.fetcher ?? fetch)(
+        `/api/translate?${query.toString()}`,
+        {
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' },
+        }
+    );
+    const payload = (await response.json().catch(() => null)) as
+        | { text?: unknown; error?: unknown }
+        | null;
+    if (!response.ok || typeof payload?.text !== 'string') {
+        throw new Error(
+            typeof payload?.error === 'string'
+                ? payload.error
+                : 'Could not translate the text.'
+        );
+    }
+    return payload.text;
 }

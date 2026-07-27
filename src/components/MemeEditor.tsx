@@ -132,7 +132,7 @@ import {
 } from '@/lib/creatorExport';
 import {
     MEME_TRANSLATION_LANGUAGES,
-    translateText,
+    requestTranslation,
     type MemeTranslationLanguageCode,
 } from '@/lib/textTranslation';
 import ImageLayerTools from '@/components/ImageLayerTools';
@@ -253,7 +253,6 @@ export default function MemeEditor({
     const canvasTemplateRef = useRef<CanvasTemplate | undefined>(
         canvasTemplate
     );
-    canvasTemplateRef.current = canvasTemplate;
     const effectiveTemplate = canvasTemplate ?? template;
     const [topBannerEnabled, setTopBannerEnabled] = useState<boolean>(
         template.layout?.type === 'top-banner'
@@ -519,6 +518,7 @@ export default function MemeEditor({
         await waitForPendingImageAdds();
         return {
             ...draftStateRef.current,
+            canvasTemplate: canvasTemplateRef.current,
             imageOverlays: imageOverlaysRef.current,
         };
     }, [waitForPendingImageAdds]);
@@ -1083,7 +1083,7 @@ export default function MemeEditor({
 
         setTranslatingTextIndex(idx);
         try {
-            const translated = await translateText(sourceText, translationLanguage);
+            const translated = await requestTranslation(sourceText, translationLanguage);
             handleChange(idx, translated);
             toast.success(`Translated to ${MEME_TRANSLATION_LANGUAGES.find((language) => language.code === translationLanguage)?.label ?? 'selected language'}.`);
         } catch (error) {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     MEME_TRANSLATION_LANGUAGES,
     parseTranslatedTextResponse,
+    requestTranslation,
     translateText,
 } from './textTranslation';
 
@@ -123,5 +124,21 @@ describe('text translation helpers', () => {
         expect(translated).toBe('বাংলা বাক্য');
         expect(fetcher.mock.calls[0]?.[0]).toContain('sl=ur');
         expect(fetcher.mock.calls[0]?.[0]).toContain('tl=bn');
+    });
+
+    it('uses the protected application endpoint for browser translation requests', async () => {
+        const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+            new Response(JSON.stringify({ text: 'नमस्ते दुनिया' }), {
+                headers: { 'Content-Type': 'application/json' },
+            })
+        );
+
+        await expect(requestTranslation('hello world', 'hi', { fetcher })).resolves.toBe(
+            'नमस्ते दुनिया'
+        );
+        expect(fetcher).toHaveBeenCalledWith(
+            '/api/translate?text=hello+world&to=hi',
+            expect.objectContaining({ credentials: 'same-origin' })
+        );
     });
 });

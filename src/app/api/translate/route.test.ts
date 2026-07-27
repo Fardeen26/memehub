@@ -82,4 +82,31 @@ describe('translate route', () => {
 
         expect(response.status).toBe(400);
     });
+
+    it('rejects unsupported source languages before calling the provider', async () => {
+        const fetcher = vi.fn<typeof fetch>();
+        vi.stubGlobal('fetch', fetcher);
+
+        const response = await GET(
+            new NextRequest('http://localhost/api/translate?text=hello&from=xx&to=hi')
+        );
+
+        expect(response.status).toBe(400);
+        expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    it('rejects text over the translation request limit before calling the provider', async () => {
+        const fetcher = vi.fn<typeof fetch>();
+        vi.stubGlobal('fetch', fetcher);
+        const text = 'a'.repeat(5_001);
+
+        const response = await GET(
+            new NextRequest(
+                `http://localhost/api/translate?${new URLSearchParams({ text, to: 'hi' })}`
+            )
+        );
+
+        expect(response.status).toBe(400);
+        expect(fetcher).not.toHaveBeenCalled();
+    });
 });
