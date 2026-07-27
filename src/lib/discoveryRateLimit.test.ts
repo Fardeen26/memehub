@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
     __resetDiscoveryRateLimitForTests,
+    consumeDiscoveryImageRateLimit,
     consumeDiscoverySearchRateLimit,
     consumeYouTubeDiscoveryQuota,
+    DISCOVERY_SEARCH_RATE_LIMITS,
     deriveDiscoveryClientKey,
 } from './discoveryRateLimit';
 
@@ -24,6 +26,41 @@ afterEach(() => {
 });
 
 describe('discovery search rate limiting', () => {
+    it('keeps the shared production search capacity above ordinary multi-user traffic', () => {
+        expect(DISCOVERY_SEARCH_RATE_LIMITS).toMatchObject({
+            clientMaxRequests: 20,
+            globalMaxRequests: 600,
+            windowMs: 10 * 60 * 1000,
+        });
+    });
+
+    it('keeps image relay requests out of a creator search quota', async () => {
+        const now = () => 1_000;
+        const options = {
+            environment: { nodeEnv: 'test' },
+            limits: testLimits,
+            now,
+        };
+        const request = requestWithHeaders({ 'x-real-ip': '192.0.2.1' });
+
+        expect(await consumeDiscoverySearchRateLimit(request, options)).toEqual({
+            allowed: true,
+        });
+        expect(await consumeDiscoverySearchRateLimit(request, options)).toEqual({
+            allowed: true,
+        });
+        expect(await consumeDiscoveryImageRateLimit(request, options)).toEqual({
+            allowed: true,
+        });
+        expect(await consumeDiscoverySearchRateLimit(request, options)).toMatchObject({
+            allowed: false,
+            scope: 'client',
+        });
+        expect(await consumeDiscoveryImageRateLimit(request, options)).toEqual({
+            allowed: true,
+        });
+    });
+
     it('derives an opaque client key from the highest-confidence proxy IP', () => {
         const request = requestWithHeaders({
             'cf-connecting-ip': '203.0.113.8',

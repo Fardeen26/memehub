@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { consumeDiscoverySearchRateLimit } from '@/lib/discoveryRateLimit';
+import { consumeDiscoveryImageRateLimit } from '@/lib/discoveryRateLimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         );
     }
 
-    const rateLimit = await consumeDiscoverySearchRateLimit(request);
+    const rateLimit = await consumeDiscoveryImageRateLimit(request);
     if (!rateLimit.allowed) {
         return NextResponse.json(
             {

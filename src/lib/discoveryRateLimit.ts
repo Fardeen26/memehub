@@ -3,7 +3,13 @@ import { isIP } from 'node:net';
 
 export const DISCOVERY_SEARCH_RATE_LIMITS = {
     clientMaxRequests: 20,
-    globalMaxRequests: 120,
+    globalMaxRequests: 600,
+    windowMs: 10 * 60 * 1000,
+} as const;
+
+export const DISCOVERY_IMAGE_RELAY_RATE_LIMITS = {
+    clientMaxRequests: 240,
+    globalMaxRequests: 1_440,
     windowMs: 10 * 60 * 1000,
 } as const;
 
@@ -17,7 +23,6 @@ const UNAVAILABLE_RETRY_SECONDS = 60;
 const CLIENT_IDENTITY_MAX_LENGTH = 512;
 const RATE_LIMIT_STORE_TIMEOUT_MS = 4_000;
 const RATE_LIMIT_KEY_PREFIX = 'memehub:creator-discovery:v1';
-const GLOBAL_RATE_LIMIT_KEY = `${RATE_LIMIT_KEY_PREFIX}:global`;
 const YOUTUBE_RATE_LIMIT_KEY_PREFIX = `${RATE_LIMIT_KEY_PREFIX}:youtube`;
 
 type RequestWithHeaders = {
@@ -28,6 +33,7 @@ type RequestWithHeaders = {
 };
 
 type RateLimitScope = 'client' | 'global';
+type DiscoveryRateLimitBucket = 'search' | 'image';
 
 export type DiscoverySearchRateLimitResult =
     | { allowed: true }
@@ -172,6 +178,16 @@ function retryAfterSeconds(resetAt: number, now: number): number {
     return Math.max(1, Math.ceil((resetAt - now) / 1000));
 }
 
+function bucketKey(bucket: DiscoveryRateLimitBucket, key: string): string {
+    return bucket === 'search'
+        ? `${RATE_LIMIT_KEY_PREFIX}:${key}`
+        : `${RATE_LIMIT_KEY_PREFIX}:image:${key}`;
+}
+
+function globalBucketKey(bucket: DiscoveryRateLimitBucket): string {
+    return bucketKey(bucket, 'global');
+}
+
 function youtubeDailyLimit(value: string | undefined): number {
     const normalized = value?.trim();
     if (!normalized || !/^\d+$/.test(normalized)) {
@@ -216,9 +232,12 @@ function activeMemoryBucket(key: string, now: number): MemoryBucket | undefined 
 function consumeMemoryRateLimit(
     clientKey: string,
     limits: DiscoveryRateLimitLimits,
-    now: number
+    now: number,
+    bucket: DiscoveryRateLimitBucket
 ): DiscoverySearchRateLimitResult {
-    const clientBucket = activeMemoryBucket(clientKey, now);
+    const scopedClientKey = bucketKey(bucket, clientKey);
+    const scopedGlobalKey = globalBucketKey(bucket);
+    const clientBucket = activeMemoryBucket(scopedClientKey, now);
     if (clientBucket && clientBucket.count >= limits.clientMaxRequests) {
         return {
             allowed: false,
@@ -228,7 +247,7 @@ function consumeMemoryRateLimit(
         };
     }
 
-    const globalBucket = activeMemoryBucket(GLOBAL_RATE_LIMIT_KEY, now);
+    const globalBucket = activeMemoryBucket(scopedGlobalKey, now);
     if (globalBucket && globalBucket.count >= limits.globalMaxRequests) {
         return {
             allowed: false,
@@ -241,7 +260,7 @@ function consumeMemoryRateLimit(
     if (clientBucket) {
         clientBucket.count += 1;
     } else {
-        memoryBuckets.set(clientKey, {
+        memoryBuckets.set(scopedClientKey, {
             count: 1,
             resetAt: now + limits.windowMs,
         });
@@ -250,7 +269,7 @@ function consumeMemoryRateLimit(
     if (globalBucket) {
         globalBucket.count += 1;
     } else {
-        memoryBuckets.set(GLOBAL_RATE_LIMIT_KEY, {
+        memoryBuckets.set(scopedGlobalKey, {
             count: 1,
             resetAt: now + limits.windowMs,
         });
@@ -296,6 +315,7 @@ function unavailableResult(): DiscoverySearchRateLimitResult {
 async function consumeSharedRateLimit(
     clientKey: string,
     limits: DiscoveryRateLimitLimits,
+    bucket: DiscoveryRateLimitBucket,
     redisUrl: string,
     redisToken: string,
     fetcher: typeof fetch,
@@ -312,8 +332,8 @@ async function consumeSharedRateLimit(
                 'EVAL',
                 CONSUME_BOTH_BUCKETS_SCRIPT,
                 2,
-                `${RATE_LIMIT_KEY_PREFIX}:${clientKey}`,
-                GLOBAL_RATE_LIMIT_KEY,
+                bucketKey(bucket, clientKey),
+                globalBucketKey(bucket),
                 limits.clientMaxRequests,
                 limits.globalMaxRequests,
                 limits.windowMs,
@@ -405,12 +425,16 @@ async function consumeSharedYouTubeQuota(
     };
 }
 
-export async function consumeDiscoverySearchRateLimit(
+async function consumeDiscoveryRateLimit(
     request: RequestWithHeaders,
+    bucket: DiscoveryRateLimitBucket,
     options: DiscoveryRateLimitOptions = {}
 ): Promise<DiscoverySearchRateLimitResult> {
     const environment = configuredEnvironment(options.environment);
-    const limits = options.limits || DISCOVERY_SEARCH_RATE_LIMITS;
+    const limits = options.limits ||
+        (bucket === 'search'
+            ? DISCOVERY_SEARCH_RATE_LIMITS
+            : DISCOVERY_IMAGE_RELAY_RATE_LIMITS);
     const clientKey = deriveDiscoveryClientKey(request);
     const hasSharedStore = Boolean(environment.redisUrl && environment.redisToken);
 
@@ -425,6 +449,7 @@ export async function consumeDiscoverySearchRateLimit(
             return await consumeSharedRateLimit(
                 clientKey,
                 limits,
+                bucket,
                 environment.redisUrl as string,
                 environment.redisToken as string,
                 options.fetcher || fetch,
@@ -439,7 +464,26 @@ export async function consumeDiscoverySearchRateLimit(
         return unavailableResult();
     }
 
-    return consumeMemoryRateLimit(clientKey, limits, (options.now || Date.now)());
+    return consumeMemoryRateLimit(
+        clientKey,
+        limits,
+        (options.now || Date.now)(),
+        bucket
+    );
+}
+
+export async function consumeDiscoverySearchRateLimit(
+    request: RequestWithHeaders,
+    options: DiscoveryRateLimitOptions = {}
+): Promise<DiscoverySearchRateLimitResult> {
+    return consumeDiscoveryRateLimit(request, 'search', options);
+}
+
+export async function consumeDiscoveryImageRateLimit(
+    request: RequestWithHeaders,
+    options: DiscoveryRateLimitOptions = {}
+): Promise<DiscoverySearchRateLimitResult> {
+    return consumeDiscoveryRateLimit(request, 'image', options);
 }
 
 export async function consumeYouTubeDiscoveryQuota(
