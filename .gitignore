@@ -43,3 +43,4 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+.searxng.env
