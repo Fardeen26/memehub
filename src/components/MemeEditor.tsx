@@ -203,6 +203,43 @@ function createTextLayerId(): string {
     return `text-layer-${Date.now().toString(36)}-${textLayerIdSequence.toString(36)}`;
 }
 
+function createDefaultTextSettings(
+    template: Template,
+    box: Template['textBoxes'][number]
+): TextSettings {
+    const isTopBanner = template.layout?.type === 'top-banner';
+    return {
+        fontSize: box.fontSize,
+        color: isTopBanner ? '#111111' : '#ffffff',
+        fontFamily: isTopBanner ? 'Arial' : 'Impact',
+        fontWeight: isTopBanner ? '700' : '900',
+        letterSpacing: 0,
+        textCase: isTopBanner ? 'normal' : 'uppercase',
+        backgroundColor: isTopBanner ? '#ffffff' : 'transparent',
+        backgroundRadius: isTopBanner ? 0 : 12,
+        outline: {
+            width: isTopBanner ? 0 : 1,
+            color: '#000000',
+        },
+        shadow: {
+            blur: isTopBanner ? 0 : 5,
+            offsetX: isTopBanner ? 0 : 1,
+            offsetY: isTopBanner ? 0 : 1,
+            color: '#000000',
+        },
+    };
+}
+
+function getTopBannerHeight(template: Template, imageHeight: number): number {
+    return template.layout?.bannerHeight ?? Math.max(160, Math.round(imageHeight * 0.22));
+}
+
+function clampTopBannerHeight(imageHeight: number, requestedHeight: number): number {
+    const minHeight = 64;
+    const maxHeight = Math.max(minHeight, Math.round(imageHeight * 0.45));
+    return Math.max(minHeight, Math.min(maxHeight, Math.round(requestedHeight)));
+}
+
 export default function MemeEditor({
     template,
     onReset,
@@ -218,6 +255,16 @@ export default function MemeEditor({
     );
     canvasTemplateRef.current = canvasTemplate;
     const effectiveTemplate = canvasTemplate ?? template;
+    const [topBannerEnabled, setTopBannerEnabled] = useState<boolean>(
+        template.layout?.type === 'top-banner'
+    );
+    const [topBannerHeight, setTopBannerHeight] = useState<number>(() =>
+        template.layout?.bannerHeight ?? 0
+    );
+    const resolvedTopBannerHeight =
+        topBannerEnabled
+            ? Math.max(64, topBannerHeight || getTopBannerHeight(effectiveTemplate, 1))
+            : 0;
     const [texts, setTexts] = useState<string[]>(Array(template.textBoxes.length).fill(''));
     const [translationSourceTexts, setTranslationSourceTexts] = useState<string[]>(
         Array(template.textBoxes.length).fill('')
@@ -297,25 +344,11 @@ export default function MemeEditor({
     }, [isMobileDevice]);
 
     const [textSettings, setTextSettings] = useState<TextSettings[]>(
-        template.textBoxes.map(box => ({
-            fontSize: box.fontSize,
-            color: '#ffffff',
-            fontFamily: getDefaultFont(),
-            fontWeight: '900',
-            letterSpacing: 0,
-            textCase: 'uppercase' as const,
-            backgroundColor: 'transparent',
-            backgroundRadius: 12,
-            outline: {
-                width: 1,
-                color: '#000000'
-            },
-            shadow: {
-                blur: 5,
-                offsetX: 1,
-                offsetY: 1,
-                color: '#000000'
-            }
+        template.textBoxes.map((box) => ({
+            ...createDefaultTextSettings(template, box),
+            fontFamily: template.layout?.type === 'top-banner'
+                ? 'Arial'
+                : getDefaultFont(),
         }))
     );
     const textsRef = useRef(texts);
@@ -417,6 +450,15 @@ export default function MemeEditor({
     const restoreDraftState = useCallback((draft: MemeEditorDraftState) => {
         setCanvasTemplate(draft.canvasTemplate);
         canvasTemplateRef.current = draft.canvasTemplate;
+        setTopBannerEnabled(
+            draft.canvasTemplate?.layout?.type === 'top-banner' ||
+                draft.template.layout?.type === 'top-banner'
+        );
+        setTopBannerHeight(
+            draft.canvasTemplate?.layout?.bannerHeight ??
+                draft.template.layout?.bannerHeight ??
+                0
+        );
         setTexts(draft.texts);
         setTranslationSourceTexts(draft.texts);
         setTextLayerIds(draft.texts.map(() => createTextLayerId()));
@@ -441,6 +483,12 @@ export default function MemeEditor({
         setSelectedImageIndex(-1);
         setSelectedShapeIndex(-1);
     }, [replaceShapes, setSelectedShapeIndex]);
+
+    useEffect(() => {
+        if (topBannerEnabled && topBannerHeight <= 0) {
+            setTopBannerHeight(getTopBannerHeight(effectiveTemplate, 1));
+        }
+    }, [effectiveTemplate, topBannerEnabled, topBannerHeight]);
 
     const draftState = useMemo<MemeEditorDraftState>(() => ({
         template,
@@ -3239,8 +3287,11 @@ export default function MemeEditor({
         ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
 
         const isMobile = isMobileDevice();
+        const isBannerLayout = effectiveTemplate.layout?.type === 'top-banner';
         const backgroundPaddingX = Math.max(6, Math.round(fontSize * 0.2));
-        const backgroundPaddingY = Math.max(4, Math.round(fontSize * 0.12));
+        const backgroundPaddingY = isBannerLayout
+            ? Math.max(2, Math.round(fontSize * 0.08))
+            : Math.max(4, Math.round(fontSize * 0.12));
         const backgroundRadius = Math.max(0, settings.backgroundRadius || 0);
         const hasBackground = Boolean(settings.backgroundColor && settings.backgroundColor !== 'transparent');
         const lineHeight = fontSize * 1.2;
@@ -3253,7 +3304,9 @@ export default function MemeEditor({
             box.width,
             measuredLineWidths.length > 0 ? Math.max(...measuredLineWidths) : 0
         );
-        const textBlockTop = box.y + Math.max(0, (box.height - textBlockHeight) / 2);
+        const textBlockTop = isBannerLayout
+            ? box.y + Math.max(0, (box.height - textBlockHeight) / 4)
+            : box.y + Math.max(0, (box.height - textBlockHeight) / 2);
         const textBlockLeft = box.x + Math.max(0, (box.width - textBlockWidth) / 2);
 
         const drawBackground = () => {
@@ -3567,12 +3620,39 @@ export default function MemeEditor({
         if (canvas.width !== img.width) {
             canvas.width = img.width;
         }
-        if (canvas.height !== img.height) {
-            canvas.height = img.height;
+        const activeLayout =
+            topBannerEnabled
+                ? {
+                      type: 'top-banner' as const,
+                      bannerHeight: clampTopBannerHeight(
+                          img.height,
+                          resolvedTopBannerHeight
+                      ),
+                      bannerColor: effectiveTemplate.layout?.bannerColor ?? '#ffffff',
+                  }
+                : effectiveTemplate.layout;
+        const bannerHeight =
+            activeLayout?.type === 'top-banner'
+                ? activeLayout.bannerHeight ?? Math.max(160, Math.round(img.height * 0.22))
+                : 0;
+        const targetHeight = img.height + bannerHeight;
+        if (canvas.height !== targetHeight) {
+            canvas.height = targetHeight;
         }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
+        if (bannerHeight > 0) {
+            ctx.save();
+            ctx.fillStyle =
+                activeLayout?.type === 'top-banner'
+                    ? activeLayout.bannerColor ?? '#ffffff'
+                    : '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, bannerHeight);
+            ctx.restore();
+            ctx.drawImage(img, 0, bannerHeight);
+        } else {
+            ctx.drawImage(img, 0, 0);
+        }
 
             if (strokes.length > 0 || currentStroke) {
                 drawStrokes(ctx);
@@ -4012,7 +4092,7 @@ export default function MemeEditor({
 
                 ctx.restore();
             }
-    }, [effectiveTemplate, textSettings, drawText, drawCreatorBranding, waitForFont, isImageInteracting, isTextInteracting, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer, isMobileDevice]);
+    }, [effectiveTemplate, resolvedTopBannerHeight, topBannerEnabled, textSettings, drawText, drawCreatorBranding, waitForFont, isImageInteracting, isTextInteracting, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer, isMobileDevice]);
 
     const draw = useCallback(async () => {
         const canvas = canvasRef.current;
@@ -5431,6 +5511,66 @@ export default function MemeEditor({
                     </EditorToolsPanel>
 
                     <EditorInspectorPanel className="rounded-xl border border-white/10 bg-[#15151c] p-3 shadow-[0_14px_36px_rgba(0,0,0,0.2)] lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:overscroll-contain">
+                    <div className="mb-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                                    Template format
+                                </p>
+                                <p className="mt-0.5 text-[9px] text-white/40">
+                                    Choose whether the meme uses a white header band.
+                                </p>
+                            </div>
+                            <div className="rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[9px] text-white/50">
+                                {topBannerEnabled ? 'Banner on' : 'Standard'}
+                            </div>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setTopBannerEnabled(false)}
+                                className={`rounded-md border px-2.5 py-1.5 text-left text-[11px] font-medium transition-colors ${
+                                    !topBannerEnabled
+                                        ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                        : 'border-white/10 bg-black/20 text-white/70 hover:bg-white/5'
+                                }`}
+                            >
+                                Standard
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTopBannerEnabled(true)}
+                                className={`rounded-md border px-2.5 py-1.5 text-left text-[11px] font-medium transition-colors ${
+                                    topBannerEnabled
+                                        ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                        : 'border-white/10 bg-black/20 text-white/70 hover:bg-white/5'
+                                }`}
+                            >
+                                White top banner
+                            </button>
+                        </div>
+                        {topBannerEnabled && (
+                            <div className="mt-2 space-y-1.5">
+                                <div className="flex items-center justify-between gap-2 text-[10px] text-white/50">
+                                    <span>Banner height</span>
+                                    <span>{resolvedTopBannerHeight}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="64"
+                                    max="600"
+                                    value={resolvedTopBannerHeight}
+                                    onChange={(event) =>
+                                        setTopBannerHeight(Number(event.target.value))
+                                    }
+                                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
+                                    style={{
+                                        background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((resolvedTopBannerHeight - 64) / 536) * 100}%, rgba(255,255,255,0.2) ${((resolvedTopBannerHeight - 64) / 536) * 100}%, rgba(255,255,255,0.2) 100%)`
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </div>
                     <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">

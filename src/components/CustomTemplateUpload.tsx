@@ -37,6 +37,7 @@ export default function CustomTemplateUpload({
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadMethod, setUploadMethod] = useState<'file' | 'paste'>('file');
+    const [templateStyle, setTemplateStyle] = useState<'classic' | 'top-banner'>('classic');
     const [pastedImageData, setPastedImageData] = useState<string | null>(null);
 
     const isMobileDevice = () => {
@@ -44,6 +45,56 @@ export default function CustomTemplateUpload({
             return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         }
         return false;
+    };
+
+    const createTemplate = (img: HTMLImageElement, imageSrc: string): Template => {
+        if (templateStyle === 'top-banner') {
+            const bannerHeight = Math.max(160, Math.round(img.height * 0.22));
+            return {
+                image: imageSrc,
+                layout: {
+                    type: 'top-banner',
+                    bannerHeight,
+                    bannerColor: '#ffffff',
+                },
+                textBoxes: [
+                    {
+                        x: Math.max(20, Math.round(img.width * 0.04)),
+                        y: Math.max(16, Math.round(bannerHeight * 0.08)),
+                        width: Math.max(100, Math.round(img.width * 0.92)),
+                        height: Math.max(80, Math.round(bannerHeight * 0.74)),
+                        fontSize: Math.max(28, Math.min(img.width, bannerHeight) * 0.22),
+                        minFont: 18,
+                        align: 'center' as const,
+                        verticalAlign: 'middle' as const,
+                    },
+                ],
+            };
+        }
+
+        return {
+            image: imageSrc,
+            textBoxes: [
+                {
+                    x: Math.max(20, img.width * 0.05),
+                    y: Math.max(50, img.height * 0.1),
+                    width: Math.min(img.width * 0.9, img.width - 40),
+                    height: Math.max(img.height * 0.2, 150),
+                    fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
+                    minFont: 20,
+                    align: 'center' as const
+                },
+                {
+                    x: Math.max(20, img.width * 0.05),
+                    y: Math.max(img.height * 0.7, img.height - 200),
+                    width: Math.min(img.width * 0.9, img.width - 40),
+                    height: Math.max(img.height * 0.2, 150),
+                    fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
+                    minFont: 20,
+                    align: 'center' as const
+                }
+            ]
+        };
     };
 
     useEffect(() => {
@@ -80,30 +131,7 @@ export default function CustomTemplateUpload({
             if (isDataUrl) {
                 const img = new window.Image();
                 img.onload = () => {
-                    const defaultTemplate: Template = {
-                        image: source as string,
-                        textBoxes: [
-                            {
-                                x: Math.max(20, img.width * 0.05),
-                                y: Math.max(50, img.height * 0.1),
-                                width: Math.min(img.width * 0.9, img.width - 40),
-                                height: Math.max(img.height * 0.2, 150),
-                                fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
-                                minFont: 20,
-                                align: 'center' as const
-                            },
-                            {
-                                x: Math.max(20, img.width * 0.05),
-                                y: Math.max(img.height * 0.7, img.height - 200),
-                                width: Math.min(img.width * 0.9, img.width - 40),
-                                height: Math.max(img.height * 0.2, 150),
-                                fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
-                                minFont: 20,
-                                align: 'center' as const
-                            }
-                        ]
-                    };
-                    resolve(defaultTemplate);
+                    resolve(createTemplate(img, source as string));
                 };
                 img.onerror = reject;
                 img.src = source as string;
@@ -112,30 +140,7 @@ export default function CustomTemplateUpload({
                 reader.onload = (e) => {
                     const img = new window.Image();
                     img.onload = () => {
-                        const defaultTemplate: Template = {
-                            image: e.target?.result as string,
-                            textBoxes: [
-                                {
-                                    x: Math.max(20, img.width * 0.05),
-                                    y: Math.max(50, img.height * 0.1),
-                                    width: Math.min(img.width * 0.9, img.width - 40),
-                                    height: Math.max(img.height * 0.2, 150),
-                                    fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
-                                    minFont: 20,
-                                    align: 'center' as const
-                                },
-                                {
-                                    x: Math.max(20, img.width * 0.05),
-                                    y: Math.max(img.height * 0.7, img.height - 200),
-                                    width: Math.min(img.width * 0.9, img.width - 40),
-                                    height: Math.max(img.height * 0.2, 150),
-                                    fontSize: Math.max(30, Math.min(img.width, img.height) * 0.08),
-                                    minFont: 20,
-                                    align: 'center' as const
-                                }
-                            ]
-                        };
-                        resolve(defaultTemplate);
+                        resolve(createTemplate(img, e.target?.result as string));
                     };
                     img.onerror = reject;
                     img.src = e.target?.result as string;
@@ -221,6 +226,7 @@ export default function CustomTemplateUpload({
         setSelectedFile(null);
         setPastedImageData(null);
         setUploadMethod('file');
+        setTemplateStyle('classic');
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -282,6 +288,31 @@ export default function CustomTemplateUpload({
                         >
                             <ImageIcon className="h-6 w-6 mx-auto mb-2" />
                             <div className="text-xs font-medium">Paste Image</div>
+                        </motion.button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            className={`p-3 rounded-md border-2 transition-colors ${templateStyle === 'classic'
+                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                }`}
+                            onClick={() => setTemplateStyle('classic')}
+                        >
+                            <div className="text-xs font-medium">Classic</div>
+                            <div className="mt-1 text-[11px] text-white/60">Top and bottom text</div>
+                        </motion.button>
+                        <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            className={`p-3 rounded-md border-2 transition-colors ${templateStyle === 'top-banner'
+                                ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                : 'border-white/20 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                }`}
+                            onClick={() => setTemplateStyle('top-banner')}
+                        >
+                            <div className="text-xs font-medium">Top Banner</div>
+                            <div className="mt-1 text-[11px] text-white/60">White header above the image</div>
                         </motion.button>
                     </div>
 
