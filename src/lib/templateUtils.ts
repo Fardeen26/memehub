@@ -15,6 +15,7 @@ export function curatedToEditorTemplates(
                 image: template.image || template.originalUrl,
                 textBoxes: template.textBoxes,
                 displayName: key.replace(/-/g, " "),
+                layout: template.layout,
             },
         ])
     );

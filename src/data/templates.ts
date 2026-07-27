@@ -25,6 +25,11 @@ export interface OptimizedMemeTemplate {
     category?: string;
     tags?: string[];
     image?: string;
+    layout?: {
+        type: "standard" | "top-banner";
+        bannerHeight?: number;
+        bannerColor?: string;
+    };
 }
 
 export const optimizeTemplates = (

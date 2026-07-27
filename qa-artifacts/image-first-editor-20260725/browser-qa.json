@@ -1,0 +1,43 @@
+{
+  "desktop": {
+    "canvas": {
+      "x": 133,
+      "y": 152,
+      "width": 760,
+      "height": 381
+    },
+    "compactTools": {
+      "x": 938,
+      "y": 152,
+      "width": 386,
+      "height": 94
+    },
+    "replacementCanvas": {
+      "width": 640,
+      "height": 400
+    },
+    "replacementTextFields": 2
+  },
+  "mobile": {
+    "canvas": {
+      "x": 20,
+      "y": 140,
+      "width": 350,
+      "height": 176
+    },
+    "compactTools": {
+      "x": 20,
+      "y": 332,
+      "width": 350,
+      "height": 94
+    },
+    "textFields": 2,
+    "resultCard": {
+      "x": 33,
+      "y": 609,
+      "width": 324,
+      "height": 395.5
+    }
+  },
+  "pageErrors": []
+}

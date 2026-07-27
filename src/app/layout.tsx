@@ -8,6 +8,10 @@ import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import { siteConfig } from "@/data/site-config";
+import {
+  ADSENSE_CLIENT_ID,
+  externalScriptDescriptors,
+} from "@/lib/externalScripts";
 import OGImage from "./og.png";
 
 // Only load the essential font for initial page load
@@ -78,18 +82,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <meta name="google-adsense-account" content="ca-pub-1916939586711533" />
-        <Script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1916939586711533"
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
-        <Script 
-          async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1916939586711533"
-          strategy="beforeInteractive"
-          crossOrigin="anonymous"
-        />
+        <meta name="google-adsense-account" content={ADSENSE_CLIENT_ID} />
       </head>
       <body
         className={`${bricolage_grotesque_init.className} antialiased min-h-screen bg-white dark:bg-black relative`}
@@ -105,15 +98,9 @@ export default function RootLayout({
           <Toaster />
         </Providers>
         <Analytics />
-        <Script
-          defer
-          data-domain="memehub.fardeen.tech"
-          src="https://analytics-code.vercel.app/tracking-script.js"
-        />
-        <Script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1916939586711533"
-          strategy="beforeInteractive"
-          crossOrigin="anonymous"
-        />
+        {externalScriptDescriptors.map(({ id, ...scriptProps }) => (
+          <Script key={id} id={id} {...scriptProps} />
+        ))}
       </body>
     </html>
   );

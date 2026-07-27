@@ -3,8 +3,8 @@
 // @ts-nocheck
 
 import { Template } from '@/types/template';
-import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Maximize2, Minimize2, Shapes, ChevronDown, ChevronUp, Layers, Download, Video, Loader2 } from 'lucide-react';
-import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
+import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Shapes, ChevronDown, ChevronUp, Layers, Download, Video, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState, ChangeEvent, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
     DropdownMenu,
@@ -17,7 +17,10 @@ import {
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
+    SelectSeparator,
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
@@ -28,12 +31,22 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog"
 import { toast } from 'sonner';
-import { MemeEditorProps, TextSettings, ImageOverlay, EraseStroke } from '@/types/editor';
+import {
+    MemeEditorProps,
+    TextSettings,
+    ImageOverlay,
+    EraseStroke,
+    type ImageSourceAttribution,
+} from '@/types/editor';
 import Image from 'next/image';
-import { useFontLoader, FONT_CONFIGS } from '@/hooks/useFontLoader';
+import {
+    useFontLoader,
+    FONT_CONFIGS,
+    INDIAN_SCRIPT_FONT_NAMES,
+    getCanonicalFontFamily,
+} from '@/hooks/useFontLoader';
 import { useCanvasShapes } from '@/hooks/useCanvasShapes';
 import ElementsPanel from '@/components/ElementsPanel';
 import { resolveImageSrc } from '@/lib/resolveImageSrc';
@@ -46,9 +59,12 @@ import {
     decodeGifFromArrayBuffer,
     fetchGifArrayBuffer,
     getAnimatedExportDurationMs,
+    getAnimatedOverlayIdsToRehydrate,
+    getGifDecodeLimitsForPolicy,
     getGifFrameCanvas,
     isGifSource,
     type DecodedGif,
+    type GifDecodePolicy,
     type GifDecodeLimits,
 } from '@/lib/gifAnimation';
 import { getMediaPerfNow, logMediaDebug } from '@/lib/mediaDebug';
@@ -60,6 +76,7 @@ import {
     downloadBlob,
     encodeSceneToGifBlob,
     recordSceneToVideoBlob,
+    renderSceneToImageBlob,
     renderSceneToPngBlob,
     type SceneRenderOptions,
 } from '@/lib/canvasExport';
@@ -69,18 +86,233 @@ import {
     uploadVideoCaptureToCloudinary,
     waitForCloudinaryMp4,
 } from '@/lib/cloudinaryVideoExport';
+import { useEditorDraft } from '@/hooks/useEditorDraft';
+import {
+    assertMemeEditorDraftLocalMediaCapacity,
+    type CanvasTemplate,
+    type DrawingStroke,
+    type MemeEditorDraftState,
+} from '@/lib/editorDraft';
+import {
+    DEFAULT_CREATOR_BRANDING,
+    fitWatermarkFontSize,
+    getWatermarkCoordinates,
+    type CreatorBranding,
+} from '@/lib/creatorBranding';
+import { getSafeLetterSpacing } from '@/lib/textShaping';
+import {
+    canMoveTextLayerWithinGroup,
+    constrainLayerPosition,
+    duplicateImageLayer,
+    duplicateShapeLayer,
+    duplicateTextLayer,
+    fitImageLayerToCanvas,
+    moveLayer,
+    moveTextLayer,
+    toggleLayerVisibility,
+} from '@/lib/layerOperations';
+import CreatorWorkspace, {
+    type CreatorWorkspaceTab,
+} from '@/components/CreatorWorkspace';
+import CreatorLayersPanel from '@/components/CreatorLayersPanel';
+import TextStylePanel from '@/components/TextStylePanel';
+import {
+    applyTextStylePreset,
+    type TextStylePresetId,
+} from '@/lib/textStylePresets';
+import CreatorAssetShelf from '@/components/CreatorAssetShelf';
+import CreatorExportPanel, {
+    type CreatorStillExportRequest,
+} from '@/components/CreatorExportPanel';
+import type { CreatorAsset } from '@/lib/creatorAssets';
+import {
+    buildCreatorExportFilename,
+    resolveCreatorExportDimensions,
+    STILL_IMAGE_FORMATS,
+} from '@/lib/creatorExport';
+import {
+    MEME_TRANSLATION_LANGUAGES,
+    requestTranslation,
+    type MemeTranslationLanguageCode,
+} from '@/lib/textTranslation';
+import ImageLayerTools from '@/components/ImageLayerTools';
+import CreatorBrandPanel from '@/components/CreatorBrandPanel';
+import CreatorDiscoveryPanel from '@/components/CreatorDiscoveryPanel';
+import type { DiscoveryImageAsset } from '@/types/creatorDiscovery';
+import { settleSceneImageLoads } from '@/lib/sceneImageLoading';
+import { materializeReusableImage } from '@/lib/reusableImagePersistence';
+import {
+    getTemplateImageTooSmallMessage,
+    isTemplateImageTooSmall,
+} from '@/lib/discoveryImageQuality';
+import {
+    EditorCanvasLayout,
+    EditorCanvasStage,
+    EditorInspectorPanel,
+    EditorToolsPanel,
+} from '@/components/EditorCanvasLayout';
 
-export default function MemeEditor({ template, onReset }: MemeEditorProps) {
+const STATIC_IMAGE_LOAD_TIMEOUT_MS = 12_000;
+const IMAGE_CACHE_MAX_ENTRIES = 32;
+const EDITOR_IMAGE_LAYER_LIMIT = 24;
+let textLayerIdSequence = 0;
+
+function getDiscoveryImageSource(
+    asset: DiscoveryImageAsset
+): ImageSourceAttribution {
+    if (asset.provider === 'SearXNG') {
+        return {
+            provider: 'SearXNG',
+            url: asset.sourceUrl,
+            creator: asset.sourceDomain,
+            licenseName: 'Rights not verified',
+            rights: 'unknown',
+            usageTerms: 'Check the original publisher before reuse.',
+        };
+    }
+
+    return {
+        provider: asset.provider,
+        url: asset.sourceUrl,
+        creator: asset.creator,
+        creditLine: asset.creditLine,
+        licenseName: asset.licenseName,
+        licenseUrl: asset.licenseUrl,
+        rights: asset.rights,
+        attributionRequired: asset.attributionRequired,
+        usageTerms: asset.usageTerms,
+        restrictions: asset.restrictions,
+    };
+}
+
+function getMaterializedImageMimeType(
+    file: File
+): CanvasTemplate['mimeType'] {
+    if (
+        file.type !== 'image/jpeg' &&
+        file.type !== 'image/png' &&
+        file.type !== 'image/webp'
+    ) {
+        throw new Error('The downloaded image format is not supported.');
+    }
+    return file.type;
+}
+
+function createTextLayerId(): string {
+    textLayerIdSequence += 1;
+    return `text-layer-${Date.now().toString(36)}-${textLayerIdSequence.toString(36)}`;
+}
+
+function createDefaultTextSettings(
+    template: Template,
+    box: Template['textBoxes'][number]
+): TextSettings {
+    const isTopBanner = template.layout?.type === 'top-banner';
+    return {
+        fontSize: box.fontSize,
+        color: isTopBanner ? '#111111' : '#ffffff',
+        fontFamily: isTopBanner ? 'Arial' : 'Impact',
+        fontWeight: isTopBanner ? '700' : '900',
+        letterSpacing: 0,
+        textCase: isTopBanner ? 'normal' : 'uppercase',
+        backgroundColor: isTopBanner ? '#ffffff' : 'transparent',
+        backgroundRadius: isTopBanner ? 0 : 12,
+        outline: {
+            width: isTopBanner ? 0 : 1,
+            color: '#000000',
+        },
+        shadow: {
+            blur: isTopBanner ? 0 : 5,
+            offsetX: isTopBanner ? 0 : 1,
+            offsetY: isTopBanner ? 0 : 1,
+            color: '#000000',
+        },
+    };
+}
+
+function getTopBannerHeight(template: Template, imageHeight: number): number {
+    return template.layout?.bannerHeight ?? Math.max(160, Math.round(imageHeight * 0.22));
+}
+
+function clampTopBannerHeight(imageHeight: number, requestedHeight: number): number {
+    const minHeight = 64;
+    const maxHeight = Math.max(minHeight, Math.round(imageHeight * 0.45));
+    return Math.max(minHeight, Math.min(maxHeight, Math.round(requestedHeight)));
+}
+
+export default function MemeEditor({
+    template,
+    onReset,
+    restoreSavedDraft = false,
+    expectedDraftUpdatedAt,
+}: MemeEditorProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const primaryCaptionRef = useRef<HTMLTextAreaElement | null>(null);
+    const [canvasTemplate, setCanvasTemplate] =
+        useState<CanvasTemplate | undefined>();
+    const canvasTemplateRef = useRef<CanvasTemplate | undefined>(
+        canvasTemplate
+    );
+    const effectiveTemplate = canvasTemplate ?? template;
+    const [topBannerEnabled, setTopBannerEnabled] = useState<boolean>(
+        template.layout?.type === 'top-banner'
+    );
+    const [topBannerHeight, setTopBannerHeight] = useState<number>(() =>
+        template.layout?.bannerHeight ?? 0
+    );
+    const resolvedTopBannerHeight =
+        topBannerEnabled
+            ? Math.max(64, topBannerHeight || getTopBannerHeight(effectiveTemplate, 1))
+            : 0;
     const [texts, setTexts] = useState<string[]>(Array(template.textBoxes.length).fill(''));
+    const [translationSourceTexts, setTranslationSourceTexts] = useState<string[]>(
+        Array(template.textBoxes.length).fill('')
+    );
+    const [textLayerIds, setTextLayerIds] = useState<string[]>(() =>
+        template.textBoxes.map(() => createTextLayerId())
+    );
+    const [isLeaving, setIsLeaving] = useState(false);
+    const isLeavingRef = useRef(false);
+    const pendingImageAddCount = useRef(0);
+    const pendingImageAddWaiters = useRef<Set<() => void>>(new Set());
+    const waitForPendingImageAdds = useCallback((): Promise<void> => {
+        if (pendingImageAddCount.current === 0) {
+            return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+            pendingImageAddWaiters.current.add(resolve);
+        });
+    }, []);
+    const beginPendingImageAdd = useCallback(() => {
+        pendingImageAddCount.current += 1;
+        let finished = false;
+        return () => {
+            if (finished) return;
+            finished = true;
+            pendingImageAddCount.current = Math.max(
+                0,
+                pendingImageAddCount.current - 1
+            );
+            if (pendingImageAddCount.current === 0) {
+                pendingImageAddWaiters.current.forEach((resolve) => resolve());
+                pendingImageAddWaiters.current.clear();
+            }
+        };
+    }, []);
 
     const [textBoxes, setTextBoxes] = useState<Template['textBoxes']>(template.textBoxes);
     const [textBoxRotations, setTextBoxRotations] = useState<number[]>(Array(template.textBoxes.length).fill(0));
-    const [originalTextBoxCount] = useState<number>(template.textBoxes.length);
+    const [originalTextBoxCount, setOriginalTextBoxCount] =
+        useState<number>(template.textBoxes.length);
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragIndex, setDragIndex] = useState<number>(-1);
     const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [selectedTextIndex, setSelectedTextIndex] = useState<number>(-1);
+    const [translationLanguage, setTranslationLanguage] =
+        useState<MemeTranslationLanguageCode>('hi');
+    const [translatingTextIndex, setTranslatingTextIndex] =
+        useState<number>(-1);
     const [isRotatingText, setIsRotatingText] = useState<boolean>(false);
     const [rotateTextIndex, setRotateTextIndex] = useState<number>(-1);
     const [rotateTextStartAngle, setRotateTextStartAngle] = useState<number>(0);
@@ -111,28 +343,26 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, [isMobileDevice]);
 
     const [textSettings, setTextSettings] = useState<TextSettings[]>(
-        template.textBoxes.map(box => ({
-            fontSize: box.fontSize,
-            color: '#ffffff',
-            fontFamily: getDefaultFont(),
-            fontWeight: '900',
-            letterSpacing: 0,
-            textCase: 'uppercase' as const,
-            outline: {
-                width: 1,
-                color: '#000000'
-            },
-            shadow: {
-                blur: 5,
-                offsetX: 1,
-                offsetY: 1,
-                color: '#000000'
-            }
+        template.textBoxes.map((box) => ({
+            ...createDefaultTextSettings(template, box),
+            fontFamily: template.layout?.type === 'top-banner'
+                ? 'Arial'
+                : getDefaultFont(),
         }))
     );
+    const textsRef = useRef(texts);
+    const translationSourceTextsRef = useRef(translationSourceTexts);
+    const textLayerIdsRef = useRef(textLayerIds);
+    const textSettingsRef = useRef(textSettings);
+    textsRef.current = texts;
+    translationSourceTextsRef.current = translationSourceTexts;
+    textLayerIdsRef.current = textLayerIds;
+    textSettingsRef.current = textSettings;
     const [openDropdown, setOpenDropdown] = useState<number>(-1);
 
     const [imageOverlays, setImageOverlays] = useState<ImageOverlay[]>([]);
+    const imageOverlaysRef = useRef<ImageOverlay[]>(imageOverlays);
+    imageOverlaysRef.current = imageOverlays;
     const [isDraggingImage, setIsDraggingImage] = useState<boolean>(false);
     const [dragImageIndex, setDragImageIndex] = useState<number>(-1);
     const [dragImageOffset, setDragImageOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -147,6 +377,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [rotateStartAngle, setRotateStartAngle] = useState<number>(0);
     const [selectedImageIndex, setSelectedImageIndex] = useState<number>(-1);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const quickUploadButtonRef = useRef<HTMLButtonElement>(null);
 
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState<boolean>(false);
     const [uploadMethod, setUploadMethod] = useState<'file' | 'paste'>('file');
@@ -161,10 +392,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const currentAnimationTimeRef = useRef<number>(0);
     const [isExporting, setIsExporting] = useState<boolean>(false);
     const [exportStatus, setExportStatus] = useState<string | null>(null);
-    const [pendingGifDecodeCount, setPendingGifDecodeCount] = useState(0);
+    const [, setPendingGifDecodeCount] = useState(0);
 
     const {
         shapeOverlays,
+        replaceShapes,
         selectedShapeIndex,
         setSelectedShapeIndex,
         addShape,
@@ -180,11 +412,17 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const lastDrawTime = useRef<number>(0);
     const isOptimizedDrawing = useRef<boolean>(false);
+    const previewRenderRevision = useRef(0);
+    const pendingDiscoveryImageAdds = useRef(0);
+    const workspaceTabPreservingImageId = useRef<string | null>(null);
 
     type Point = { x: number; y: number };
-    type Stroke = { points: Point[]; color: string; size: number; eraser: boolean };
+    type Stroke = DrawingStroke;
     const [isDrawingMode, setIsDrawingMode] = useState(false);
     const [showElementsPanel, setShowElementsPanel] = useState(false);
+    const [branding, setBranding] = useState<CreatorBranding>(() => ({
+        ...DEFAULT_CREATOR_BRANDING,
+    }));
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [isEraser, setIsEraser] = useState(false);
     const [drawColor, setDrawColor] = useState('#ff0000');
@@ -200,24 +438,180 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const [eraseBrushOpacity, setEraseBrushOpacity] = useState(1);
     const [currentEraseStroke, setCurrentEraseStroke] = useState<EraseStroke | null>(null);
     const [isErasing, setIsErasing] = useState(false);
-    const [isExpanded, setIsExpanded] = useState(false);
     const [showLayerPanel, setShowLayerPanel] = useState(true);
     const [showMediaLayers, setShowMediaLayers] = useState(true);
     const [showShapeLayers, setShowShapeLayers] = useState(true);
+    const [creatorWorkspaceTab, setCreatorWorkspaceTab] =
+        useState<CreatorWorkspaceTab>('discover');
+    const [creatorWorkspaceCollapsed, setCreatorWorkspaceCollapsed] =
+        useState(false);
+
+    const restoreDraftState = useCallback((draft: MemeEditorDraftState) => {
+        setCanvasTemplate(draft.canvasTemplate);
+        canvasTemplateRef.current = draft.canvasTemplate;
+        setTopBannerEnabled(
+            draft.canvasTemplate?.layout?.type === 'top-banner' ||
+                draft.template.layout?.type === 'top-banner'
+        );
+        setTopBannerHeight(
+            draft.canvasTemplate?.layout?.bannerHeight ??
+                draft.template.layout?.bannerHeight ??
+                0
+        );
+        setTexts(draft.texts);
+        setTranslationSourceTexts(draft.texts);
+        setTextLayerIds(draft.texts.map(() => createTextLayerId()));
+        setTextBoxes(draft.textBoxes);
+        setTextBoxRotations(draft.textBoxRotations);
+        setOriginalTextBoxCount(
+            draft.canvasTemplate?.textBoxes.length ??
+                draft.template.textBoxes.length
+        );
+        setTextSettings(
+            draft.textSettings.map((settings) => ({
+                ...settings,
+                fontFamily: getCanonicalFontFamily(settings.fontFamily),
+            }))
+        );
+        imageOverlaysRef.current = draft.imageOverlays;
+        setImageOverlays(draft.imageOverlays);
+        replaceShapes(draft.shapeOverlays);
+        setStrokes(draft.strokes);
+        setBranding(draft.branding ?? { ...DEFAULT_CREATOR_BRANDING });
+        setSelectedTextIndex(-1);
+        setSelectedImageIndex(-1);
+        setSelectedShapeIndex(-1);
+    }, [replaceShapes, setSelectedShapeIndex]);
+
+    useEffect(() => {
+        if (topBannerEnabled && topBannerHeight <= 0) {
+            setTopBannerHeight(getTopBannerHeight(effectiveTemplate, 1));
+        }
+    }, [effectiveTemplate, topBannerEnabled, topBannerHeight]);
+
+    const draftState = useMemo<MemeEditorDraftState>(() => ({
+        template,
+        canvasTemplate,
+        texts,
+        textBoxes,
+        textBoxRotations,
+        textSettings,
+        imageOverlays,
+        shapeOverlays,
+        strokes,
+        branding,
+    }), [
+        branding,
+        canvasTemplate,
+        imageOverlays,
+        shapeOverlays,
+        strokes,
+        template,
+        textBoxes,
+        textBoxRotations,
+        textSettings,
+        texts,
+    ]);
+    const draftStateRef = useRef(draftState);
+    draftStateRef.current = draftState;
+    const prepareDraftSave = useCallback(async () => {
+        await waitForPendingImageAdds();
+        return {
+            ...draftStateRef.current,
+            canvasTemplate: canvasTemplateRef.current,
+            imageOverlays: imageOverlaysRef.current,
+        };
+    }, [waitForPendingImageAdds]);
+
+    const {
+        canEdit: canEditDraft,
+        isReady: isDraftReady,
+        restoreError: draftRestoreError,
+        saveNow,
+        status: draftStatus,
+    } = useEditorDraft({
+        state: draftState,
+        onRestore: restoreDraftState,
+        beforeSave: prepareDraftSave,
+        restoreSavedDraft,
+        expectedDraftUpdatedAt,
+    });
+    const editorCanEdit = canEditDraft && !isLeaving;
+
+    useEffect(() => {
+        const warnAboutPendingImage = (event: BeforeUnloadEvent) => {
+            if (pendingImageAddCount.current === 0) return;
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        window.addEventListener('beforeunload', warnAboutPendingImage);
+        return () =>
+            window.removeEventListener('beforeunload', warnAboutPendingImage);
+    }, []);
+
+    const handleBack = useCallback(async () => {
+        if (isLeavingRef.current) return;
+        isLeavingRef.current = true;
+        setIsLeaving(true);
+
+        try {
+            await waitForPendingImageAdds();
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+            await saveNow();
+            onReset();
+        } catch {
+            toast.error('Your draft could not be saved. Please retry before leaving.');
+            if (
+                window.confirm(
+                    'Your draft could not be saved. Leave without saving these latest changes?'
+                )
+            ) {
+                onReset();
+                return;
+            }
+            isLeavingRef.current = false;
+            setIsLeaving(false);
+        }
+    }, [onReset, saveNow, waitForPendingImageAdds]);
 
     const loadAndCacheImage = useCallback(async (src: string): Promise<HTMLImageElement> => {
         if (imageCache.current.has(src)) {
-            return imageCache.current.get(src)!;
+            const cachedImage = imageCache.current.get(src)!;
+            imageCache.current.delete(src);
+            imageCache.current.set(src, cachedImage);
+            return cachedImage;
         }
 
         return new Promise((resolve, reject) => {
             const img = new window.Image();
             img.crossOrigin = 'anonymous';
+            const timeoutId = window.setTimeout(() => {
+                img.onload = null;
+                img.onerror = null;
+                reject(
+                    new Error(
+                        'Image loading timed out. Try a smaller file or a different source.'
+                    )
+                );
+            }, STATIC_IMAGE_LOAD_TIMEOUT_MS);
             img.onload = () => {
+                window.clearTimeout(timeoutId);
                 imageCache.current.set(src, img);
+                while (
+                    imageCache.current.size >
+                    IMAGE_CACHE_MAX_ENTRIES
+                ) {
+                    const oldestSource =
+                        imageCache.current.keys().next().value;
+                    if (typeof oldestSource !== 'string') break;
+                    imageCache.current.delete(oldestSource);
+                }
                 resolve(img);
             };
-            img.onerror = reject;
+            img.onerror = () => {
+                window.clearTimeout(timeoutId);
+                reject(new Error('Image could not be loaded.'));
+            };
             img.src = src;
         });
     }, []);
@@ -269,6 +663,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, []);
 
     const clearOverlayGifDecodePending = useCallback((overlayId: string) => {
+        if (isLeavingRef.current) return;
         setGifDecodePending(overlayId, false);
         setImageOverlays((prev) => prev.map((overlay) => (
             overlay.id === overlayId
@@ -296,9 +691,23 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     limits: options.limits,
                     signal: controller?.signal,
                 });
+                if (isLeavingRef.current) return;
 
                 if (decodedGif.frameCount <= 1) {
                     decodedGifCache.current.delete(options.overlayId);
+                    setImageOverlays((prev) =>
+                        prev.map((overlay) =>
+                            overlay.id === options.overlayId
+                                ? {
+                                      ...overlay,
+                                      animated: false,
+                                      animatedSrc: undefined,
+                                      animationDecodePolicy: undefined,
+                                      animationDecodePending: false,
+                                  }
+                                : overlay
+                        )
+                    );
                     logMediaDebug('gif-decode-skipped-static', {
                         label: options.label,
                         overlayId: options.overlayId,
@@ -319,6 +728,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             ? {
                                 ...overlay,
                                 animated: true,
+                                animatedSrc: undefined,
                                 animationDecodePending: false,
                                 animationStartMs: getAnimationNow(),
                                 mimeType: 'image/gif',
@@ -340,6 +750,21 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 });
             } catch (error) {
                 decodedGifCache.current.delete(options.overlayId);
+                if (!isLeavingRef.current) {
+                    setImageOverlays((prev) =>
+                        prev.map((overlay) =>
+                            overlay.id === options.overlayId
+                                ? {
+                                    ...overlay,
+                                    animated: false,
+                                    animatedSrc: undefined,
+                                    animationDecodePolicy: undefined,
+                                    animationDecodePending: false,
+                                }
+                                : overlay
+                        )
+                    );
+                }
                 logMediaDebug('gif-decode-kept-static', {
                     error: error instanceof Error ? error.message : 'GIF decode failed',
                     label: options.label,
@@ -354,6 +779,41 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }
         });
     }, [clearOverlayGifDecodePending, decodeGifForOverlay, getAnimationNow, queueBackgroundGifDecode]);
+
+    useEffect(() => {
+        const overlayIds = getAnimatedOverlayIdsToRehydrate(
+            imageOverlays,
+            new Set(decodedGifCache.current.keys()),
+            pendingGifDecodeIds.current
+        );
+
+        overlayIds.forEach((overlayId) => {
+            const overlay = imageOverlays.find((item) => item.id === overlayId);
+            if (!overlay) return;
+
+            setGifDecodePending(overlayId, true);
+            setImageOverlays((prev) =>
+                prev.map((item) =>
+                    item.id === overlayId
+                        ? { ...item, animationDecodePending: true }
+                        : item
+                )
+            );
+            startBackgroundGifDecode({
+                label: overlay.label,
+                limits: getGifDecodeLimitsForPolicy(
+                    overlay.animationDecodePolicy
+                ),
+                overlayId,
+                src: overlay.animatedSrc || overlay.src,
+                startedAt: getMediaPerfNow(),
+                timeoutMs:
+                    overlay.animationDecodePolicy === 'giphy'
+                        ? GIPHY_GIF_FETCH_TIMEOUT_MS
+                        : undefined,
+            });
+        });
+    }, [imageOverlays, setGifDecodePending, startBackgroundGifDecode]);
 
     const isUnsupportedAnimatedUploadCandidate = useCallback((file: File) => {
         const lowerName = file.name.toLowerCase();
@@ -393,7 +853,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     }, []);
 
-    const MIN_FONT_SIZE = template.textBoxes[0]?.minFont ?? 10;
+    const MIN_FONT_SIZE = effectiveTemplate.textBoxes[0]?.minFont ?? 10;
     const CUSTOM_TEXT_MIN_FONT_SIZE = 10;
     const MAX_TEXT_FONT_SIZE = 300;
     const MIN_TEXT_BOX_SIZE = 24;
@@ -403,9 +863,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }, []);
 
     const getFontFallbacks = useCallback((fontFamily: string): string => {
+        const canonicalFontFamily = getCanonicalFontFamily(fontFamily);
         return [
-            fontFamily,
-            fontFamily === 'Impact' ? 'Arial Black' : 'Impact',
+            canonicalFontFamily,
+            canonicalFontFamily === 'Impact' ? 'Arial Black' : 'Impact',
             'Arial Black',
             'Helvetica Neue',
             'Arial',
@@ -418,12 +879,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         text: string,
         letterSpacing: number
     ): number => {
-        if (letterSpacing === 0) {
+        const safeLetterSpacing = getSafeLetterSpacing(text, letterSpacing);
+        if (safeLetterSpacing === 0) {
             return ctx.measureText(text).width;
         }
 
         return text.split('').reduce((width, char, index) => {
-            return width + ctx.measureText(char).width + (index > 0 ? letterSpacing : 0);
+            return width + ctx.measureText(char).width + (index > 0 ? safeLetterSpacing : 0);
         }, 0);
     }, []);
 
@@ -576,7 +1038,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             const canvas = canvasRef.current;
             const templateMaxWidth = idx < originalTextBoxCount
-                ? template.textBoxes[idx]?.width
+                ? effectiveTemplate.textBoxes[idx]?.width
                 : undefined;
             const maxWidth = templateMaxWidth && canvas
                 ? Math.min(templateMaxWidth, canvas.width * 0.95)
@@ -588,10 +1050,19 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             });
             return updated;
         });
-    }, [fitTextBoxToContent, originalTextBoxCount, template.textBoxes]);
+    }, [
+        effectiveTemplate.textBoxes,
+        fitTextBoxToContent,
+        originalTextBoxCount,
+    ]);
 
     const handleChange = useCallback((idx: number, value: string) => {
         setTexts(prev => {
+            const arr = [...prev];
+            arr[idx] = value;
+            return arr;
+        });
+        setTranslationSourceTexts(prev => {
             const arr = [...prev];
             arr[idx] = value;
             return arr;
@@ -603,9 +1074,33 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     }, [textSettings, updateTextBoxToContent]);
 
+    const handleTranslateText = useCallback(async (idx: number) => {
+        const sourceText = translationSourceTextsRef.current[idx]?.trim() ?? '';
+        if (!sourceText) {
+            toast.error('Type some text first, then translate it.');
+            return;
+        }
+
+        setTranslatingTextIndex(idx);
+        try {
+            const translated = await requestTranslation(sourceText, translationLanguage);
+            handleChange(idx, translated);
+            toast.success(`Translated to ${MEME_TRANSLATION_LANGUAGES.find((language) => language.code === translationLanguage)?.label ?? 'selected language'}.`);
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not translate the text.'
+            );
+        } finally {
+            setTranslatingTextIndex(-1);
+        }
+    }, [handleChange, translationLanguage]);
+
     const handleSettingsChange = useCallback((idx: number, setting: keyof TextSettings, value: string | number) => {
         const currentSettings = textSettings[idx];
-        if (!currentSettings) return;
+        const textLayerId = textLayerIds[idx];
+        if (!currentSettings || !textLayerId) return;
 
         const nextSettings = {
             ...currentSettings,
@@ -614,10 +1109,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         setTextSettings(prev => {
             const updated = [...prev];
-            updated[idx] = {
-                ...updated[idx],
-                [setting]: value
-            };
+            updated[idx] = nextSettings;
             return updated;
         });
 
@@ -625,10 +1117,76 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         if (setting === 'fontFamily' && typeof value === 'string' && FONT_CONFIGS[value]) {
             loadFont(FONT_CONFIGS[value])
-                .then(() => updateTextBoxToContent(idx, texts[idx] || '', nextSettings))
+                .then(() => {
+                    if (isLeavingRef.current) return;
+                    const currentIndex =
+                        textLayerIdsRef.current.indexOf(textLayerId);
+                    const currentSettings =
+                        textSettingsRef.current[currentIndex];
+                    if (
+                        currentIndex === -1 ||
+                        currentSettings?.fontFamily !== value
+                    ) return;
+                    updateTextBoxToContent(
+                        currentIndex,
+                        textsRef.current[currentIndex] || '',
+                        currentSettings
+                    );
+                })
                 .catch(() => undefined);
         }
     }, [loadFont, textSettings, texts, updateTextBoxToContent]);
+
+    const handleApplyTextStyle = useCallback((
+        presetId: TextStylePresetId,
+        index: number
+    ) => {
+        const currentSettings = textSettings[index];
+        const textLayerId = textLayerIds[index];
+        if (!currentSettings || !textLayerId) return;
+
+        const nextSettings = applyTextStylePreset(
+            currentSettings,
+            presetId
+        );
+        setTextSettings((current) => {
+            const updated = [...current];
+            updated[index] = nextSettings;
+            return updated;
+        });
+        setSelectedTextIndex(index);
+        setSelectedImageIndex(-1);
+        setSelectedShapeIndex(-1);
+        updateTextBoxToContent(index, texts[index] || '', nextSettings);
+
+        if (FONT_CONFIGS[nextSettings.fontFamily]) {
+            loadFont(FONT_CONFIGS[nextSettings.fontFamily])
+                .then(() => {
+                    if (isLeavingRef.current) return;
+                    const currentIndex =
+                        textLayerIdsRef.current.indexOf(textLayerId);
+                    const currentSettings =
+                        textSettingsRef.current[currentIndex];
+                    if (
+                        currentIndex === -1 ||
+                        currentSettings?.fontFamily !==
+                            nextSettings.fontFamily
+                    ) return;
+                    updateTextBoxToContent(
+                        currentIndex,
+                        textsRef.current[currentIndex] || '',
+                        currentSettings
+                    );
+                })
+                .catch(() => undefined);
+        }
+    }, [
+        loadFont,
+        setSelectedShapeIndex,
+        textSettings,
+        texts,
+        updateTextBoxToContent,
+    ]);
 
     const handleShadowChange = useCallback((idx: number, shadowProperty: keyof TextSettings['shadow'], value: string | number) => {
         const currentSettings = textSettings[idx];
@@ -789,15 +1347,28 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const getTextAtPosition = useCallback((x: number, y: number): number => {
         for (let i = textBoxes.length - 1; i >= 0; i--) {
             const box = textBoxes[i];
-            if (texts[i] && x >= box.x && x <= box.x + box.width && y >= box.y - box.fontSize && y <= box.y + box.height) {
+            if (
+                textSettings[i]?.visible !== false &&
+                texts[i] &&
+                x >= box.x &&
+                x <= box.x + box.width &&
+                y >= box.y - box.fontSize &&
+                y <= box.y + box.height
+            ) {
                 return i;
             }
         }
         return -1;
-    }, [textBoxes, texts]);
+    }, [textBoxes, textSettings, texts]);
 
     const getTextResizeHandleAtPosition = useCallback((x: number, y: number): { index: number; handle: string } => {
-        if (selectedTextIndex === -1 || !texts[selectedTextIndex]) return { index: -1, handle: '' };
+        if (
+            selectedTextIndex === -1 ||
+            !texts[selectedTextIndex] ||
+            textSettings[selectedTextIndex]?.visible === false
+        ) {
+            return { index: -1, handle: '' };
+        }
 
         const box = textBoxes[selectedTextIndex];
         const rotation = textBoxRotations[selectedTextIndex] || 0;
@@ -880,7 +1451,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
 
         return { index: -1, handle: '' };
-    }, [selectedTextIndex, textBoxes, texts, textBoxRotations, isMobileDevice, canvasRef]);
+    }, [selectedTextIndex, textBoxes, textSettings, texts, textBoxRotations, isMobileDevice, canvasRef]);
 
     const generateImageId = (): string => {
         return `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -889,6 +1460,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const getImageAtPosition = useCallback((x: number, y: number): { index: number; handle: string } => {
         for (let i = imageOverlays.length - 1; i >= 0; i--) {
             const img = imageOverlays[i];
+            if (img.visible === false) continue;
 
             const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const rotationHandleSize = isMobile ? 60 : 50;
@@ -935,13 +1507,24 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             animatedSrc?: string;
             decodeLimits?: GifDecodeLimits;
             decodeTimeoutMs?: number;
+            decodePolicy?: GifDecodePolicy;
             deferAnimationDecode?: boolean;
             isDataUrl?: boolean;
             label?: string;
             mimeType?: string;
+            preserveWorkspaceTab?: boolean;
+            continueWhileLeaving?: boolean;
+            source?: ImageOverlay['source'];
             stillUrl?: string;
         }
     ): Promise<boolean> => {
+        if (
+            (isLeavingRef.current && !options?.continueWhileLeaving) ||
+            !canEditDraft
+        ) {
+            return false;
+        }
+        const finishPendingImageAdd = beginPendingImageAdd();
         const addStartedAt = getMediaPerfNow();
 
         try {
@@ -1031,9 +1614,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 id: overlayId,
                 src: staticSrc,
                 label: options?.label || 'Image',
-                animated: Boolean(decodedGif),
+                animated: Boolean(decodedGif) || shouldDeferAnimationDecode,
+                animatedSrc: shouldDeferAnimationDecode ? animatedSrc : undefined,
+                animationDecodePolicy: options?.decodePolicy,
                 animationDecodePending: shouldDeferAnimationDecode,
                 mimeType,
+                source: options?.source,
                 animationStartMs: decodedGif ? getAnimationNow() : undefined,
                 x: (canvas.width - width) / 2,
                 y: (canvas.height - height) / 2,
@@ -1045,18 +1631,38 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 rotation: 0,
                 eraseStrokes: []
             };
+            const nextImageOverlays = [
+                ...imageOverlaysRef.current,
+                newOverlay,
+            ];
+            if (
+                nextImageOverlays.length >
+                EDITOR_IMAGE_LAYER_LIMIT
+            ) {
+                throw new Error(
+                    `A meme can contain up to ${EDITOR_IMAGE_LAYER_LIMIT} image layers. Remove one before adding another.`
+                );
+            }
+            assertMemeEditorDraftLocalMediaCapacity({
+                ...draftStateRef.current,
+                canvasTemplate: canvasTemplateRef.current,
+                imageOverlays: nextImageOverlays,
+            });
 
+            if (options?.preserveWorkspaceTab) {
+                workspaceTabPreservingImageId.current = overlayId;
+            }
             if (shouldDeferAnimationDecode) {
                 setGifDecodePending(overlayId, true);
             }
 
             setShowLayerPanel(true);
             setShowMediaLayers(true);
-            setImageOverlays(prev => {
-                setSelectedImageIndex(prev.length);
-                setSelectedShapeIndex(-1);
-                return [...prev, newOverlay];
-            });
+            setSelectedTextIndex(-1);
+            setSelectedShapeIndex(-1);
+            imageOverlaysRef.current = nextImageOverlays;
+            setSelectedImageIndex(nextImageOverlays.length - 1);
+            setImageOverlays(nextImageOverlays);
 
             const visibleMs = Math.round(getMediaPerfNow() - addStartedAt);
             logMediaDebug('overlay-added', {
@@ -1084,8 +1690,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             const message = error instanceof Error ? error.message : 'Failed to add image';
             toast.error(message);
             return false;
+        } finally {
+            finishPendingImageAdd();
         }
-    }, [decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setGifDecodePending, setSelectedShapeIndex, startBackgroundGifDecode]);
+    }, [beginPendingImageAdd, canEditDraft, decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setGifDecodePending, setSelectedShapeIndex, startBackgroundGifDecode]);
 
     const addMediaFromLibrary = useCallback(
         async (item: GiphyMediaItem) => {
@@ -1096,6 +1704,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 label: item.title,
                 animated: item.animated,
                 animatedSrc: item.animated ? item.url : undefined,
+                decodePolicy: item.animated ? 'giphy' : undefined,
                 decodeLimits: item.animated ? GIPHY_GIF_DECODE_LIMITS : undefined,
                 decodeTimeoutMs: item.animated ? GIPHY_GIF_FETCH_TIMEOUT_MS : undefined,
                 deferAnimationDecode: item.animated,
@@ -1104,6 +1713,301 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             });
         },
         [addImageOverlay]
+    );
+
+    const addCreatorAssetToCanvas = useCallback(
+        async (asset: CreatorAsset) => {
+            const file = new File([asset.blob], asset.name, {
+                type: asset.mimeType,
+            });
+            const added = await addImageOverlay(file, {
+                label: asset.name,
+                mimeType: asset.mimeType,
+            });
+            if (!added) {
+                throw new Error('Could not add this saved asset to the canvas.');
+            }
+        },
+        [addImageOverlay]
+    );
+
+    const addDiscoveredImageToCanvas = useCallback(
+        async (asset: DiscoveryImageAsset) => {
+            if (isLeavingRef.current || !canEditDraft) {
+                throw new Error('The editor is leaving. This image was not added.');
+            }
+            const finishPendingImageAdd = beginPendingImageAdd();
+            pendingDiscoveryImageAdds.current += 1;
+            try {
+                const localFile = await materializeReusableImage(asset);
+                const mimeType = getMaterializedImageMimeType(localFile);
+                const added = await addImageOverlay(localFile, {
+                    label: asset.title,
+                    mimeType,
+                    preserveWorkspaceTab: true,
+                    continueWhileLeaving: true,
+                    source: getDiscoveryImageSource(asset),
+                });
+                if (!added) {
+                    throw new Error(
+                        'Could not add this image to the canvas.'
+                    );
+                }
+            } finally {
+                pendingDiscoveryImageAdds.current = Math.max(
+                    0,
+                    pendingDiscoveryImageAdds.current - 1
+                );
+                finishPendingImageAdd();
+            }
+        },
+        [addImageOverlay, beginPendingImageAdd, canEditDraft]
+    );
+
+    const startFromDiscoveredImage = useCallback(
+        async (asset: DiscoveryImageAsset) => {
+            if (isLeavingRef.current || !canEditDraft) {
+                throw new Error(
+                    'The editor is leaving. This image was not used.'
+                );
+            }
+            if (pendingImageAddCount.current > 0) {
+                throw new Error(
+                    'Wait for the current image to finish, then try again.'
+                );
+            }
+
+            const hasMeaningfulScene =
+                textsRef.current.some((text) => text.trim().length > 0) ||
+                imageOverlaysRef.current.length > 0 ||
+                shapeOverlays.length > 0 ||
+                strokes.length > 0;
+            if (
+                hasMeaningfulScene &&
+                !window.confirm(
+                    'Start with this image? Your current canvas layers will be cleared.'
+                )
+            ) {
+                return false;
+            }
+            const sceneBeforeImageLoad = draftStateRef.current;
+            let candidateLocalImage: string | null = null;
+            let candidateCommitted = false;
+
+            const finishPendingImageAdd = beginPendingImageAdd();
+            try {
+                const localFile = await materializeReusableImage(asset);
+                const mimeType = getMaterializedImageMimeType(localFile);
+                const localImage = await resolveImageSrc(localFile);
+                candidateLocalImage = localImage;
+                const decodedImage = await loadAndCacheImage(localImage);
+                const imageWidth =
+                    decodedImage.naturalWidth ||
+                    decodedImage.width ||
+                    asset.width;
+                const imageHeight =
+                    decodedImage.naturalHeight ||
+                    decodedImage.height ||
+                    asset.height;
+                if (!imageWidth || !imageHeight) {
+                    throw new Error(
+                        'This image has no usable dimensions. Try another image.'
+                    );
+                }
+                if (isTemplateImageTooSmall(imageWidth, imageHeight)) {
+                    throw new Error(
+                        getTemplateImageTooSmallMessage(
+                            imageWidth,
+                            imageHeight
+                        )
+                    );
+                }
+                if (draftStateRef.current !== sceneBeforeImageLoad) {
+                    throw new Error(
+                        'Your meme changed while the image was loading, so nothing was replaced. Try again when you are ready.'
+                    );
+                }
+
+                const horizontalMargin = Math.max(
+                    12,
+                    Math.round(imageWidth * 0.04)
+                );
+                const verticalMargin = Math.max(
+                    10,
+                    Math.round(imageHeight * 0.035)
+                );
+                const fontSize = Math.max(
+                    24,
+                    Math.min(
+                        72,
+                        Math.round(Math.min(imageWidth, imageHeight) * 0.09)
+                    )
+                );
+                const boxHeight = Math.min(
+                    Math.round(imageHeight * 0.3),
+                    Math.max(
+                        Math.round(fontSize * 1.75),
+                        Math.round(imageHeight * 0.16)
+                    )
+                );
+                const boxWidth = Math.max(
+                    80,
+                    imageWidth - horizontalMargin * 2
+                );
+                const nextTextBoxes: Template['textBoxes'] = [
+                    {
+                        x: horizontalMargin,
+                        y: verticalMargin,
+                        width: boxWidth,
+                        height: boxHeight,
+                        fontSize,
+                        minFont: 10,
+                        align: 'center',
+                    },
+                    {
+                        x: horizontalMargin,
+                        y: Math.max(
+                            verticalMargin,
+                            imageHeight - boxHeight - verticalMargin
+                        ),
+                        width: boxWidth,
+                        height: boxHeight,
+                        fontSize,
+                        minFont: 10,
+                        align: 'center',
+                    },
+                ];
+                const nextTexts = ['', ''];
+                const nextTextLayerIds = nextTextBoxes.map(() =>
+                    createTextLayerId()
+                );
+                const nextTextSettings: TextSettings[] =
+                nextTextBoxes.map((box) => ({
+                        fontSize: box.fontSize,
+                        color: '#ffffff',
+                        fontFamily: getDefaultFont(),
+                        fontWeight: '900',
+                        letterSpacing: 0,
+                        textCase: 'uppercase',
+                        backgroundColor: 'transparent',
+                        backgroundRadius: 12,
+                        outline: {
+                            width: 1,
+                            color: '#000000',
+                        },
+                        shadow: {
+                            blur: 5,
+                            offsetX: 1,
+                            offsetY: 1,
+                            color: '#000000',
+                        },
+                    }));
+                const nextCanvasTemplate: CanvasTemplate = {
+                    image: localImage,
+                    displayName: asset.title,
+                    textBoxes: nextTextBoxes,
+                    mimeType,
+                    source: getDiscoveryImageSource(asset),
+                };
+                const nextDraftState: MemeEditorDraftState = {
+                    ...draftStateRef.current,
+                    canvasTemplate: nextCanvasTemplate,
+                    texts: nextTexts,
+                    textBoxes: nextTextBoxes,
+                    textBoxRotations: [0, 0],
+                    textSettings: nextTextSettings,
+                    imageOverlays: [],
+                    shapeOverlays: [],
+                    strokes: [],
+                };
+                assertMemeEditorDraftLocalMediaCapacity(nextDraftState);
+                const replacedCachedSources = [
+                    canvasTemplateRef.current?.image ?? template.image,
+                    ...imageOverlaysRef.current.map(
+                        (overlay) => overlay.src
+                    ),
+                ];
+
+                previewRenderRevision.current += 1;
+                canvasTemplateRef.current = nextCanvasTemplate;
+                textsRef.current = nextTexts;
+                translationSourceTextsRef.current = nextTexts;
+                textLayerIdsRef.current = nextTextLayerIds;
+                textSettingsRef.current = nextTextSettings;
+                imageOverlaysRef.current = [];
+                draftStateRef.current = nextDraftState;
+
+                setCanvasTemplate(nextCanvasTemplate);
+                setTexts(nextTexts);
+                setTranslationSourceTexts(nextTexts);
+                setTextLayerIds(nextTextLayerIds);
+                setTextBoxes(nextTextBoxes);
+                setTextBoxRotations([0, 0]);
+                setOriginalTextBoxCount(nextTextBoxes.length);
+                setTextSettings(nextTextSettings);
+                setImageOverlays([]);
+                replaceShapes([]);
+                setStrokes([]);
+                setCurrentStroke(null);
+                decodedGifCache.current.clear();
+                pendingGifDecodeIds.current.clear();
+                setPendingGifDecodeCount(0);
+                setSelectedTextIndex(-1);
+                setSelectedImageIndex(-1);
+                setSelectedShapeIndex(-1);
+                setIsDrawing(false);
+                setIsDrawingMode(false);
+                setIsImageEraseMode(false);
+                setImageEraseTargetIndex(-1);
+                setShowElementsPanel(false);
+                setCreatorWorkspaceTab('styles');
+                setCreatorWorkspaceCollapsed(true);
+                candidateCommitted = true;
+                replacedCachedSources.forEach((source) => {
+                    if (source !== nextCanvasTemplate.image) {
+                        imageCache.current.delete(source);
+                    }
+                });
+                toast.success('Image ready. Add your caption.');
+                window.requestAnimationFrame(() => {
+                    primaryCaptionRef.current?.focus();
+                });
+                return true;
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : 'Could not start from this image.';
+                toast.error(message);
+                throw error;
+            } finally {
+                if (candidateLocalImage && !candidateCommitted) {
+                    const candidateIsActive =
+                        candidateLocalImage === template.image ||
+                        candidateLocalImage ===
+                            canvasTemplateRef.current?.image ||
+                        imageOverlaysRef.current.some(
+                            (overlay) =>
+                                overlay.src === candidateLocalImage
+                        );
+                    if (!candidateIsActive) {
+                        imageCache.current.delete(candidateLocalImage);
+                    }
+                }
+                finishPendingImageAdd();
+            }
+        },
+        [
+            beginPendingImageAdd,
+            canEditDraft,
+            getDefaultFont,
+            loadAndCacheImage,
+            replaceShapes,
+            setSelectedShapeIndex,
+            shapeOverlays.length,
+            strokes.length,
+            template.image,
+        ]
     );
 
     const handleDialogFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
@@ -1216,7 +2120,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     };
 
     const handlePaste = useCallback(async (event: ClipboardEvent) => {
-        if (isUploadDialogOpen) return;
+        if (!editorCanEdit || isUploadDialogOpen) return;
 
         const items = event.clipboardData?.items;
         if (!items) return;
@@ -1232,7 +2136,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 }
             }
         }
-    }, [isUploadDialogOpen, addImageOverlay]);
+    }, [editorCanEdit, isUploadDialogOpen, addImageOverlay]);
 
     const removeImageOverlay = (index: number) => {
         const overlay = imageOverlays[index];
@@ -1296,6 +2200,63 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         });
     }, []);
 
+    const fitSelectedImageToCanvas = useCallback((mode: 'fit' | 'fill') => {
+        const canvas = canvasRef.current;
+        if (!canvas || selectedImageIndex < 0) return;
+
+        setImageOverlays((current) => {
+            const selected = current[selectedImageIndex];
+            if (!selected) return current;
+            const updated = [...current];
+            updated[selectedImageIndex] = fitImageLayerToCanvas(
+                selected,
+                canvas.width,
+                canvas.height,
+                mode
+            );
+            return updated;
+        });
+    }, [selectedImageIndex]);
+
+    const rotateSelectedImage90 = useCallback(() => {
+        if (selectedImageIndex < 0) return;
+        setImageOverlays((current) => {
+            const selected = current[selectedImageIndex];
+            if (!selected) return current;
+            const updated = [...current];
+            updated[selectedImageIndex] = {
+                ...selected,
+                rotation: (selected.rotation + 90) % 360,
+            };
+            return updated;
+        });
+    }, [selectedImageIndex]);
+
+    const toggleSelectedImageErase = useCallback(() => {
+        if (selectedImageIndex < 0) return;
+        const selectedImage = imageOverlays[selectedImageIndex];
+        if (!selectedImage || selectedImage.visible === false) {
+            toast.info('Show this image layer before erasing it.');
+            return;
+        }
+
+        setIsImageEraseMode((current) => {
+            const next = !(current && imageEraseTargetIndex === selectedImageIndex);
+            setImageEraseTargetIndex(next ? selectedImageIndex : -1);
+            if (next) {
+                setIsDrawingMode(false);
+                setSelectedShapeIndex(-1);
+                setSelectedTextIndex(-1);
+            }
+            return next;
+        });
+    }, [
+        imageEraseTargetIndex,
+        imageOverlays,
+        selectedImageIndex,
+        setSelectedShapeIndex,
+    ]);
+
     const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -1310,8 +2271,78 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
 
+        // Text renders above shapes and images, so it must win overlapping hits.
+        const topTextHandle = getTextResizeHandleAtPosition(x, y);
+        if (topTextHandle.index !== -1) {
+            setSelectedImageIndex(-1);
+            setSelectedShapeIndex(-1);
+            setSelectedTextIndex(topTextHandle.index);
+            if (topTextHandle.handle === 'rotate') {
+                setIsRotatingText(true);
+                setRotateTextIndex(topTextHandle.index);
+                const box = textBoxes[topTextHandle.index];
+                const boxCenterX = box.x + box.width / 2;
+                const boxCenterY = box.y + box.height / 2;
+                const angle =
+                    (Math.atan2(y - boxCenterY, x - boxCenterX) * 180) /
+                    Math.PI;
+                setRotateTextStartAngle(
+                    angle - (textBoxRotations[topTextHandle.index] || 0)
+                );
+                canvas.style.cursor = 'grab';
+            } else if (topTextHandle.handle.startsWith('width-')) {
+                setIsResizingTextWidth(true);
+                setIsResizingFromLeft(
+                    topTextHandle.handle === 'width-left'
+                );
+                canvas.style.cursor = 'ew-resize';
+            } else if (topTextHandle.handle.startsWith('height-')) {
+                setIsResizingTextHeight(true);
+                setIsResizingFromTop(
+                    topTextHandle.handle === 'height-top'
+                );
+                canvas.style.cursor = 'ns-resize';
+            } else if (
+                ['nw', 'ne', 'sw', 'se'].includes(topTextHandle.handle)
+            ) {
+                setIsResizingTextCorner(true);
+                setResizeTextCornerHandle(topTextHandle.handle);
+                setResizeTextStartSize({
+                    width: textBoxes[topTextHandle.index].width,
+                    height: textBoxes[topTextHandle.index].height,
+                });
+                setResizeTextStartBoxPos({
+                    x: textBoxes[topTextHandle.index].x,
+                    y: textBoxes[topTextHandle.index].y,
+                });
+                setResizeTextStartFontSize(
+                    textSettings[topTextHandle.index]?.fontSize ||
+                        textBoxes[topTextHandle.index].fontSize
+                );
+                canvas.style.cursor = `${topTextHandle.handle}-resize`;
+            }
+            setResizeTextIndex(topTextHandle.index);
+            return;
+        }
+
+        const topTextIndex = getTextAtPosition(x, y);
+        if (topTextIndex !== -1) {
+            setSelectedTextIndex(topTextIndex);
+            setSelectedImageIndex(-1);
+            setSelectedShapeIndex(-1);
+            setIsDragging(true);
+            setDragIndex(topTextIndex);
+            setDragOffset({
+                x: x - textBoxes[topTextIndex].x,
+                y: y - textBoxes[topTextIndex].y,
+            });
+            canvas.style.cursor = 'grabbing';
+            return;
+        }
+
         if (tryShapeMouseDown(x, y, canvas)) {
             setSelectedImageIndex(-1);
+            setSelectedTextIndex(-1);
             return;
         }
         setSelectedShapeIndex(-1);
@@ -1319,6 +2350,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const imageResult = getImageAtPosition(x, y);
         if (imageResult.index !== -1) {
             setSelectedImageIndex(imageResult.index);
+            setSelectedTextIndex(-1);
 
             if (imageResult.handle === 'move') {
                 setIsDraggingImage(true);
@@ -1432,16 +2464,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (isDraggingImage && dragImageIndex !== -1) {
             const newX = x - dragImageOffset.x;
             const newY = y - dragImageOffset.y;
-
-            const constrainedX = Math.max(0, Math.min(canvas.width - imageOverlays[dragImageIndex].width, newX));
-            const constrainedY = Math.max(0, Math.min(canvas.height - imageOverlays[dragImageIndex].height, newY));
+            const constrained = constrainLayerPosition(
+                imageOverlays[dragImageIndex],
+                canvas,
+                { x: newX, y: newY }
+            );
 
             setImageOverlays(prev => {
                 const updated = [...prev];
                 updated[dragImageIndex] = {
                     ...updated[dragImageIndex],
-                    x: constrainedX,
-                    y: constrainedY
+                    x: constrained.x,
+                    y: constrained.y
                 };
                 return updated;
             });
@@ -1620,25 +2654,31 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     canvas.style.cursor = `${resizeHandleResult.handle}-resize`;
                 }
             } else {
-                const shapeHit = getShapeAtPosition(x, y);
-                if (shapeHit && shapeHit.index !== -1) {
-                    canvas.style.cursor =
-                        shapeHit.handle === 'move' || shapeHit.handle === 'rotate'
-                            ? 'grab'
-                            : `${shapeHit.handle}-resize`;
+                const textIndex = getTextAtPosition(x, y);
+                if (textIndex !== -1) {
+                    canvas.style.cursor = 'grab';
                 } else {
-                    const imageResult = getImageAtPosition(x, y);
-                    if (imageResult.index !== -1) {
-                        if (imageResult.handle === 'move') {
-                            canvas.style.cursor = 'grab';
-                        } else if (imageResult.handle === 'rotate') {
-                            canvas.style.cursor = 'grab';
-                        } else {
-                            canvas.style.cursor = `${imageResult.handle}-resize`;
-                        }
+                    const shapeHit = getShapeAtPosition(x, y);
+                    if (shapeHit && shapeHit.index !== -1) {
+                        canvas.style.cursor =
+                            shapeHit.handle === 'move' ||
+                            shapeHit.handle === 'rotate'
+                                ? 'grab'
+                                : `${shapeHit.handle}-resize`;
                     } else {
-                        const textIndex = getTextAtPosition(x, y);
-                        canvas.style.cursor = textIndex !== -1 ? 'grab' : 'default';
+                        const imageResult = getImageAtPosition(x, y);
+                        if (imageResult.index !== -1) {
+                            if (
+                                imageResult.handle === 'move' ||
+                                imageResult.handle === 'rotate'
+                            ) {
+                                canvas.style.cursor = 'grab';
+                            } else {
+                                canvas.style.cursor = `${imageResult.handle}-resize`;
+                            }
+                        } else {
+                            canvas.style.cursor = 'default';
+                        }
                     }
                 }
             }
@@ -1700,8 +2740,73 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const x = (touch.clientX - rect.left) * scaleX;
         const y = (touch.clientY - rect.top) * scaleY;
 
+        // Match visual stacking on touch: text is above shapes and images.
+        const topTextHandle = getTextResizeHandleAtPosition(x, y);
+        if (topTextHandle.index !== -1) {
+            setSelectedImageIndex(-1);
+            setSelectedShapeIndex(-1);
+            setSelectedTextIndex(topTextHandle.index);
+            if (topTextHandle.handle === 'rotate') {
+                setIsRotatingText(true);
+                setRotateTextIndex(topTextHandle.index);
+                const box = textBoxes[topTextHandle.index];
+                const boxCenterX = box.x + box.width / 2;
+                const boxCenterY = box.y + box.height / 2;
+                const angle =
+                    (Math.atan2(y - boxCenterY, x - boxCenterX) * 180) /
+                    Math.PI;
+                setRotateTextStartAngle(
+                    angle - (textBoxRotations[topTextHandle.index] || 0)
+                );
+            } else if (topTextHandle.handle.startsWith('width-')) {
+                setIsResizingTextWidth(true);
+                setIsResizingFromLeft(
+                    topTextHandle.handle === 'width-left'
+                );
+            } else if (topTextHandle.handle.startsWith('height-')) {
+                setIsResizingTextHeight(true);
+                setIsResizingFromTop(
+                    topTextHandle.handle === 'height-top'
+                );
+            } else if (
+                ['nw', 'ne', 'sw', 'se'].includes(topTextHandle.handle)
+            ) {
+                setIsResizingTextCorner(true);
+                setResizeTextCornerHandle(topTextHandle.handle);
+                setResizeTextStartSize({
+                    width: textBoxes[topTextHandle.index].width,
+                    height: textBoxes[topTextHandle.index].height,
+                });
+                setResizeTextStartBoxPos({
+                    x: textBoxes[topTextHandle.index].x,
+                    y: textBoxes[topTextHandle.index].y,
+                });
+                setResizeTextStartFontSize(
+                    textSettings[topTextHandle.index]?.fontSize ||
+                        textBoxes[topTextHandle.index].fontSize
+                );
+            }
+            setResizeTextIndex(topTextHandle.index);
+            return;
+        }
+
+        const topTextIndex = getTextAtPosition(x, y);
+        if (topTextIndex !== -1) {
+            setSelectedTextIndex(topTextIndex);
+            setSelectedImageIndex(-1);
+            setSelectedShapeIndex(-1);
+            setIsDragging(true);
+            setDragIndex(topTextIndex);
+            setDragOffset({
+                x: x - textBoxes[topTextIndex].x,
+                y: y - textBoxes[topTextIndex].y,
+            });
+            return;
+        }
+
         if (tryShapeMouseDown(x, y, canvas)) {
             setSelectedImageIndex(-1);
+            setSelectedTextIndex(-1);
             return;
         }
         setSelectedShapeIndex(-1);
@@ -1709,6 +2814,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const imageResult = getImageAtPosition(x, y);
         if (imageResult.index !== -1) {
             setSelectedImageIndex(imageResult.index);
+            setSelectedTextIndex(-1);
 
             if (imageResult.handle === 'move') {
                 setIsDraggingImage(true);
@@ -1822,16 +2928,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (isDraggingImage && dragImageIndex !== -1) {
             const newX = x - dragImageOffset.x;
             const newY = y - dragImageOffset.y;
-
-            const constrainedX = Math.max(0, Math.min(canvas.width - imageOverlays[dragImageIndex].width, newX));
-            const constrainedY = Math.max(0, Math.min(canvas.height - imageOverlays[dragImageIndex].height, newY));
+            const constrained = constrainLayerPosition(
+                imageOverlays[dragImageIndex],
+                canvas,
+                { x: newX, y: newY }
+            );
 
             setImageOverlays(prev => {
                 const updated = [...prev];
                 updated[dragImageIndex] = {
                     ...updated[dragImageIndex],
-                    x: constrainedX,
-                    y: constrainedY
+                    x: constrained.x,
+                    y: constrained.y
                 };
                 return updated;
             });
@@ -2048,22 +3156,16 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const transformedText = transformText(text, textCase);
 
         const getTextWidth = (text: string): number => {
-            if (letterSpacing === 0) {
+            const safeLetterSpacing = getSafeLetterSpacing(text, letterSpacing);
+            if (safeLetterSpacing === 0) {
                 return ctx.measureText(text).width;
             }
             return text.split('').reduce((width, char, index) => {
-                return width + ctx.measureText(char).width + (index > 0 ? letterSpacing : 0);
+                return width + ctx.measureText(char).width + (index > 0 ? safeLetterSpacing : 0);
             }, 0);
         };
 
-        const fontFallbacks = [
-            fontFamily,
-            fontFamily === 'Impact' ? 'Arial Black' : 'Impact',
-            'Arial Black',
-            'Helvetica Neue',
-            'Arial',
-            'sans-serif'
-        ].join(', ');
+        const fontFallbacks = getFontFallbacks(fontFamily);
 
         const processTextWithLineBreaks = (text: string): string[] => {
             const manualLines = text.split('\n');
@@ -2120,45 +3222,38 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
 
         return { fontSize, lines };
-    }, [transformText, MIN_FONT_SIZE]);
+    }, [getFontFallbacks, transformText, MIN_FONT_SIZE]);
 
     const waitForFont = useCallback(async (font: string) => {
-        const cached = fontLoadCache.current.get(font);
+        const canonicalFont = getCanonicalFontFamily(font);
+        const cached = fontLoadCache.current.get(canonicalFont);
         if (cached) {
             await cached;
             return;
         }
 
         const loadPromise = (async () => {
-            try {
-                if (document.fonts && document.fonts.load) {
-                    const fontVariations = [
-                        `bold 20px "${font}"`,
-                        `normal 20px "${font}"`,
-                        `900 20px "${font}"`,
-                        `800 20px "${font}"`,
-                        `700 20px "${font}"`,
-                    ];
+            if (FONT_CONFIGS[canonicalFont]) {
+                await loadFont(FONT_CONFIGS[canonicalFont]);
+                return;
+            }
 
-                    await Promise.all(fontVariations.map(async (fontStyle) => {
-                        try {
-                            await document.fonts.load(fontStyle);
-                        } catch (error) {
-                            console.warn(`Failed to load font style: ${fontStyle}`, error);
-                        }
-                    }));
-
-                    await document.fonts.ready;
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
-            } catch (error) {
-                console.warn(`Font loading error for ${font}:`, error);
+            if (document.fonts?.load) {
+                await document.fonts.load(`normal 20px "${canonicalFont}"`);
+                await document.fonts.ready;
             }
         })();
 
-        fontLoadCache.current.set(font, loadPromise);
-        await loadPromise;
-    }, []);
+        fontLoadCache.current.set(canonicalFont, loadPromise);
+        try {
+            await loadPromise;
+        } catch (error) {
+            fontLoadCache.current.delete(canonicalFont);
+            throw new Error(`Could not load the selected font "${canonicalFont}".`, {
+                cause: error,
+            });
+        }
+    }, [loadFont]);
 
     const drawText = useCallback((rotation: number = 0) => (
         ctx: CanvasRenderingContext2D,
@@ -2192,6 +3287,95 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
 
         const isMobile = isMobileDevice();
+        const isBannerLayout = effectiveTemplate.layout?.type === 'top-banner';
+        const backgroundPaddingX = Math.max(6, Math.round(fontSize * 0.2));
+        const backgroundPaddingY = isBannerLayout
+            ? Math.max(2, Math.round(fontSize * 0.08))
+            : Math.max(4, Math.round(fontSize * 0.12));
+        const backgroundRadius = Math.max(0, settings.backgroundRadius || 0);
+        const hasBackground = Boolean(settings.backgroundColor && settings.backgroundColor !== 'transparent');
+        const lineHeight = fontSize * 1.2;
+        const textBlockHeight = Math.max(lineHeight, lines.length * lineHeight);
+        const measuredLineWidths = lines.map((line) => {
+            const transformedText = transformText(line, settings.textCase);
+            return getTextWidthWithSpacing(ctx, transformedText, settings.letterSpacing);
+        });
+        const textBlockWidth = Math.max(
+            box.width,
+            measuredLineWidths.length > 0 ? Math.max(...measuredLineWidths) : 0
+        );
+        const textBlockTop = isBannerLayout
+            ? box.y + Math.max(0, (box.height - textBlockHeight) / 4)
+            : box.y + Math.max(0, (box.height - textBlockHeight) / 2);
+        const textBlockLeft = box.x + Math.max(0, (box.width - textBlockWidth) / 2);
+
+        const drawBackground = () => {
+            if (!hasBackground) return;
+            const backgroundX = textBlockLeft - backgroundPaddingX;
+            const backgroundY = textBlockTop - backgroundPaddingY;
+            const backgroundWidth = textBlockWidth + backgroundPaddingX * 2;
+            const backgroundHeight = textBlockHeight + backgroundPaddingY * 2;
+            const radius = Math.min(
+                backgroundRadius,
+                Math.max(0, Math.min(backgroundWidth, backgroundHeight) / 2)
+            );
+
+            ctx.save();
+            ctx.fillStyle = settings.backgroundColor;
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            if (radius > 0) {
+                ctx.beginPath();
+                ctx.moveTo(backgroundX + radius, backgroundY);
+                ctx.lineTo(backgroundX + backgroundWidth - radius, backgroundY);
+                ctx.quadraticCurveTo(
+                    backgroundX + backgroundWidth,
+                    backgroundY,
+                    backgroundX + backgroundWidth,
+                    backgroundY + radius
+                );
+                ctx.lineTo(
+                    backgroundX + backgroundWidth,
+                    backgroundY + backgroundHeight - radius
+                );
+                ctx.quadraticCurveTo(
+                    backgroundX + backgroundWidth,
+                    backgroundY + backgroundHeight,
+                    backgroundX + backgroundWidth - radius,
+                    backgroundY + backgroundHeight
+                );
+                ctx.lineTo(backgroundX + radius, backgroundY + backgroundHeight);
+                ctx.quadraticCurveTo(
+                    backgroundX,
+                    backgroundY + backgroundHeight,
+                    backgroundX,
+                    backgroundY + backgroundHeight - radius
+                );
+                ctx.lineTo(backgroundX, backgroundY + radius);
+                ctx.quadraticCurveTo(
+                    backgroundX,
+                    backgroundY,
+                    backgroundX + radius,
+                    backgroundY
+                );
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                ctx.fillRect(
+                    backgroundX,
+                    backgroundY,
+                    backgroundWidth,
+                    backgroundHeight
+                );
+            }
+
+            ctx.restore();
+        };
+
+        drawBackground();
 
         if (isMobile) {
             ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
@@ -2203,14 +3387,16 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.lineWidth = settings.outline.width;
             ctx.fillStyle = settings.color;
             ctx.textAlign = box.align || 'center';
-
-            const lineHeight = fontSize * 1.2;
-            let currentY = box.y + fontSize;
+            ctx.textBaseline = 'middle';
 
             const drawTextWithSpacingMobile = (text: string, x: number, y: number) => {
                 const transformedText = transformText(text, settings.textCase);
+                const safeLetterSpacing = getSafeLetterSpacing(
+                    transformedText,
+                    settings.letterSpacing
+                );
 
-                if (settings.letterSpacing === 0) {
+                if (safeLetterSpacing === 0) {
                     if (settings.outline.width > 0) {
                         ctx.strokeText(transformedText, x, y);
                     }
@@ -2224,12 +3410,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
                 if (originalTextAlign === 'center') {
                     const totalWidth = transformedText.split('').reduce((width, char, index) => {
-                        return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
+                        return width + ctx.measureText(char).width + (index > 0 ? safeLetterSpacing : 0);
                     }, 0);
                     currentX = x - totalWidth / 2;
                 } else if (originalTextAlign === 'right') {
                     const totalWidth = transformedText.split('').reduce((width, char, index) => {
-                        return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
+                        return width + ctx.measureText(char).width + (index > 0 ? safeLetterSpacing : 0);
                     }, 0);
                     currentX = x - totalWidth;
                 }
@@ -2240,20 +3426,20 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         ctx.strokeText(char, currentX, y);
                     }
                     ctx.fillText(char, currentX, y);
-                    currentX += ctx.measureText(char).width + settings.letterSpacing;
+                    currentX += ctx.measureText(char).width + safeLetterSpacing;
                 }
 
                 ctx.textAlign = originalTextAlign;
             };
 
-            lines.forEach(line => {
-                const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
-                const adjustedY = Math.max(currentY, box.y + fontSize);
-                const maxY = box.y + box.height - 5;
-                if (adjustedY <= maxY) {
-                    drawTextWithSpacingMobile(line, x, adjustedY);
-                }
-                currentY += lineHeight;
+            lines.forEach((line, lineIndex) => {
+                const x = box.align === 'center'
+                    ? textBlockLeft + textBlockWidth / 2
+                    : box.align === 'right'
+                        ? textBlockLeft + textBlockWidth
+                        : textBlockLeft;
+                const y = textBlockTop + lineHeight * lineIndex + lineHeight / 2;
+                drawTextWithSpacingMobile(line, x, y);
             });
         } else {
             ctx.font = `${settings.fontWeight} ${fontSize}px ${fontFallbacks}`;
@@ -2266,14 +3452,16 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             ctx.shadowColor = settings.shadow.color;
             ctx.fillStyle = settings.color;
             ctx.textAlign = box.align || 'center';
-
-            const lineHeight = fontSize * 1.2;
-            let currentY = box.y + fontSize;
+            ctx.textBaseline = 'middle';
 
             const drawTextWithSpacing = (text: string, x: number, y: number) => {
                 const transformedText = transformText(text, settings.textCase);
+                const safeLetterSpacing = getSafeLetterSpacing(
+                    transformedText,
+                    settings.letterSpacing
+                );
 
-                if (settings.letterSpacing === 0) {
+                if (safeLetterSpacing === 0) {
                     if (settings.outline.width > 0) {
                         ctx.strokeText(transformedText, x, y);
                     }
@@ -2287,12 +3475,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
                 if (originalTextAlign === 'center') {
                     const totalWidth = transformedText.split('').reduce((width, char, index) => {
-                        return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
+                        return width + ctx.measureText(char).width + (index > 0 ? safeLetterSpacing : 0);
                     }, 0);
                     currentX = x - totalWidth / 2;
                 } else if (originalTextAlign === 'right') {
                     const totalWidth = transformedText.split('').reduce((width, char, index) => {
-                        return width + ctx.measureText(char).width + (index > 0 ? settings.letterSpacing : 0);
+                        return width + ctx.measureText(char).width + (index > 0 ? safeLetterSpacing : 0);
                     }, 0);
                     currentX = x - totalWidth;
                 }
@@ -2303,20 +3491,20 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         ctx.strokeText(char, currentX, y);
                     }
                     ctx.fillText(char, currentX, y);
-                    currentX += ctx.measureText(char).width + settings.letterSpacing;
+                    currentX += ctx.measureText(char).width + safeLetterSpacing;
                 }
 
                 ctx.textAlign = originalTextAlign;
             };
 
-            lines.forEach(line => {
-                const x = box.align === 'center' ? box.x + box.width / 2 : box.x;
-                const adjustedY = Math.max(currentY, box.y + fontSize);
-                const maxY = box.y + box.height - 5;
-                if (adjustedY <= maxY) {
-                    drawTextWithSpacing(line, x, adjustedY);
-                }
-                currentY += lineHeight;
+            lines.forEach((line, lineIndex) => {
+                const x = box.align === 'center'
+                    ? textBlockLeft + textBlockWidth / 2
+                    : box.align === 'right'
+                        ? textBlockLeft + textBlockWidth
+                        : textBlockLeft;
+                const y = textBlockTop + lineHeight * lineIndex + lineHeight / 2;
+                drawTextWithSpacing(line, x, y);
             });
         }
 
@@ -2328,59 +3516,150 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const isImageInteracting = isDraggingImage || isResizingImage || isRotatingImage;
     const isElementInteracting = isTextInteracting || isImageInteracting || isShapeInteracting;
 
-    const renderScene = useCallback(async (canvas: HTMLCanvasElement, options: SceneRenderOptions) => {
+    const drawCreatorBranding = useCallback((
+        ctx: CanvasRenderingContext2D,
+        canvas: HTMLCanvasElement
+    ) => {
+        const watermarkText = branding.text.trim();
+        if (!branding.enabled || !watermarkText) return;
+
+        const padding = Math.max(10, Math.min(canvas.width, canvas.height) * 0.015);
+        const initialFontSize = Math.max(
+            12,
+            Math.min(canvas.width, canvas.height) * 0.02
+        );
+
+        ctx.save();
+        ctx.font = `${initialFontSize}px Arial, sans-serif`;
+        const watermarkFontSize = fitWatermarkFontSize({
+            initialFontSize,
+            maxWidth: canvas.width - padding * 2,
+            measureWidth: () => ctx.measureText(watermarkText).width,
+            minFontSize: 8,
+        });
+        ctx.font = `${watermarkFontSize}px Arial, sans-serif`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.lineWidth = Math.max(1, watermarkFontSize * 0.08);
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = Math.max(3, watermarkFontSize * 0.25);
+
+        const {
+            x: watermarkX,
+            y: watermarkY,
+            textAlign,
+            textBaseline,
+        } = getWatermarkCoordinates(
+            branding.position,
+            canvas.width,
+            canvas.height,
+            padding
+        );
+        ctx.textAlign = textAlign;
+        ctx.textBaseline = textBaseline;
+        ctx.strokeText(watermarkText, watermarkX, watermarkY);
+        ctx.fillText(watermarkText, watermarkX, watermarkY);
+        ctx.restore();
+    }, [branding]);
+
+    const renderScene = useCallback(async (
+        canvas: HTMLCanvasElement,
+        options: SceneRenderOptions & { shouldCommit?: () => boolean }
+    ) => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const fontsToLoad = [...new Set(textSettings.map(setting => setting.fontFamily))];
-        await Promise.all(fontsToLoad.map(font => waitForFont(font)));
+        const fontsToLoad = [
+            ...new Set(
+                textSettings
+                    .filter((setting) => setting.visible !== false)
+                    .map((setting) => setting.fontFamily)
+            ),
+        ];
+        try {
+            await Promise.all(fontsToLoad.map(font => waitForFont(font)));
+        } catch (error) {
+            if (!options.includeEditorControls) throw error;
+            console.warn('Preview is using a fallback font:', error);
+        }
 
-        const img = await loadAndCacheImage(template.image);
+        const img = await loadAndCacheImage(effectiveTemplate.image);
+        const staticImageOverlays = imageOverlays
+            .filter((overlay) => overlay.visible !== false)
+            .filter(
+                (overlay) =>
+                    !overlay.animated ||
+                    !decodedGifCache.current.has(overlay.id)
+            );
+        const imagePromises = staticImageOverlays.map((overlay) =>
+            loadAndCacheImage(overlay.src)
+        );
+        const imageResults = await settleSceneImageLoads(imagePromises, {
+            strict: !options.includeEditorControls,
+        });
+        if (imageResults.some((result) => result.status === 'rejected')) {
+            console.warn('Some images failed to load.');
+        }
+        const loadedOverlayImages = new Map<
+            string,
+            HTMLImageElement
+        >();
+        imageResults.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+                loadedOverlayImages.set(
+                    staticImageOverlays[index].id,
+                    result.value
+                );
+            }
+        });
+
+        if (options.shouldCommit && !options.shouldCommit()) {
+            return;
+        }
+
         if (canvas.width !== img.width) {
             canvas.width = img.width;
         }
-        if (canvas.height !== img.height) {
-            canvas.height = img.height;
+        const activeLayout =
+            topBannerEnabled
+                ? {
+                      type: 'top-banner' as const,
+                      bannerHeight: clampTopBannerHeight(
+                          img.height,
+                          resolvedTopBannerHeight
+                      ),
+                      bannerColor: effectiveTemplate.layout?.bannerColor ?? '#ffffff',
+                  }
+                : effectiveTemplate.layout;
+        const bannerHeight =
+            activeLayout?.type === 'top-banner'
+                ? activeLayout.bannerHeight ?? Math.max(160, Math.round(img.height * 0.22))
+                : 0;
+        const targetHeight = img.height + bannerHeight;
+        if (canvas.height !== targetHeight) {
+            canvas.height = targetHeight;
         }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-
-            const watermarkText = "memehub.mom";
-            const watermarkFontSize = Math.max(12, Math.min(canvas.width, canvas.height) * 0.02);
+        if (bannerHeight > 0) {
             ctx.save();
-            ctx.font = `${watermarkFontSize}px Arial, sans-serif`;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-            ctx.lineWidth = 1;
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'bottom';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-            ctx.shadowBlur = 5;
-
-            const padding = 10;
-            const watermarkX = padding;
-            const watermarkY = canvas.height - padding;
-
-            ctx.strokeText(watermarkText, watermarkX, watermarkY);
-            ctx.fillText(watermarkText, watermarkX, watermarkY);
+            ctx.fillStyle =
+                activeLayout?.type === 'top-banner'
+                    ? activeLayout.bannerColor ?? '#ffffff'
+                    : '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, bannerHeight);
             ctx.restore();
+            ctx.drawImage(img, 0, bannerHeight);
+        } else {
+            ctx.drawImage(img, 0, 0);
+        }
 
             if (strokes.length > 0 || currentStroke) {
                 drawStrokes(ctx);
             }
 
-            const imagePromises = imageOverlays
-                .filter(overlay => !overlay.animated || !decodedGifCache.current.has(overlay.id))
-                .map(overlay => loadAndCacheImage(overlay.src));
-
-            try {
-                await Promise.all(imagePromises);
-            } catch (error) {
-                console.warn('Some images failed to load:', error);
-            }
-
             for (const overlay of imageOverlays) {
+                if (overlay.visible === false) continue;
                 try {
                     const decodedGif = overlay.animated ? decodedGifCache.current.get(overlay.id) : null;
                     const animationTime = options.resetAnimations
@@ -2388,7 +3667,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         : options.timeMs - (overlay.animationStartMs ?? 0);
                     const overlayImg = decodedGif
                         ? getGifFrameCanvas(decodedGif, animationTime)
-                        : imageCache.current.get(overlay.src);
+                        : loadedOverlayImages.get(overlay.id) ??
+                          imageCache.current.get(overlay.src);
                     if (!overlayImg) continue;
 
                     // Check if this image has erase strokes
@@ -2478,7 +3758,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             drawShapesLayer(ctx, options.includeEditorControls);
 
             // Only show selection handles if not in erase mode
-            if (options.includeEditorControls && selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length && !isImageEraseMode && !isImageInteracting) {
+            if (
+                options.includeEditorControls &&
+                selectedImageIndex !== -1 &&
+                selectedImageIndex < imageOverlays.length &&
+                imageOverlays[selectedImageIndex].visible !== false &&
+                !isImageEraseMode &&
+                !isImageInteracting
+            ) {
                 const selectedImg = imageOverlays[selectedImageIndex];
 
                 const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -2557,11 +3844,22 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             }
 
             textBoxes.forEach((box, i) => {
+                if (textSettings[i]?.visible === false) return;
                 const rotation = textBoxRotations[i] || 0;
                 drawText(rotation)(ctx, texts[i], box, textSettings[i]);
             });
 
-            if (options.includeEditorControls && selectedTextIndex !== -1 && selectedTextIndex < textBoxes.length && texts[selectedTextIndex] && !isTextInteracting) {
+            // Creator identity is the top-most exported content layer.
+            drawCreatorBranding(ctx, canvas);
+
+            if (
+                options.includeEditorControls &&
+                selectedTextIndex !== -1 &&
+                selectedTextIndex < textBoxes.length &&
+                textSettings[selectedTextIndex]?.visible !== false &&
+                texts[selectedTextIndex] &&
+                !isTextInteracting
+            ) {
                 const selectedBox = textBoxes[selectedTextIndex];
                 const rotation = textBoxRotations[selectedTextIndex] || 0;
                 const isMobile = isMobileDevice();
@@ -2794,7 +4092,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
                 ctx.restore();
             }
-    }, [template, textSettings, drawText, waitForFont, isImageInteracting, isTextInteracting, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer, isMobileDevice]);
+    }, [effectiveTemplate, resolvedTopBannerHeight, topBannerEnabled, textSettings, drawText, drawCreatorBranding, waitForFont, isImageInteracting, isTextInteracting, imageOverlays, selectedImageIndex, selectedTextIndex, textBoxes, texts, textBoxRotations, loadAndCacheImage, strokes, currentStroke, isImageEraseMode, imageEraseTargetIndex, currentEraseStroke, drawShapesLayer, isMobileDevice]);
 
     const draw = useCallback(async () => {
         const canvas = canvasRef.current;
@@ -2812,10 +4110,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
         const timeMs = getAnimationNow();
         currentAnimationTimeRef.current = timeMs;
+        const renderRevision = previewRenderRevision.current + 1;
+        previewRenderRevision.current = renderRevision;
         await renderScene(canvas, {
             timeMs,
             includeEditorControls: true,
             resetAnimations: false,
+            shouldCommit: () =>
+                previewRenderRevision.current === renderRevision,
         });
     }, [getAnimationNow, isElementInteracting, renderScene]);
 
@@ -2825,9 +4127,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         draw();
     }, [draw, texts, textBoxes, textSettings, textBoxRotations, imageOverlays, shapeOverlays, selectedImageIndex, selectedShapeIndex, selectedTextIndex, strokes, currentStroke]);
 
-    const hasAnimatedOverlays = imageOverlays.some((o) => o.animated);
+    const hasAnimatedOverlays = imageOverlays.some(
+        (overlay) => overlay.visible !== false && overlay.animated
+    );
     const hasPendingAnimatedOverlays =
-        pendingGifDecodeCount > 0 || imageOverlays.some((o) => o.animationDecodePending);
+        imageOverlays.some(
+            (overlay) =>
+                overlay.visible !== false && overlay.animationDecodePending
+        );
     const hasAnimatedExportOverlays = hasAnimatedOverlays || hasPendingAnimatedOverlays;
     useEffect(() => {
         if (!hasAnimatedOverlays) return;
@@ -2870,20 +4177,43 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (selectedImageIndex === -1) return;
         setShowLayerPanel(true);
         setShowMediaLayers(true);
-    }, [selectedImageIndex]);
+        const selectedImageId = imageOverlays[selectedImageIndex]?.id;
+        if (
+            selectedImageId &&
+            workspaceTabPreservingImageId.current === selectedImageId
+        ) {
+            workspaceTabPreservingImageId.current = null;
+            return;
+        }
+        if (pendingDiscoveryImageAdds.current > 0) {
+            return;
+        }
+        setCreatorWorkspaceTab('layers');
+    }, [imageOverlays, selectedImageIndex]);
 
     useEffect(() => {
         if (selectedShapeIndex === -1) return;
         setShowLayerPanel(true);
         setShowShapeLayers(true);
+        if (pendingDiscoveryImageAdds.current > 0) {
+            return;
+        }
+        setCreatorWorkspaceTab('layers');
     }, [selectedShapeIndex]);
 
     useEffect(() => {
-        const isEditableTarget = (target: EventTarget | null) => {
-            if (!(target instanceof HTMLElement)) return false;
-            const tag = target.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
-            return target.isContentEditable;
+        const isInteractiveTarget = (target: EventTarget | null) => {
+            if (!(target instanceof Element)) return false;
+            if (
+                target.closest(
+                    'input, textarea, select, button, a, [role="button"], [role="tab"], [role="slider"], [role="menu"], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="listbox"], [role="option"], [role="dialog"], [role="combobox"], [role="switch"], [role="spinbutton"], [role="radio"], [role="checkbox"], [contenteditable="true"]'
+                )
+            ) {
+                return true;
+            }
+            return (
+                target instanceof HTMLElement && target.isContentEditable
+            );
         };
 
         const getArrowDelta = (key: string, step: number): { dx: number; dy: number } | null => {
@@ -2902,7 +4232,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         };
 
         const keyHandler = (event: KeyboardEvent) => {
-            if (isEditableTarget(event.target)) return;
+            if (!editorCanEdit) return;
+            if (event.defaultPrevented || isInteractiveTarget(event.target)) return;
             if (isDrawingMode || isImageEraseMode) return;
 
             if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -2914,6 +4245,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 if (selectedImageIndex !== -1) {
                     removeImageOverlay(selectedImageIndex);
                     setSelectedImageIndex(-1);
+                    event.preventDefault();
+                    return;
+                }
+                if (selectedTextIndex !== -1) {
+                    clearTextBox(selectedTextIndex);
                     event.preventDefault();
                     return;
                 }
@@ -2937,15 +4273,21 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
             if (selectedImageIndex !== -1 && selectedImageIndex < imageOverlays.length) {
                 const img = imageOverlays[selectedImageIndex];
-                const newX = Math.max(0, Math.min(canvas.width - img.width, img.x + delta.dx));
-                const newY = Math.max(0, Math.min(canvas.height - img.height, img.y + delta.dy));
+                const constrained = constrainLayerPosition(
+                    img,
+                    canvas,
+                    {
+                        x: img.x + delta.dx,
+                        y: img.y + delta.dy,
+                    }
+                );
 
                 setImageOverlays((prev) => {
                     const updated = [...prev];
                     updated[selectedImageIndex] = {
                         ...updated[selectedImageIndex],
-                        x: newX,
-                        y: newY,
+                        x: constrained.x,
+                        y: constrained.y,
                     };
                     return updated;
                 });
@@ -2983,6 +4325,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         imageOverlays,
         shapeOverlays,
         textBoxes,
+        editorCanEdit,
         isDrawingMode,
         isImageEraseMode,
         removeShape,
@@ -3024,7 +4367,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const getAnimatedSceneExportDurationMs = useCallback(() => {
         const overlayDurations = imageOverlays.map((overlay) => {
-            if (!overlay.animated) return 0;
+            if (overlay.visible === false || !overlay.animated) return 0;
             return decodedGifCache.current.get(overlay.id)?.durationMs ?? 0;
         });
 
@@ -3040,8 +4383,17 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         toast.error(corsMessage);
     }, []);
 
+    const blockExportWhileAddingImage = useCallback(() => {
+        if (pendingImageAddCount.current === 0) return false;
+        toast.info(
+            'An image is still being added. Export again when it appears on the canvas.'
+        );
+        return true;
+    }, []);
+
     const downloadMeme = async () => {
-        if (pendingGifDecodeIds.current.size > 0) {
+        if (blockExportWhileAddingImage()) return;
+        if (hasPendingAnimatedOverlays) {
             toast.info('GIF is still preparing. Try exporting again in a moment.');
             return;
         }
@@ -3059,7 +4411,79 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     };
 
+    const downloadCreatorStill = async (
+        request: CreatorStillExportRequest
+    ) => {
+        if (blockExportWhileAddingImage()) return;
+        if (hasPendingAnimatedOverlays) {
+            toast.info('GIF is still preparing. Try exporting again in a moment.');
+            return;
+        }
+
+        const currentCanvas = canvasRef.current;
+        if (!currentCanvas?.width || !currentCanvas.height) {
+            toast.error('The canvas is still preparing. Try again in a moment.');
+            return;
+        }
+
+        const format = STILL_IMAGE_FORMATS[request.format];
+        const dimensions = resolveCreatorExportDimensions(
+            request.profileId,
+            {
+                width: currentCanvas.width,
+                height: currentCanvas.height,
+            }
+        );
+        setIsExporting(true);
+        setExportStatus(
+            `Preparing ${format.label} ${dimensions.width}×${dimensions.height}…`
+        );
+
+        try {
+            const blob = await renderSceneToImageBlob(
+                renderScene,
+                getExportTimeMs(),
+                {
+                    mimeType: format.mimeType,
+                    quality: format.supportsQuality
+                        ? request.quality
+                        : undefined,
+                    ...(request.profileId === 'original'
+                        ? {}
+                        : {
+                              width: dimensions.width,
+                              height: dimensions.height,
+                              mode: request.placement,
+                              backgroundColor: request.backgroundColor,
+                          }),
+                }
+            );
+            downloadBlob(
+                blob,
+                buildCreatorExportFilename({
+                    baseName: effectiveTemplate.displayName || 'meme',
+                    profileId: request.profileId,
+                    format: request.format,
+                })
+            );
+            toast.success(
+                `${format.label} ready at ${dimensions.width}×${dimensions.height}`
+            );
+        } catch (error) {
+            showExportError(error, `${format.label} export failed`);
+        } finally {
+            setIsExporting(false);
+            setExportStatus(null);
+        }
+    };
+
     const copyMeme = async () => {
+        if (blockExportWhileAddingImage()) return;
+        if (hasPendingAnimatedOverlays) {
+            toast.info('GIF is still preparing. Try copying again in a moment.');
+            return;
+        }
+
         setIsExporting(true);
         setExportStatus('Copying...');
         try {
@@ -3080,7 +4504,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     }
 
     const downloadAnimatedMeme = async () => {
-        if (pendingGifDecodeIds.current.size > 0) {
+        if (blockExportWhileAddingImage()) return;
+        if (hasPendingAnimatedOverlays) {
             toast.info('GIF is still preparing. Try exporting again in a moment.');
             return;
         }
@@ -3154,6 +4579,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             fontWeight: '900',
             letterSpacing: 0,
             textCase: 'uppercase' as const,
+            backgroundColor: 'transparent',
+            backgroundRadius: 12,
             outline: {
                 width: 1,
                 color: '#000000'
@@ -3180,6 +4607,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         });
 
         setTexts(prev => [...prev, defaultText]);
+        setTranslationSourceTexts((prev) => [...prev, defaultText]);
+        setTextLayerIds((current) => [
+            ...current,
+            createTextLayerId(),
+        ]);
         setTextBoxes(prev => {
             setSelectedTextIndex(prev.length);
             setSelectedImageIndex(-1);
@@ -3199,19 +4631,225 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setSelectedShapeIndex
     ]);
 
-    const removeTextBox = useCallback((index: number) => {
+    const clearTextBox = useCallback((index: number) => {
         if (index < originalTextBoxCount) {
-            toast.error('Cannot remove template text boxes');
+            setTexts(prev => {
+                const updated = [...prev];
+                updated[index] = '';
+                return updated;
+            });
+            setTranslationSourceTexts(prev => {
+                const updated = [...prev];
+                updated[index] = '';
+                return updated;
+            });
+            setSelectedTextIndex(index);
+            toast.success('Text cleared');
             return;
         }
 
-        setTexts(prev => prev.filter((_, i) => i !== index));
-        setTextBoxes(prev => prev.filter((_, i) => i !== index));
-        setTextSettings(prev => prev.filter((_, i) => i !== index));
-        setTextBoxRotations(prev => prev.filter((_, i) => i !== index));
-
-        toast.success('Text box removed');
+        setTexts((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTranslationSourceTexts((prev) =>
+            prev.filter((_, itemIndex) => itemIndex !== index)
+        );
+        setTextBoxes((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTextBoxRotations((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTextSettings((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setTextLayerIds((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+        setSelectedTextIndex((current) => {
+            if (current === index) return -1;
+            return current > index ? current - 1 : current;
+        });
+        toast.success('Custom text box removed');
     }, [originalTextBoxCount]);
+
+    const toggleTextLayer = useCallback((index: number) => {
+        setTextSettings((current) =>
+            toggleLayerVisibility(current, index)
+        );
+    }, []);
+
+    const duplicateTextLayerAt = useCallback((index: number) => {
+        try {
+            const duplicated = duplicateTextLayer(
+                {
+                    texts,
+                    textBoxes,
+                    rotations: textBoxRotations,
+                    settings: textSettings,
+                },
+                index
+            );
+            setTexts(duplicated.texts);
+            setTranslationSourceTexts(duplicated.texts);
+            setTextBoxes(duplicated.textBoxes);
+            setTextBoxRotations(duplicated.rotations);
+            setTextSettings(duplicated.settings);
+            setTextLayerIds((current) => [
+                ...current,
+                createTextLayerId(),
+            ]);
+            setSelectedTextIndex(duplicated.selectedIndex);
+            setSelectedImageIndex(-1);
+            setSelectedShapeIndex(-1);
+            toast.success('Text layer duplicated');
+        } catch (error) {
+            toast.error(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not duplicate text layer'
+            );
+        }
+    }, [
+        setSelectedShapeIndex,
+        textBoxes,
+        textBoxRotations,
+        textSettings,
+        texts,
+    ]);
+
+    const toggleImageLayer = useCallback((index: number) => {
+        if (
+            imageEraseTargetIndex === index &&
+            imageOverlays[index]?.visible !== false
+        ) {
+            setIsImageEraseMode(false);
+            setImageEraseTargetIndex(-1);
+            setCurrentEraseStroke(null);
+            setIsErasing(false);
+        }
+        setImageOverlays((current) =>
+            toggleLayerVisibility(current, index)
+        );
+    }, [imageEraseTargetIndex, imageOverlays]);
+
+    const moveTextLayerAt = useCallback((
+        index: number,
+        direction: 'forward' | 'backward'
+    ) => {
+        if (
+            !canMoveTextLayerWithinGroup(
+                index,
+                direction,
+                texts.length,
+                originalTextBoxCount
+            )
+        ) {
+            return;
+        }
+
+        try {
+            const moved = moveTextLayer(
+                {
+                    texts,
+                    textBoxes,
+                    rotations: textBoxRotations,
+                    settings: textSettings,
+                },
+                index,
+                direction
+            );
+            setTexts(moved.texts);
+            setTranslationSourceTexts(moved.texts);
+            setTextBoxes(moved.textBoxes);
+            setTextBoxRotations(moved.rotations);
+            setTextSettings(moved.settings);
+            setTextLayerIds(
+                moveLayer(textLayerIds, index, direction).items
+            );
+            setSelectedTextIndex(moved.selectedIndex);
+            setSelectedImageIndex(-1);
+            setSelectedShapeIndex(-1);
+        } catch {
+            toast.error('Could not reorder text layers.');
+        }
+    }, [
+        originalTextBoxCount,
+        setSelectedShapeIndex,
+        textBoxes,
+        textBoxRotations,
+        textLayerIds,
+        textSettings,
+        texts,
+    ]);
+
+    const duplicateImageLayerAt = useCallback((index: number) => {
+        const layer = imageOverlays[index];
+        if (!layer) return;
+
+        try {
+            const copy = duplicateImageLayer(layer, generateImageId());
+            const nextImageOverlays = [...imageOverlays, copy];
+            if (
+                nextImageOverlays.length >
+                EDITOR_IMAGE_LAYER_LIMIT
+            ) {
+                throw new Error(
+                    `A meme can contain up to ${EDITOR_IMAGE_LAYER_LIMIT} image layers. Remove one before duplicating another.`
+                );
+            }
+            assertMemeEditorDraftLocalMediaCapacity({
+                ...draftStateRef.current,
+                canvasTemplate: canvasTemplateRef.current,
+                imageOverlays: nextImageOverlays,
+            });
+            imageOverlaysRef.current = nextImageOverlays;
+            setImageOverlays(nextImageOverlays);
+            setSelectedImageIndex(nextImageOverlays.length - 1);
+            setSelectedTextIndex(-1);
+            setSelectedShapeIndex(-1);
+            toast.success('Image layer duplicated');
+        } catch (error) {
+            toast.info(
+                error instanceof Error
+                    ? error.message
+                    : 'Could not duplicate image layer'
+            );
+        }
+    }, [imageOverlays, setSelectedShapeIndex]);
+
+    const moveImageLayer = useCallback((
+        index: number,
+        direction: 'forward' | 'backward'
+    ) => {
+        setImageOverlays((current) => {
+            const moved = moveLayer(current, index, direction);
+            setSelectedImageIndex(moved.selectedIndex);
+            return moved.items;
+        });
+        setIsImageEraseMode(false);
+        setImageEraseTargetIndex(-1);
+    }, []);
+
+    const toggleShapeLayer = useCallback((index: number) => {
+        replaceShapes(toggleLayerVisibility(shapeOverlays, index));
+        setSelectedShapeIndex(index);
+    }, [replaceShapes, setSelectedShapeIndex, shapeOverlays]);
+
+    const duplicateShapeLayerAt = useCallback((index: number) => {
+        const layer = shapeOverlays[index];
+        if (!layer) return;
+
+        const copy = duplicateShapeLayer(
+            layer,
+            `shape_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+        );
+        const next = [...shapeOverlays, copy];
+        replaceShapes(next);
+        setSelectedShapeIndex(next.length - 1);
+        setSelectedImageIndex(-1);
+        setSelectedTextIndex(-1);
+        toast.success('Shape layer duplicated');
+    }, [replaceShapes, setSelectedShapeIndex, shapeOverlays]);
+
+    const moveShapeLayer = useCallback((
+        index: number,
+        direction: 'forward' | 'backward'
+    ) => {
+        const moved = moveLayer(shapeOverlays, index, direction);
+        replaceShapes(moved.items);
+        setSelectedShapeIndex(moved.selectedIndex);
+    }, [replaceShapes, setSelectedShapeIndex, shapeOverlays]);
 
     const getPointerPos = (e: MouseEvent | TouchEvent, canvas: HTMLCanvasElement): Point => {
         const rect = canvas.getBoundingClientRect();
@@ -3268,7 +4906,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!canvas) return;
         const canvasPos = getPointerPos(e, canvas);
         const overlay = imageOverlays[imageEraseTargetIndex];
-        if (!overlay) return;
+        if (!overlay || overlay.visible === false) return;
         
         // Always start erasing, even if click is outside the image
         // This allows user to click outside and drag onto the image
@@ -3297,7 +4935,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         if (!canvas) return;
         const canvasPos = getPointerPos(e, canvas);
         const overlay = imageOverlays[imageEraseTargetIndex];
-        if (!overlay) return;
+        if (!overlay || overlay.visible === false) return;
         
         // Only add points that are within the image bounds
         const localPos = getImageLocalPos(canvasPos, overlay);
@@ -3322,6 +4960,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const handleImageEraseEnd = (e?: MouseEvent | TouchEvent) => {
         if (!isImageEraseMode || !isErasing || !currentEraseStroke || imageEraseTargetIndex === -1) return;
+        if (imageOverlays[imageEraseTargetIndex]?.visible === false) {
+            setCurrentEraseStroke(null);
+            setIsErasing(false);
+            return;
+        }
         
         // Only save the stroke if it has at least one point (user actually drew on the image)
         if (currentEraseStroke.points.length > 0) {
@@ -3433,52 +5076,98 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const animatedExportLabel =
         animatedExportCapability.format === 'mp4' ? 'Video MP4' : 'Animated GIF';
     const exportButtonLabel = exportStatus ?? (hasPendingAnimatedOverlays ? 'Preparing GIF...' : 'Download');
+    const draftStatusLabel = {
+        restoring: 'Restoring draft…',
+        saving: 'Saving…',
+        saved: 'Draft saved',
+        error: 'Draft not saved',
+    }[draftStatus];
+    const toggleDrawingMode = () => {
+        const nextDrawingMode = !isDrawingMode;
+        if (nextDrawingMode) {
+            setIsImageEraseMode(false);
+            setImageEraseTargetIndex(-1);
+        }
+        setIsDrawingMode(nextDrawingMode);
+    };
 
     return (
-        <motion.section
-            className="space-y-4 min-h-[65vh] max-sm:min-h-[75vh]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-        >
+        <>
+            {!isDraftReady && (
+                <div
+                    role="status"
+                    aria-live="polite"
+                    className="mb-3 rounded-xl border border-[#6a7bd1]/30 bg-[#6a7bd1]/10 px-4 py-3 text-sm"
+                >
+                    Restoring your saved draft before editing…
+                </div>
+            )}
+            {draftRestoreError && (
+                <div
+                    role="alert"
+                    className="mb-3 flex flex-col gap-3 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                >
+                    <span>{draftRestoreError}</span>
+                    <button
+                        type="button"
+                        onClick={onReset}
+                        className="rounded-md border border-red-400/40 px-3 py-2 font-semibold"
+                    >
+                        Return to templates
+                    </button>
+                </div>
+            )}
+            <motion.section
+                aria-busy={!isDraftReady}
+                inert={!editorCanEdit}
+                className={`min-h-[65vh] space-y-3 max-sm:min-h-[75vh] ${
+                    editorCanEdit ? '' : 'pointer-events-none opacity-60'
+                }`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: isDraftReady ? 1 : 0.6 }}
+                transition={{ duration: 0.3 }}
+            >
             <div className="flex items-center justify-between">
                 <motion.button
+                    type="button"
                     className="bg-transparent cursor-pointer flex items-center"
-                    onClick={onReset}
+                    onClick={handleBack}
+                    disabled={!editorCanEdit}
                     whileHover={{ x: -5 }}
                     transition={{ duration: 0.2 }}
                 >
                     <MoveLeft className='h-4 w-4' /> &nbsp; Back
                 </motion.button>
-                <motion.button
-                    className="bg-transparent max-sm:hidden cursor-pointer flex items-center space-x-2 px-3 py-1.5 rounded-md border border-white/20 hover:bg-white/5 transition-colors"
-                    onClick={() => setIsExpanded(!isExpanded)}
-                    whileTap={{ scale: 0.95 }}
-                    title={isExpanded ? "Collapse Editor" : "Expand Editor"}
+                <span
+                    aria-live="polite"
+                    className={`text-xs ${
+                        draftStatus === 'error'
+                            ? 'text-red-400'
+                            : 'text-black/50 dark:text-white/50'
+                    }`}
                 >
-                    {isExpanded ? (
-                        <>
-                            <Minimize2 className='h-4 w-4' />
-                            <span className="text-sm">Collapse</span>
-                        </>
-                    ) : (
-                        <>
-                            <Maximize2 className='h-4 w-4' />
-                            <span className="text-sm">Expand</span>
-                        </>
-                    )}
-                </motion.button>
+                    {draftStatusLabel}
+                </span>
             </div>
-            <div className={`flex ${isExpanded ? 'flex-col space-y-6' : 'max-sm:flex-col max-sm:space-y-10'} items-start ${isExpanded ? '' : 'space-x-16'}`}>
+            <EditorCanvasLayout toolsCollapsed={creatorWorkspaceCollapsed}>
+                <EditorCanvasStage className="self-start rounded-xl border border-white/10 bg-[#101016] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_36px_rgba(0,0,0,0.2)] lg:sticky lg:top-4">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: 0.1 }}
-                    className={isExpanded ? 'w-full flex justify-center' : 'max-sm:mx-auto'}
+                    className="flex w-full flex-col items-center"
                 >
+                    <div className="mb-3 flex w-full items-center justify-between gap-3 text-xs text-white/45">
+                        <span className="font-semibold uppercase tracking-[0.16em]">
+                            Canvas
+                        </span>
+                        <span>{effectiveTemplate.displayName || 'Untitled meme'}</span>
+                    </div>
+                    <div className="flex w-full items-center justify-center rounded-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.075)_1px,transparent_1px)] bg-[length:18px_18px] p-2 sm:p-3">
                     <canvas
                         ref={canvasRef}
-                        className={`border border-gray-300 dark:border-gray-700 ${isExpanded ? 'w-full max-w-[800px]' : 'w-[400px] max-sm:w-full'} h-fit bg-white select-none`}
+                        aria-label="Editable meme canvas"
+                        className="h-auto max-h-[calc(100dvh-16rem)] w-auto max-w-full select-none bg-white shadow-[0_20px_70px_rgba(0,0,0,0.45)]"
                         onMouseDown={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawStart(e.nativeEvent) : handleMouseDown}
                         onMouseMove={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawMove(e.nativeEvent) : handleMouseMove}
                         onMouseUp={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleMouseUp}
@@ -3488,8 +5177,13 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         onTouchEnd={(isDrawingMode || isImageEraseMode) ? (e) => handleDrawEnd(e.nativeEvent) : handleTouchEnd}
                         style={{ touchAction: 'none' }}
                     />
+                    </div>
 
-                    <div className={`flex items-center space-x-2 mt-3 ${isDrawingMode ? '' : 'hidden'}`}>
+                    <div
+                        className={`mt-3 flex w-full flex-wrap items-center justify-center gap-2 ${
+                            isDrawingMode ? '' : 'hidden'
+                        }`}
+                    >
                         <input
                             type="color"
                             value={drawColor}
@@ -3505,7 +5199,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             value={drawSize}
                             onChange={e => setDrawSize(Number(e.target.value))}
                             disabled={!isDrawingMode}
-                            className="w-24 mx-2"
+                            className="min-w-24 max-w-48 flex-1"
                             title="Stroke Size"
                         />
                         <span className="text-xs dark:text-white/60">{drawSize}px</span>
@@ -3537,14 +5231,357 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             <Trash className="h-4 w-4" /> <span>Erase All</span>
                         </motion.button>
                     </div>
+                    <div
+                        role="toolbar"
+                        aria-label="Canvas quick tools"
+                        className="mt-2 flex w-full flex-wrap items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/30 p-1"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsDrawingMode(false);
+                                setIsImageEraseMode(false);
+                                setImageEraseTargetIndex(-1);
+                                setCreatorWorkspaceTab('discover');
+                                setCreatorWorkspaceCollapsed(false);
+                            }}
+                            className="editor-quick-tool"
+                        >
+                            <ImageIcon className="h-4 w-4" />
+                            Images
+                        </button>
+                        <button
+                            ref={quickUploadButtonRef}
+                            type="button"
+                            onClick={() => {
+                                setIsDrawingMode(false);
+                                setIsImageEraseMode(false);
+                                setImageEraseTargetIndex(-1);
+                                setIsUploadDialogOpen(true);
+                            }}
+                            className="editor-quick-tool"
+                        >
+                            <Upload className="h-4 w-4" />
+                            Upload
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsDrawingMode(false);
+                                setIsImageEraseMode(false);
+                                setImageEraseTargetIndex(-1);
+                                addTextBox();
+                            }}
+                            className="editor-quick-tool"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Add Text
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={isDrawingMode}
+                            onClick={toggleDrawingMode}
+                            className={`editor-quick-tool ${
+                                isDrawingMode
+                                    ? 'border-[#7c8cff]/60 bg-[#6a7bd1]/30 text-white'
+                                    : ''
+                            }`}
+                        >
+                            <Pencil className="h-4 w-4" />
+                            Draw
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsDrawingMode(false);
+                                setIsImageEraseMode(false);
+                                setImageEraseTargetIndex(-1);
+                                setCreatorWorkspaceTab('layers');
+                                setCreatorWorkspaceCollapsed(false);
+                            }}
+                            className="editor-quick-tool"
+                        >
+                            <Layers className="h-4 w-4" />
+                            Layers
+                        </button>
+                    </div>
                 </motion.div>
+                </EditorCanvasStage>
 
                 <motion.div
-                    className={`space-y-2 ${isExpanded ? 'w-full max-w-[800px] mx-auto' : 'max-sm:-mt-4 w-full'}`}
+                    className="contents"
                     initial={{ opacity: 0, x: 0 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4, delay: 0.2 }}
                 >
+                    <EditorToolsPanel className="lg:sticky lg:top-4 lg:max-h-[calc(100dvh-7rem)]">
+                    <CreatorWorkspace
+                        activeTab={creatorWorkspaceTab}
+                        onTabChange={setCreatorWorkspaceTab}
+                        collapsed={creatorWorkspaceCollapsed}
+                        onCollapsedChange={setCreatorWorkspaceCollapsed}
+                        discover={
+                            <CreatorDiscoveryPanel
+                                onAddImage={addDiscoveredImageToCanvas}
+                                onUseAsTemplate={startFromDiscoveredImage}
+                                disabled={
+                                    isDrawingMode || isImageEraseMode
+                                }
+                            />
+                        }
+                        styles={
+                            <div className="space-y-3">
+                            <TextStylePanel
+                                activeTextIndex={
+                                    selectedTextIndex >= 0
+                                        ? selectedTextIndex
+                                        : 0
+                                }
+                                textCount={texts.length}
+                                onSelectText={(index) => {
+                                    setSelectedTextIndex(index);
+                                    setSelectedImageIndex(-1);
+                                    setSelectedShapeIndex(-1);
+                                }}
+                                onApplyPreset={handleApplyTextStyle}
+                            />
+                            <CreatorBrandPanel
+                                branding={branding}
+                                onChange={setBranding}
+                            />
+                            </div>
+                        }
+                        assets={
+                            <div className="space-y-4">
+                                <CreatorAssetShelf
+                                    onAddAsset={addCreatorAssetToCanvas}
+                                />
+                                <div className="border-t border-white/10 pt-3">
+                                    <div className="mb-2">
+                                        <p className="text-xs font-semibold text-white">
+                                            Stickers, GIFs &amp; shapes
+                                        </p>
+                                        <p className="text-[10px] text-white/45">
+                                            Search reactions or add visual callouts.
+                                        </p>
+                                    </div>
+                                    <ElementsPanel
+                                        onAddMedia={addMediaFromLibrary}
+                                        onAddShape={(type) => {
+                                            addShape(type);
+                                            setSelectedTextIndex(-1);
+                                            setSelectedImageIndex(-1);
+                                            setCreatorWorkspaceTab('layers');
+                                        }}
+                                        disabled={
+                                            isDrawingMode ||
+                                            isImageEraseMode
+                                        }
+                                    />
+                                </div>
+                            </div>
+                        }
+                        layers={
+                            <div className="space-y-3">
+                            <CreatorLayersPanel
+                                texts={texts.map((text, index) => ({
+                                    id:
+                                        textLayerIds[index] ??
+                                        `text-layer-fallback-${index}`,
+                                    text,
+                                    settings: textSettings[index],
+                                }))}
+                                images={imageOverlays}
+                                shapes={shapeOverlays}
+                                selectedTextIndex={selectedTextIndex}
+                                selectedImageIndex={selectedImageIndex}
+                                selectedShapeIndex={selectedShapeIndex}
+                                originalTextCount={originalTextBoxCount}
+                                backgroundLabel={
+                                    canvasTemplate?.displayName
+                                }
+                                backgroundSource={canvasTemplate?.source}
+                                onSelectText={(index) => {
+                                    setSelectedTextIndex(index);
+                                    setSelectedImageIndex(-1);
+                                    setSelectedShapeIndex(-1);
+                                }}
+                                onSelectImage={(index) => {
+                                    setSelectedImageIndex(index);
+                                    setSelectedTextIndex(-1);
+                                    setSelectedShapeIndex(-1);
+                                    setIsImageEraseMode(false);
+                                    setImageEraseTargetIndex(-1);
+                                }}
+                                onSelectShape={(index) => {
+                                    setSelectedShapeIndex(index);
+                                    setSelectedTextIndex(-1);
+                                    setSelectedImageIndex(-1);
+                                    setIsImageEraseMode(false);
+                                    setImageEraseTargetIndex(-1);
+                                }}
+                                onToggleText={toggleTextLayer}
+                                onToggleImage={toggleImageLayer}
+                                onToggleShape={toggleShapeLayer}
+                                onDuplicateText={duplicateTextLayerAt}
+                                onDuplicateImage={duplicateImageLayerAt}
+                                onDuplicateShape={duplicateShapeLayerAt}
+                                onMoveText={moveTextLayerAt}
+                                onMoveImage={moveImageLayer}
+                                onMoveShape={moveShapeLayer}
+                                onDeleteText={clearTextBox}
+                                onDeleteImage={(index) => {
+                                    removeImageOverlay(index);
+                                    setSelectedImageIndex((current) => {
+                                        if (current === index) return -1;
+                                        return current > index
+                                            ? current - 1
+                                            : current;
+                                    });
+                                }}
+                                onDeleteShape={removeShape}
+                            />
+                            {selectedImageIndex >= 0 &&
+                                imageOverlays[selectedImageIndex] && (
+                                    <ImageLayerTools
+                                        image={
+                                            imageOverlays[
+                                                selectedImageIndex
+                                            ]
+                                        }
+                                        eraseMode={
+                                            isImageEraseMode &&
+                                            imageEraseTargetIndex ===
+                                                selectedImageIndex
+                                        }
+                                        eraseBrushSize={eraseBrushSize}
+                                        eraseBrushOpacity={
+                                            eraseBrushOpacity
+                                        }
+                                        onOpacityChange={(opacity) =>
+                                            handleImageOpacityChange(
+                                                selectedImageIndex,
+                                                opacity
+                                            )
+                                        }
+                                        onRotate90={rotateSelectedImage90}
+                                        onFit={() =>
+                                            fitSelectedImageToCanvas('fit')
+                                        }
+                                        onFill={() =>
+                                            fitSelectedImageToCanvas('fill')
+                                        }
+                                        onToggleErase={
+                                            toggleSelectedImageErase
+                                        }
+                                        onEraseBrushSizeChange={
+                                            setEraseBrushSize
+                                        }
+                                        onEraseBrushOpacityChange={
+                                            setEraseBrushOpacity
+                                        }
+                                        onUndoErase={() =>
+                                            undoImageErase(
+                                                selectedImageIndex
+                                            )
+                                        }
+                                        onClearErase={() =>
+                                            clearImageErase(
+                                                selectedImageIndex
+                                            )
+                                        }
+                                    />
+                                )}
+                            </div>
+                        }
+                        exportPanel={
+                            <CreatorExportPanel
+                                isExporting={
+                                    isExporting ||
+                                    hasPendingAnimatedOverlays
+                                }
+                                onExport={downloadCreatorStill}
+                                onCopy={copyMeme}
+                                hasAnimatedMedia={hasAnimatedExportOverlays}
+                                animatedLabel={animatedExportLabel}
+                                onExportAnimated={downloadAnimatedMeme}
+                            />
+                        }
+                    />
+                    </EditorToolsPanel>
+
+                    <EditorInspectorPanel className="rounded-xl border border-white/10 bg-[#15151c] p-3 shadow-[0_14px_36px_rgba(0,0,0,0.2)] lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:overscroll-contain">
+                    <div className="mb-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <div>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                                    Template format
+                                </p>
+                                <p className="mt-0.5 text-[9px] text-white/40">
+                                    Choose whether the meme uses a white header band.
+                                </p>
+                            </div>
+                            <div className="rounded-full border border-white/10 bg-black/30 px-2 py-0.5 text-[9px] text-white/50">
+                                {topBannerEnabled ? 'Banner on' : 'Standard'}
+                            </div>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setTopBannerEnabled(false)}
+                                className={`rounded-md border px-2.5 py-1.5 text-left text-[11px] font-medium transition-colors ${
+                                    !topBannerEnabled
+                                        ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                        : 'border-white/10 bg-black/20 text-white/70 hover:bg-white/5'
+                                }`}
+                            >
+                                Standard
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTopBannerEnabled(true)}
+                                className={`rounded-md border px-2.5 py-1.5 text-left text-[11px] font-medium transition-colors ${
+                                    topBannerEnabled
+                                        ? 'border-[#6a7bd1] bg-[#6a7bd1]/20 text-white'
+                                        : 'border-white/10 bg-black/20 text-white/70 hover:bg-white/5'
+                                }`}
+                            >
+                                White top banner
+                            </button>
+                        </div>
+                        {topBannerEnabled && (
+                            <div className="mt-2 space-y-1.5">
+                                <div className="flex items-center justify-between gap-2 text-[10px] text-white/50">
+                                    <span>Banner height</span>
+                                    <span>{resolvedTopBannerHeight}px</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="64"
+                                    max="600"
+                                    value={resolvedTopBannerHeight}
+                                    onChange={(event) =>
+                                        setTopBannerHeight(Number(event.target.value))
+                                    }
+                                    className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/20"
+                                    style={{
+                                        background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${((resolvedTopBannerHeight - 64) / 536) * 100}%, rgba(255,255,255,0.2) ${((resolvedTopBannerHeight - 64) / 536) * 100}%, rgba(255,255,255,0.2) 100%)`
+                                    }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                    <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-3">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
+                                Captions
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-white/40">
+                                Type your text; use the gear for styling
+                            </p>
+                        </div>
+                        <Settings className="h-4 w-4 text-white/35" />
+                    </div>
                     {/* Text inputs — primary */}
                     {texts.map((txt, i) => (
                         <motion.div
@@ -3556,6 +5593,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <button
+                                                type="button"
+                                                aria-label={`Text settings for ${
+                                                    i < originalTextBoxCount
+                                                        ? `text position ${i + 1}`
+                                                        : `Custom text ${i - originalTextBoxCount + 1}`
+                                                }`}
                                                 className="p-2 border rounded-md bg-[#0f0f0f] border-white/20 text-white dark:hover:bg-white/5 hover:bg-black/80 transition-colors"
                                             >
                                                 <Settings className="h-4 w-4" />
@@ -3592,21 +5635,33 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                             <SelectValue placeholder="Font Family" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="Impact">Impact</SelectItem>
-                                                            <SelectItem value="Anton">Anton</SelectItem>
-                                                            <SelectItem value="Oswald">Oswald</SelectItem>
-                                                            <SelectItem value="Bebas Neue">Bebas Neue</SelectItem>
-                                                            <SelectItem value="Arial Black">Arial Black</SelectItem>
-                                                            <SelectItem value="Helvetica Neue">Helvetica Neue</SelectItem>
-                                                            <SelectItem value="Roboto Condensed">Roboto Condensed</SelectItem>
-                                                            <SelectItem value="Montserrat">Montserrat</SelectItem>
-                                                            <SelectItem value="Open Sans">Open Sans</SelectItem>
-                                                            <SelectItem value="Lato">Lato</SelectItem>
-                                                            <SelectItem value="Poppins">Poppins</SelectItem>
-                                                            <SelectItem value="Source Sans Pro">Source Sans Pro</SelectItem>
-                                                            <SelectItem value="Nunito">Nunito</SelectItem>
-                                                            <SelectItem value="Inter">Inter</SelectItem>
-                                                            <SelectItem value="Work Sans">Work Sans</SelectItem>
+                                                            <SelectGroup>
+                                                                <SelectLabel>Meme classics</SelectLabel>
+                                                                <SelectItem value="Impact">Impact</SelectItem>
+                                                                <SelectItem value="Anton">Anton</SelectItem>
+                                                                <SelectItem value="Oswald">Oswald</SelectItem>
+                                                                <SelectItem value="Bebas Neue">Bebas Neue</SelectItem>
+                                                                <SelectItem value="Arial Black">Arial Black</SelectItem>
+                                                                <SelectItem value="Helvetica Neue">Helvetica Neue</SelectItem>
+                                                                <SelectItem value="Roboto Condensed">Roboto Condensed</SelectItem>
+                                                                <SelectItem value="Montserrat">Montserrat</SelectItem>
+                                                                <SelectItem value="Open Sans">Open Sans</SelectItem>
+                                                                <SelectItem value="Lato">Lato</SelectItem>
+                                                                <SelectItem value="Poppins">Poppins</SelectItem>
+                                                                <SelectItem value="Source Sans 3">Source Sans 3</SelectItem>
+                                                                <SelectItem value="Nunito">Nunito</SelectItem>
+                                                                <SelectItem value="Inter">Inter</SelectItem>
+                                                                <SelectItem value="Work Sans">Work Sans</SelectItem>
+                                                            </SelectGroup>
+                                                            <SelectSeparator />
+                                                            <SelectGroup>
+                                                                <SelectLabel>Indian scripts</SelectLabel>
+                                                                {INDIAN_SCRIPT_FONT_NAMES.map((fontName) => (
+                                                                    <SelectItem key={fontName} value={fontName}>
+                                                                        {fontName}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectGroup>
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
@@ -3654,6 +5709,41 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                                                 <div className='w-full' onClick={(e) => e.stopPropagation()}>
+                                                    <label className="block text-xs dark:text-white/60 mb-1">Text Background</label>
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center space-x-2">
+                                                            <input
+                                                                type="color"
+                                                                value={textSettings[i].backgroundColor === 'transparent' ? '#000000' : textSettings[i].backgroundColor}
+                                                                onChange={(e) => handleSettingsChange(i, 'backgroundColor', e.target.value)}
+                                                                className="w-8 h-8 rounded border border-white/20 cursor-pointer"
+                                                            />
+                                                            <input
+                                                                type="text"
+                                                                value={textSettings[i].backgroundColor}
+                                                                onChange={(e) => handleSettingsChange(i, 'backgroundColor', e.target.value)}
+                                                                className="flex-1 p-1 text-xs border rounded bg-[#0f0f0f] border-white/20 text-white"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs dark:text-white/40 mb-1">Radius: {textSettings[i].backgroundRadius}px</label>
+                                                            <input
+                                                                type="range"
+                                                                min="0"
+                                                                max="80"
+                                                                value={textSettings[i].backgroundRadius}
+                                                                onChange={(e) => handleSettingsChange(i, 'backgroundRadius', parseInt(e.target.value))}
+                                                                className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                                                style={{
+                                                                    background: `linear-gradient(to right, #6a7bd1 0%, #6a7bd1 ${(textSettings[i].backgroundRadius / 80) * 100}%, rgba(255,255,255,0.2) ${(textSettings[i].backgroundRadius / 80) * 100}%, rgba(255,255,255,0.2) 100%)`
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                                <div className='w-full' onClick={(e) => e.stopPropagation()}>
                                                     <label className="block text-xs dark:text-white/60 mb-1">Letter Spacing</label>
                                                     <input
                                                         type="range"
@@ -3683,6 +5773,51 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                             <SelectItem value="normal">Normal (As Written)</SelectItem>
                                                         </SelectContent>
                                                     </Select>
+                                                </div>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className='flex flex-col space-y-2'>
+                                                <div className='w-full' onClick={(e) => e.stopPropagation()}>
+                                                    <label className="block text-xs dark:text-white/60 mb-2">Translate text</label>
+                                                    <div className="grid gap-2">
+                                                        <div className="grid grid-cols-[auto,1fr] items-center gap-2">
+                                                            <span className="text-[10px] font-medium text-white/55">
+                                                                Translate to
+                                                            </span>
+                                                            <select
+                                                                value={translationLanguage}
+                                                                onChange={(event) =>
+                                                                    setTranslationLanguage(
+                                                                        event.target.value as MemeTranslationLanguageCode
+                                                                    )
+                                                                }
+                                                                aria-label="Translate to"
+                                                                className="h-8 w-full rounded-md border border-white/20 bg-[#0f0f0f] px-2 text-xs text-white"
+                                                            >
+                                                                {MEME_TRANSLATION_LANGUAGES.map(
+                                                                    (language) => (
+                                                                        <option
+                                                                            key={language.code}
+                                                                            value={language.code}
+                                                                        >
+                                                                            {language.label}
+                                                                        </option>
+                                                                    )
+                                                                )}
+                                                            </select>
+                                                        </div>
+                                                        <motion.button
+                                                            type="button"
+                                                            whileTap={{ scale: 0.98 }}
+                                                            className="inline-flex items-center justify-center gap-2 rounded-md bg-[#6a7bd1] px-3 py-1.5 text-[10px] font-semibold text-white transition-colors hover:bg-[#7889e8] disabled:cursor-not-allowed disabled:opacity-60"
+                                                            onClick={() => handleTranslateText(i)}
+                                                            disabled={translatingTextIndex === i}
+                                                            title="Translate this text layer"
+                                                        >
+                                                            {translatingTextIndex === i
+                                                                ? 'Translating...'
+                                                                : 'Translate'}
+                                                        </motion.button>
+                                                    </div>
                                                 </div>
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -3813,10 +5948,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                     </DropdownMenu>
                                 </div>
                                 <textarea
+                                    ref={i === 0 ? primaryCaptionRef : undefined}
+                                    aria-label={i < originalTextBoxCount ? `text position ${i + 1}` : `Custom text ${i - originalTextBoxCount + 1}`}
+                                    dir="auto"
                                     className="w-full p-2 pl-3 text-sm border rounded-md bg-[#0f0f0f] border-white/20 text-white placeholder:text-white/70 resize-none min-h-[40px] max-h-[120px]"
                                     placeholder={i < originalTextBoxCount ? `text position ${i + 1}` : `Custom text ${i - originalTextBoxCount + 1}`}
                                     value={txt}
                                     onChange={(e: ChangeEvent<HTMLTextAreaElement>) => handleChange(i, e.target.value)}
+                                    onFocus={() => {
+                                        setSelectedTextIndex(i);
+                                        setSelectedImageIndex(-1);
+                                        setSelectedShapeIndex(-1);
+                                    }}
                                     rows={txt.split('\n').length || 1}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
@@ -3827,10 +5970,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                 {/* Add remove button for custom text boxes */}
                                 {i >= originalTextBoxCount && (
                                     <motion.button
+                                        type="button"
                                         whileTap={{ scale: 0.9 }}
                                         className="p-2 border rounded-md bg-[#0f0f0f] border-white/20 text-white transition-colors"
-                                        onClick={() => removeTextBox(i)}
-                                        title="Remove text box"
+                                        onClick={() => clearTextBox(i)}
+                                        title="Delete custom text"
+                                        aria-label="Delete custom text"
                                     >
                                         <X className="h-4 w-4" />
                                     </motion.button>
@@ -3840,24 +5985,23 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     ))}
 
                     {/* Action Buttons Row */}
-                    <div className="flex space-x-2">
-                        <Dialog open={isUploadDialogOpen} onOpenChange={(open) => {
-                            setIsUploadDialogOpen(open);
-                            if (!open) {
-                                resetDialogState();
-                            }
-                        }}>
-                            <DialogTrigger asChild>
-                                <motion.button
-                                    whileTap={{ scale: 0.98 }}
-                                    className="flex items-center justify-center h-9 space-x-2 px-3 py-2 bg-black/70 dark:bg-white/15 border border-white/20 text-white text-xs rounded-md transition-colors w-full text-center"
-                                    onClick={() => setIsUploadDialogOpen(true)}
-                                >
-                                    <Upload className="h-3 w-3" />
-                                    <span>Upload Image</span>
-                                </motion.button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-md bg-[#0f0f0f] border-white/20">
+                    <div className="hidden" aria-hidden="true">
+                        <Dialog
+                            open={isUploadDialogOpen}
+                            onOpenChange={(open) => {
+                                setIsUploadDialogOpen(open);
+                                if (!open) {
+                                    resetDialogState();
+                                }
+                            }}
+                        >
+                            <DialogContent
+                                className="sm:max-w-md bg-[#0f0f0f] border-white/20"
+                                onCloseAutoFocus={(event) => {
+                                    event.preventDefault();
+                                    quickUploadButtonRef.current?.focus();
+                                }}
+                            >
                                 <DialogHeader>
                                     <DialogTitle className="text-white">Upload Image</DialogTitle>
                                     <DialogDescription className="text-white/60">
@@ -4006,13 +6150,82 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         <motion.button
                             whileTap={{ scale: 0.98 }}
                             className={`p-2 rounded-md border text-xs flex items-center space-x-1 ${isDrawingMode ? 'bg-[#6a7bd1] text-white border-[#6a7bd1]' : ' bg-black/70 dark:bg-white/15 border border-white/20 text-white'}`}
-                            onClick={() => setIsDrawingMode((v) => !v)}
+                            onClick={toggleDrawingMode}
                             title="Draw Mode"
                         >
                             <Pencil className="h-4 w-4" /> <span>Draw</span>
                         </motion.button>
                     </div>
 
+                    <div className="hidden rounded-md border border-white/15 bg-black/60 p-3" aria-hidden="true">
+                        <label className="flex cursor-pointer items-center gap-2 text-xs text-white">
+                            <input
+                                type="checkbox"
+                                aria-label="Add creator watermark"
+                                checked={branding.enabled}
+                                onChange={(event) =>
+                                    setBranding((current) => ({
+                                        ...current,
+                                        enabled: event.target.checked,
+                                    }))
+                                }
+                                className="h-4 w-4 accent-[#6a7bd1]"
+                            />
+                            Add creator watermark
+                        </label>
+
+                        {branding.enabled && (
+                            <div className="mt-3 grid gap-3">
+                                <label
+                                    htmlFor="creator-watermark-text"
+                                    className="grid gap-1 text-xs text-white/70"
+                                >
+                                    Creator name or handle
+                                    <input
+                                        id="creator-watermark-text"
+                                        aria-label="Creator watermark text"
+                                        type="text"
+                                        maxLength={60}
+                                        value={branding.text}
+                                        onChange={(event) =>
+                                            setBranding((current) => ({
+                                                ...current,
+                                                text: event.target.value,
+                                            }))
+                                        }
+                                        placeholder="@yourpage"
+                                        className="h-9 rounded-md border border-white/20 bg-black/70 px-3 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-[#6a7bd1]"
+                                    />
+                                </label>
+
+                                <label className="grid gap-1 text-xs text-white/70">
+                                    Position
+                                    <select
+                                        aria-label="Creator watermark position"
+                                        value={branding.position}
+                                        onChange={(event) =>
+                                            setBranding((current) => ({
+                                                ...current,
+                                                position: event.target.value as CreatorBranding['position'],
+                                            }))
+                                        }
+                                        className="h-9 rounded-md border border-white/20 bg-black/70 px-3 text-sm text-white outline-none transition-colors focus:border-[#6a7bd1]"
+                                    >
+                                        <option value="top-left">Top left</option>
+                                        <option value="top-right">Top right</option>
+                                        <option value="bottom-left">Bottom left</option>
+                                        <option value="bottom-right">Bottom right</option>
+                                    </select>
+                                </label>
+                            </div>
+                        )}
+
+                        <p className="mt-2 text-[11px] leading-relaxed text-white/45">
+                            Optional—Memehub never forces its own watermark on your export.
+                        </p>
+                    </div>
+
+                    <div className="hidden" aria-hidden="true">
                     <motion.button
                         type="button"
                         whileTap={{ scale: 0.98 }}
@@ -4542,7 +6755,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, delay: 0.5 }}
                             whileTap={{ scale: 0.98 }}
-                            disabled={isExporting}
+                            disabled={isExporting || hasPendingAnimatedOverlays}
                             className="px-4 py-2 w-full bg-transparent text-black hover:bg-gray-100/50 dark:hover:bg-white/5 font-medium  border border-[#6a7bd1] text-sm dark:text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                             onClick={copyMeme}
                         >
@@ -4554,8 +6767,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             </span>
                         </motion.button>
                     </div>
+                    </div>
+                    </EditorInspectorPanel>
                 </motion.div>
-            </div>
-        </motion.section>
+            </EditorCanvasLayout>
+            </motion.section>
+        </>
     );
 }

@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+.searxng.env
 
 # vercel
 .vercel
@@ -42,3 +43,4 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+.searxng.env

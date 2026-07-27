@@ -4,6 +4,7 @@ export type TransformableBox = {
     width: number;
     height: number;
     rotation: number;
+    visible?: boolean;
 };
 
 export function isMobileCanvas(): boolean {
@@ -20,6 +21,7 @@ export function getTransformableAtPosition(
 ): { index: number; handle: string } {
     for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i];
+        if (item.visible === false) continue;
         const isMobile = isMobileCanvas();
         const rotationHandleSize = isMobile ? 60 : 50;
         const rotationHandleX = item.x + item.width / 2;

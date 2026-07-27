@@ -1,8 +1,20 @@
 import { applyPalette, GIFEncoder, quantize } from 'gifenc';
 import { PNG_EXPORT_MIME_TYPE, type AnimatedExportCapability } from '@/lib/exportCapabilities';
 import { ANIMATED_EXPORT_MIN_DURATION_MS } from '@/lib/gifAnimation';
+import {
+    calculateImagePlacement,
+    type ImagePlacementMode,
+} from '@/lib/creatorExport';
 
 export const ANIMATED_VIDEO_EXPORT_MAX_DIMENSION = 1080;
+
+export function copyBytesToArrayBuffer(
+    bytes: Uint8Array<ArrayBufferLike>
+): ArrayBuffer {
+    const ownedBytes = new Uint8Array(bytes.byteLength);
+    ownedBytes.set(bytes);
+    return ownedBytes.buffer;
+}
 
 export type SceneRenderOptions = {
     timeMs: number;
@@ -17,7 +29,7 @@ export type SceneRenderer = (
 
 export async function canvasToBlob(
     canvas: HTMLCanvasElement,
-    type = PNG_EXPORT_MIME_TYPE,
+    type: string = PNG_EXPORT_MIME_TYPE,
     quality?: number
 ): Promise<Blob> {
     return new Promise((resolve, reject) => {
@@ -56,6 +68,103 @@ export async function renderSceneToPngBlob(
         resetAnimations: false,
     });
     return canvasToBlob(canvas, PNG_EXPORT_MIME_TYPE);
+}
+
+export type StillSceneExportOptions = {
+    mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
+    quality?: number;
+    width?: number;
+    height?: number;
+    mode?: ImagePlacementMode;
+    backgroundColor?: string;
+};
+
+async function encodeStillCanvas(
+    canvas: HTMLCanvasElement,
+    mimeType: StillSceneExportOptions['mimeType'],
+    quality?: number
+): Promise<Blob> {
+    const blob = await canvasToBlob(canvas, mimeType, quality);
+    const actualMimeType = blob.type.split(';', 1)[0].trim().toLowerCase();
+
+    if (!actualMimeType) {
+        throw new Error(
+            `This browser could not verify ${mimeType} encoding.`
+        );
+    }
+
+    if (actualMimeType !== mimeType.toLowerCase()) {
+        throw new Error(
+            `This browser could not encode ${mimeType}; it returned ${actualMimeType} instead.`
+        );
+    }
+
+    return blob;
+}
+
+export async function renderSceneToImageBlob(
+    renderScene: SceneRenderer,
+    timeMs: number,
+    options: StillSceneExportOptions
+): Promise<Blob> {
+    const sourceCanvas = document.createElement('canvas');
+    await renderScene(sourceCanvas, {
+        timeMs,
+        includeEditorControls: false,
+        resetAnimations: false,
+    });
+
+    if (options.width === undefined && options.height === undefined) {
+        return encodeStillCanvas(
+            sourceCanvas,
+            options.mimeType,
+            options.quality
+        );
+    }
+    if (options.width === undefined || options.height === undefined) {
+        throw new RangeError(
+            'Still export requires both target width and target height.'
+        );
+    }
+
+    const outputCanvas = document.createElement('canvas');
+    outputCanvas.width = options.width;
+    outputCanvas.height = options.height;
+    const outputContext = outputCanvas.getContext('2d');
+    if (!outputContext) {
+        throw new Error('Still image export is not supported in this browser.');
+    }
+
+    if (options.backgroundColor) {
+        outputContext.fillStyle = options.backgroundColor;
+        outputContext.fillRect(
+            0,
+            0,
+            outputCanvas.width,
+            outputCanvas.height
+        );
+    }
+
+    const placement = calculateImagePlacement({
+        sourceWidth: sourceCanvas.width,
+        sourceHeight: sourceCanvas.height,
+        targetWidth: outputCanvas.width,
+        targetHeight: outputCanvas.height,
+        mode: options.mode,
+    });
+    outputContext.drawImage(
+        sourceCanvas,
+        placement.x,
+        placement.y,
+        placement.width,
+        placement.height
+    );
+
+    return encodeStillCanvas(
+        outputCanvas,
+        options.mimeType,
+        options.quality
+    );
 }
 
 export function getContainedEvenDimensions(
@@ -211,7 +320,9 @@ export async function encodeSceneToGifBlob(
     }
 
     encoder.finish();
-    const blob = new Blob([encoder.bytesView()], { type: 'image/gif' });
+    const blob = new Blob([copyBytesToArrayBuffer(encoder.bytesView())], {
+        type: 'image/gif',
+    });
     if (blob.size === 0) throw new Error('GIF export produced an empty file.');
     return blob;
 }

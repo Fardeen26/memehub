@@ -7,7 +7,7 @@ import { useEffect, useState } from "react"
 
 export default function Navbar() {
     const [mounted, setMounted] = useState(false)
-    const { theme, setTheme } = useTheme()
+    const { resolvedTheme, setTheme } = useTheme()
 
     useEffect(() => {
         setMounted(true)
@@ -16,6 +16,9 @@ export default function Navbar() {
     if (!mounted) {
         return null
     }
+
+    const currentTheme = resolvedTheme === "dark" ? "dark" : "light"
+    const nextTheme = currentTheme === "dark" ? "light" : "dark"
 
     return (
         <nav className="w-full bg-white dark:bg-black">
@@ -32,10 +35,11 @@ export default function Navbar() {
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                            onClick={() => setTheme(nextTheme)}
+                            aria-label={`Switch to ${nextTheme} theme`}
                             className="p-2 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors cursor-pointer"
                         >
-                            {theme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
+                            {currentTheme === "dark" ? <SunIcon className="h-4 w-4" /> : <MoonIcon className="h-4 w-4" />}
                         </button>
                         <button
                             onClick={() => window.open("https://github.com/sponsors/Fardeen26", "_blank")}
@@ -54,4 +58,4 @@ export default function Navbar() {
             </div>
         </nav>
     )
-} 
+}

@@ -27,6 +27,11 @@ export function useCanvasShapes(canvasRef: RefObject<HTMLCanvasElement | null>) 
     const [rotateShapeIndex, setRotateShapeIndex] = useState(-1);
     const [rotateShapeStartAngle, setRotateShapeStartAngle] = useState(0);
 
+    const replaceShapes = useCallback((shapes: ShapeOverlay[]) => {
+        setShapeOverlays(shapes);
+        setSelectedShapeIndex(-1);
+    }, []);
+
     const addShape = useCallback(
         (type: ShapeType) => {
             const canvas = canvasRef.current;
@@ -203,13 +208,15 @@ export function useCanvasShapes(canvasRef: RefObject<HTMLCanvasElement | null>) 
     const drawShapesLayer = useCallback(
         (ctx: CanvasRenderingContext2D, includeEditorControls = true) => {
             for (const shape of shapeOverlays) {
+                if (shape.visible === false) continue;
                 drawShape(ctx, shape);
             }
             if (
                 includeEditorControls &&
                 !isShapeInteracting &&
                 selectedShapeIndex >= 0 &&
-                selectedShapeIndex < shapeOverlays.length
+                selectedShapeIndex < shapeOverlays.length &&
+                shapeOverlays[selectedShapeIndex].visible !== false
             ) {
                 drawTransformableSelection(ctx, shapeOverlays[selectedShapeIndex]);
             }
@@ -219,6 +226,7 @@ export function useCanvasShapes(canvasRef: RefObject<HTMLCanvasElement | null>) 
 
     return {
         shapeOverlays,
+        replaceShapes,
         selectedShapeIndex,
         setSelectedShapeIndex,
         addShape,
