@@ -48,6 +48,12 @@ function WorkspaceHarness() {
 }
 
 describe('CreatorWorkspace keyboard navigation', () => {
+    it('memoizes the workspace shell so canvas drag updates do not rerender it', () => {
+        expect(
+            (CreatorWorkspace as unknown as { $$typeof?: symbol }).$$typeof
+        ).toBe(Symbol.for('react.memo'));
+    });
+
     it('renders as a desktop tool rail with a scrollable panel', () => {
         vi.stubGlobal(
             'matchMedia',

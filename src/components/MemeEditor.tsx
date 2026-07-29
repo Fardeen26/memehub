@@ -4,7 +4,7 @@
 
 import { Template } from '@/types/template';
 import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Shapes, ChevronDown, ChevronUp, Layers, Download, Video, Loader2 } from 'lucide-react';
-import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
+import { useEffect, useRef, useState, ChangeEvent, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
     DropdownMenu,
@@ -144,6 +144,7 @@ import {
     EditorInspectorPanel,
     EditorToolsPanel,
 } from '@/components/EditorCanvasLayout';
+import { createFrameCoalescer } from '@/lib/frameCoalescer';
 
 const STATIC_IMAGE_LOAD_TIMEOUT_MS = 12_000;
 const IMAGE_CACHE_MAX_ENTRIES = 32;
@@ -243,6 +244,11 @@ type DrawingStroke = {
 type CanvasTemplate = Template & {
     mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
     source: ImageSourceAttribution;
+};
+
+type CanvasPointerPosition = {
+    clientX: number;
+    clientY: number;
 };
 
 export default function MemeEditor({ template, onReset }: MemeEditorProps) {
@@ -413,6 +419,18 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const lastDrawTime = useRef<number>(0);
     const isOptimizedDrawing = useRef<boolean>(false);
     const previewRenderRevision = useRef(0);
+    const processMouseMoveRef = useRef<
+        (position: CanvasPointerPosition) => void
+    >(() => undefined);
+    const mouseMoveCoalescerRef = useRef<ReturnType<
+        typeof createFrameCoalescer<CanvasPointerPosition>
+    > | null>(null);
+    const processTouchMoveRef = useRef<
+        (position: CanvasPointerPosition) => void
+    >(() => undefined);
+    const touchMoveCoalescerRef = useRef<ReturnType<
+        typeof createFrameCoalescer<CanvasPointerPosition>
+    > | null>(null);
     const pendingDiscoveryImageAdds = useRef(0);
     const workspaceTabPreservingImageId = useRef<string | null>(null);
 
@@ -2312,7 +2330,10 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     };
 
-    const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const processMouseMove = ({
+        clientX,
+        clientY,
+    }: CanvasPointerPosition) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
@@ -2323,8 +2344,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
 
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
+        const x = (clientX - rect.left) * scaleX;
+        const y = (clientY - rect.top) * scaleY;
 
         if (isShapeInteracting) {
             handleShapeMouseMove(x, y, canvas);
@@ -2556,6 +2577,21 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     };
 
+    processMouseMoveRef.current = processMouseMove;
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (!mouseMoveCoalescerRef.current) {
+            mouseMoveCoalescerRef.current = createFrameCoalescer(
+                (position) => processMouseMoveRef.current(position)
+            );
+        }
+
+        mouseMoveCoalescerRef.current.schedule({
+            clientX: e.clientX,
+            clientY: e.clientY,
+        });
+    };
+
     const handleMouseUp = () => {
         endShapeInteraction();
         setIsDragging(false);
@@ -2768,10 +2804,12 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         }
     };
 
-    const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-        e.preventDefault();
+    const processTouchMove = ({
+        clientX,
+        clientY,
+    }: CanvasPointerPosition) => {
         const canvas = canvasRef.current;
-        if (!canvas || e.touches.length !== 1) return;
+        if (!canvas) return;
 
         if (!isDragging && !isDraggingImage && !isRotatingImage && !isResizingImage && !isResizingTextWidth && !isResizingTextHeight && !isResizingTextCorner && !isRotatingText && !isShapeInteracting) return;
         if (isDragging && dragIndex === -1) return;
@@ -2787,9 +2825,8 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
 
-        const touch = e.touches[0];
-        const x = (touch.clientX - rect.left) * scaleX;
-        const y = (touch.clientY - rect.top) * scaleY;
+        const x = (clientX - rect.left) * scaleX;
+        const y = (clientY - rect.top) * scaleY;
 
         if (isShapeInteracting) {
             handleShapeMouseMove(x, y, canvas);
@@ -2973,6 +3010,32 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
             });
         }
     };
+
+    processTouchMoveRef.current = processTouchMove;
+
+    const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        if (!touch) return;
+
+        if (!touchMoveCoalescerRef.current) {
+            touchMoveCoalescerRef.current = createFrameCoalescer(
+                (position) => processTouchMoveRef.current(position)
+            );
+        }
+
+        touchMoveCoalescerRef.current.schedule({
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+        });
+    };
+
+    useEffect(() => {
+        return () => {
+            mouseMoveCoalescerRef.current?.cancel();
+            touchMoveCoalescerRef.current?.cancel();
+        };
+    }, []);
 
     const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
         e.preventDefault();
@@ -4951,6 +5014,141 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         setIsDrawingMode(nextDrawingMode);
     };
 
+    const workspaceDiscover = useMemo(() => (
+        <CreatorDiscoveryPanel
+            onAddImage={addDiscoveredImageToCanvas}
+            onUseAsTemplate={startFromDiscoveredImage}
+            disabled={isDrawingMode || isImageEraseMode}
+        />
+    ), [addDiscoveredImageToCanvas, isDrawingMode, isImageEraseMode, startFromDiscoveredImage]);
+
+    const workspaceStyles = useMemo(() => (
+        <div className="space-y-3">
+            <TextStylePanel
+                activeTextIndex={selectedTextIndex >= 0 ? selectedTextIndex : 0}
+                textCount={texts.length}
+                onSelectText={(index) => {
+                    setSelectedTextIndex(index);
+                    setSelectedImageIndex(-1);
+                    setSelectedShapeIndex(-1);
+                }}
+                onApplyPreset={handleApplyTextStyle}
+            />
+            <CreatorBrandPanel branding={branding} onChange={setBranding} />
+        </div>
+    ), [branding, handleApplyTextStyle, selectedTextIndex, setSelectedShapeIndex, texts.length]);
+
+    const workspaceAssets = useMemo(() => (
+        <div className="space-y-4">
+            <CreatorAssetShelf onAddAsset={addCreatorAssetToCanvas} />
+            <div className="border-t border-white/10 pt-3">
+                <div className="mb-2">
+                    <p className="text-xs font-semibold text-white">
+                        Stickers, GIFs &amp; shapes
+                    </p>
+                    <p className="text-[10px] text-white/45">
+                        Search reactions or add visual callouts.
+                    </p>
+                </div>
+                <ElementsPanel
+                    onAddMedia={addMediaFromLibrary}
+                    onAddShape={(type) => {
+                        addShape(type);
+                        setSelectedTextIndex(-1);
+                        setSelectedImageIndex(-1);
+                        setCreatorWorkspaceTab('layers');
+                    }}
+                    disabled={isDrawingMode || isImageEraseMode}
+                />
+            </div>
+        </div>
+    ), [addCreatorAssetToCanvas, addMediaFromLibrary, addShape, isDrawingMode, isImageEraseMode]);
+
+    const workspaceLayers = useMemo(() => (
+        <div className="space-y-3">
+            <CreatorLayersPanel
+                texts={texts.map((text, index) => ({
+                    id: textLayerIds[index] ?? `text-layer-fallback-${index}`,
+                    text,
+                    settings: textSettings[index],
+                }))}
+                images={imageOverlays}
+                shapes={shapeOverlays}
+                selectedTextIndex={selectedTextIndex}
+                selectedImageIndex={selectedImageIndex}
+                selectedShapeIndex={selectedShapeIndex}
+                originalTextCount={originalTextBoxCount}
+                backgroundLabel={canvasTemplate?.displayName}
+                backgroundSource={canvasTemplate?.source}
+                onSelectText={(index) => {
+                    setSelectedTextIndex(index);
+                    setSelectedImageIndex(-1);
+                    setSelectedShapeIndex(-1);
+                }}
+                onSelectImage={(index) => {
+                    setSelectedImageIndex(index);
+                    setSelectedTextIndex(-1);
+                    setSelectedShapeIndex(-1);
+                    setIsImageEraseMode(false);
+                    setImageEraseTargetIndex(-1);
+                }}
+                onSelectShape={(index) => {
+                    setSelectedShapeIndex(index);
+                    setSelectedTextIndex(-1);
+                    setSelectedImageIndex(-1);
+                    setIsImageEraseMode(false);
+                    setImageEraseTargetIndex(-1);
+                }}
+                onToggleText={toggleTextLayer}
+                onToggleImage={toggleImageLayer}
+                onToggleShape={toggleShapeLayer}
+                onDuplicateText={duplicateTextLayerAt}
+                onDuplicateImage={duplicateImageLayerAt}
+                onDuplicateShape={duplicateShapeLayerAt}
+                onMoveText={moveTextLayerAt}
+                onMoveImage={moveImageLayer}
+                onMoveShape={moveShapeLayer}
+                onDeleteText={clearTextBox}
+                onDeleteImage={(index) => {
+                    removeImageOverlay(index);
+                    setSelectedImageIndex((current) => {
+                        if (current === index) return -1;
+                        return current > index ? current - 1 : current;
+                    });
+                }}
+                onDeleteShape={removeShape}
+            />
+            {selectedImageIndex >= 0 && imageOverlays[selectedImageIndex] && (
+                <ImageLayerTools
+                    image={imageOverlays[selectedImageIndex]}
+                    eraseMode={isImageEraseMode && imageEraseTargetIndex === selectedImageIndex}
+                    eraseBrushSize={eraseBrushSize}
+                    eraseBrushOpacity={eraseBrushOpacity}
+                    onOpacityChange={(opacity) => handleImageOpacityChange(selectedImageIndex, opacity)}
+                    onRotate90={rotateSelectedImage90}
+                    onFit={() => fitSelectedImageToCanvas('fit')}
+                    onFill={() => fitSelectedImageToCanvas('fill')}
+                    onToggleErase={toggleSelectedImageErase}
+                    onEraseBrushSizeChange={setEraseBrushSize}
+                    onEraseBrushOpacityChange={setEraseBrushOpacity}
+                    onUndoErase={() => undoImageErase(selectedImageIndex)}
+                    onClearErase={() => clearImageErase(selectedImageIndex)}
+                />
+            )}
+        </div>
+    ), [canvasTemplate, clearImageErase, clearTextBox, duplicateImageLayerAt, duplicateShapeLayerAt, duplicateTextLayerAt, eraseBrushOpacity, eraseBrushSize, fitSelectedImageToCanvas, handleImageOpacityChange, imageEraseTargetIndex, imageOverlays, isImageEraseMode, moveImageLayer, moveShapeLayer, moveTextLayerAt, originalTextBoxCount, removeImageOverlay, removeShape, rotateSelectedImage90, selectedImageIndex, selectedShapeIndex, selectedTextIndex, shapeOverlays, textLayerIds, textSettings, texts, toggleImageLayer, toggleSelectedImageErase, toggleShapeLayer, toggleTextLayer, undoImageErase]);
+
+    const workspaceExport = useMemo(() => (
+        <CreatorExportPanel
+            isExporting={isExporting || hasPendingAnimatedOverlays}
+            onExport={downloadCreatorStill}
+            onCopy={copyMeme}
+            hasAnimatedMedia={hasAnimatedExportOverlays}
+            animatedLabel={animatedExportLabel}
+            onExportAnimated={downloadAnimatedMeme}
+        />
+    ), [animatedExportLabel, copyMeme, downloadAnimatedMeme, downloadCreatorStill, hasAnimatedExportOverlays, hasPendingAnimatedOverlays, isExporting]);
+
     return (
         <>
             <motion.section
@@ -5145,193 +5343,11 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         onTabChange={setCreatorWorkspaceTab}
                         collapsed={creatorWorkspaceCollapsed}
                         onCollapsedChange={setCreatorWorkspaceCollapsed}
-                        discover={
-                            <CreatorDiscoveryPanel
-                                onAddImage={addDiscoveredImageToCanvas}
-                                onUseAsTemplate={startFromDiscoveredImage}
-                                disabled={
-                                    isDrawingMode || isImageEraseMode
-                                }
-                            />
-                        }
-                        styles={
-                            <div className="space-y-3">
-                            <TextStylePanel
-                                activeTextIndex={
-                                    selectedTextIndex >= 0
-                                        ? selectedTextIndex
-                                        : 0
-                                }
-                                textCount={texts.length}
-                                onSelectText={(index) => {
-                                    setSelectedTextIndex(index);
-                                    setSelectedImageIndex(-1);
-                                    setSelectedShapeIndex(-1);
-                                }}
-                                onApplyPreset={handleApplyTextStyle}
-                            />
-                            <CreatorBrandPanel
-                                branding={branding}
-                                onChange={setBranding}
-                            />
-                            </div>
-                        }
-                        assets={
-                            <div className="space-y-4">
-                                <CreatorAssetShelf
-                                    onAddAsset={addCreatorAssetToCanvas}
-                                />
-                                <div className="border-t border-white/10 pt-3">
-                                    <div className="mb-2">
-                                        <p className="text-xs font-semibold text-white">
-                                            Stickers, GIFs &amp; shapes
-                                        </p>
-                                        <p className="text-[10px] text-white/45">
-                                            Search reactions or add visual callouts.
-                                        </p>
-                                    </div>
-                                    <ElementsPanel
-                                        onAddMedia={addMediaFromLibrary}
-                                        onAddShape={(type) => {
-                                            addShape(type);
-                                            setSelectedTextIndex(-1);
-                                            setSelectedImageIndex(-1);
-                                            setCreatorWorkspaceTab('layers');
-                                        }}
-                                        disabled={
-                                            isDrawingMode ||
-                                            isImageEraseMode
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        }
-                        layers={
-                            <div className="space-y-3">
-                            <CreatorLayersPanel
-                                texts={texts.map((text, index) => ({
-                                    id:
-                                        textLayerIds[index] ??
-                                        `text-layer-fallback-${index}`,
-                                    text,
-                                    settings: textSettings[index],
-                                }))}
-                                images={imageOverlays}
-                                shapes={shapeOverlays}
-                                selectedTextIndex={selectedTextIndex}
-                                selectedImageIndex={selectedImageIndex}
-                                selectedShapeIndex={selectedShapeIndex}
-                                originalTextCount={originalTextBoxCount}
-                                backgroundLabel={
-                                    canvasTemplate?.displayName
-                                }
-                                backgroundSource={canvasTemplate?.source}
-                                onSelectText={(index) => {
-                                    setSelectedTextIndex(index);
-                                    setSelectedImageIndex(-1);
-                                    setSelectedShapeIndex(-1);
-                                }}
-                                onSelectImage={(index) => {
-                                    setSelectedImageIndex(index);
-                                    setSelectedTextIndex(-1);
-                                    setSelectedShapeIndex(-1);
-                                    setIsImageEraseMode(false);
-                                    setImageEraseTargetIndex(-1);
-                                }}
-                                onSelectShape={(index) => {
-                                    setSelectedShapeIndex(index);
-                                    setSelectedTextIndex(-1);
-                                    setSelectedImageIndex(-1);
-                                    setIsImageEraseMode(false);
-                                    setImageEraseTargetIndex(-1);
-                                }}
-                                onToggleText={toggleTextLayer}
-                                onToggleImage={toggleImageLayer}
-                                onToggleShape={toggleShapeLayer}
-                                onDuplicateText={duplicateTextLayerAt}
-                                onDuplicateImage={duplicateImageLayerAt}
-                                onDuplicateShape={duplicateShapeLayerAt}
-                                onMoveText={moveTextLayerAt}
-                                onMoveImage={moveImageLayer}
-                                onMoveShape={moveShapeLayer}
-                                onDeleteText={clearTextBox}
-                                onDeleteImage={(index) => {
-                                    removeImageOverlay(index);
-                                    setSelectedImageIndex((current) => {
-                                        if (current === index) return -1;
-                                        return current > index
-                                            ? current - 1
-                                            : current;
-                                    });
-                                }}
-                                onDeleteShape={removeShape}
-                            />
-                            {selectedImageIndex >= 0 &&
-                                imageOverlays[selectedImageIndex] && (
-                                    <ImageLayerTools
-                                        image={
-                                            imageOverlays[
-                                                selectedImageIndex
-                                            ]
-                                        }
-                                        eraseMode={
-                                            isImageEraseMode &&
-                                            imageEraseTargetIndex ===
-                                                selectedImageIndex
-                                        }
-                                        eraseBrushSize={eraseBrushSize}
-                                        eraseBrushOpacity={
-                                            eraseBrushOpacity
-                                        }
-                                        onOpacityChange={(opacity) =>
-                                            handleImageOpacityChange(
-                                                selectedImageIndex,
-                                                opacity
-                                            )
-                                        }
-                                        onRotate90={rotateSelectedImage90}
-                                        onFit={() =>
-                                            fitSelectedImageToCanvas('fit')
-                                        }
-                                        onFill={() =>
-                                            fitSelectedImageToCanvas('fill')
-                                        }
-                                        onToggleErase={
-                                            toggleSelectedImageErase
-                                        }
-                                        onEraseBrushSizeChange={
-                                            setEraseBrushSize
-                                        }
-                                        onEraseBrushOpacityChange={
-                                            setEraseBrushOpacity
-                                        }
-                                        onUndoErase={() =>
-                                            undoImageErase(
-                                                selectedImageIndex
-                                            )
-                                        }
-                                        onClearErase={() =>
-                                            clearImageErase(
-                                                selectedImageIndex
-                                            )
-                                        }
-                                    />
-                                )}
-                            </div>
-                        }
-                        exportPanel={
-                            <CreatorExportPanel
-                                isExporting={
-                                    isExporting ||
-                                    hasPendingAnimatedOverlays
-                                }
-                                onExport={downloadCreatorStill}
-                                onCopy={copyMeme}
-                                hasAnimatedMedia={hasAnimatedExportOverlays}
-                                animatedLabel={animatedExportLabel}
-                                onExportAnimated={downloadAnimatedMeme}
-                            />
-                        }
+                        discover={workspaceDiscover}
+                        styles={workspaceStyles}
+                        assets={workspaceAssets}
+                        layers={workspaceLayers}
+                        exportPanel={workspaceExport}
                     />
                     </EditorToolsPanel>
 

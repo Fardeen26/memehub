@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
     Flame,
     FolderHeart,
@@ -47,7 +47,7 @@ const TABS: Array<{
     { id: 'export', label: 'Export', icon: Send },
 ];
 
-export default function CreatorWorkspace({
+function CreatorWorkspace({
     activeTab,
     onTabChange,
     collapsed,
@@ -217,3 +217,5 @@ export default function CreatorWorkspace({
         </section>
     );
 }
+
+export default memo(CreatorWorkspace);
