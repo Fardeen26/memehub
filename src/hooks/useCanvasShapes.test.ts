@@ -14,8 +14,8 @@ vi.mock('@/lib/shapeDrawing', () => ({
     drawShape: drawShapeMock,
 }));
 
-describe('useCanvasShapes draft restoration', () => {
-    it('exposes a way to replace the persisted shape collection', () => {
+describe('useCanvasShapes', () => {
+    it('exposes a way to replace the shape collection', () => {
         const canvasRef = { current: null };
         const { result } = renderHook(() => useCanvasShapes(canvasRef));
 

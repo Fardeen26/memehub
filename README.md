@@ -1,6 +1,6 @@
 # Memehub
 
-An image-first creator workspace for making publish-ready memes quickly. Memehub combines templates, custom uploads, layered editing, Indian-language typography, creator branding, and local draft recovery in one browser tool.
+An image-first creator workspace for making publish-ready memes quickly. Memehub combines templates, custom uploads, layered editing, Indian-language typography, and creator branding in one browser tool.
 
 ## Features
 
@@ -15,7 +15,6 @@ An image-first creator workspace for making publish-ready memes quickly. Memehub
 - **Image Tools**: Opacity, fit, fill, rotation, and manual erase controls
 - **Indian-language Type**: Verified fonts for nine major Indian writing systems
 - **Creator Branding**: Optional custom handle watermark with corner placement
-- **Draft Recovery**: Private, versioned local autosave with explicit resume/discard
 - **Template Search**: Quickly find templates with built-in search functionality
 - **Giphy Stickers & GIFs**: Search real sticker and GIF catalogs from Giphy (not custom assets)
 - **Creator Exports**: Instagram and WhatsApp presets in PNG, JPEG, or WebP, plus clipboard copy and animated GIF/MP4 where supported
@@ -126,7 +125,7 @@ npm run dev
 7. **Add page identity**: Optionally save your own handle into a corner of the export.
 8. **Publish**: Export the original or an Instagram/WhatsApp variant as PNG, JPEG, or WebP.
 
-Work is autosaved locally. The gallery offers explicit Resume and Discard actions when a draft is available.
+Edits stay in the active browser session until you export or leave the editor.
 
 ## Project Structure
 

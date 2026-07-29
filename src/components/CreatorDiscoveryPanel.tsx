@@ -707,7 +707,7 @@ export default function CreatorDiscoveryPanel({
                     />
                     <ResultGrid
                         title="Reusable & licensed"
-                        description="Open-license images with source and credit details kept in your draft."
+                        description="Open-license images with source and credit details kept with each layer."
                         assets={data.reusableImages}
                         actionDisabled={actionDisabled}
                         pendingAction={pendingAction}

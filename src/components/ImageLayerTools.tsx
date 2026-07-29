@@ -133,8 +133,8 @@ export default function ImageLayerTools({
                     </div>
                     <p className="mt-1.5 text-[9px] leading-relaxed text-white/35">
                         {sourceRightsUnknown
-                            ? 'Source and rights warning stay attached to this layer after draft recovery.'
-                            : 'Source and license stay attached to this layer after draft recovery.'}
+                            ? 'Source and rights warning stay attached to this layer.'
+                            : 'Source and license stay attached to this layer.'}
                     </p>
                     {sourceRightsUnknown && (
                         <p className="mt-1.5 rounded border border-amber-300/15 bg-black/15 px-2 py-1 text-[9px] leading-relaxed text-amber-100/75">

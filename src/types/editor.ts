@@ -4,10 +4,6 @@ import { Template } from "./template";
 export type MemeEditorProps = {
     template: Template;
     onReset: () => void;
-    /** Only true after the creator explicitly chooses to open a local draft. */
-    restoreSavedDraft?: boolean;
-    /** Optimistic revision token captured when the creator chose Resume. */
-    expectedDraftUpdatedAt?: number;
 };
 
 export type TextSettings = {

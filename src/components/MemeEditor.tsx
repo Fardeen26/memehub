@@ -4,7 +4,7 @@
 
 import { Template } from '@/types/template';
 import { MoveLeft, Settings, Upload, Image as ImageIcon, Trash2, Plus, X, Pencil, Undo2, Trash, Shapes, ChevronDown, ChevronUp, Layers, Download, Video, Loader2 } from 'lucide-react';
-import { useEffect, useRef, useState, ChangeEvent, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, ChangeEvent, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
     DropdownMenu,
@@ -86,13 +86,6 @@ import {
     uploadVideoCaptureToCloudinary,
     waitForCloudinaryMp4,
 } from '@/lib/cloudinaryVideoExport';
-import { useEditorDraft } from '@/hooks/useEditorDraft';
-import {
-    assertMemeEditorDraftLocalMediaCapacity,
-    type CanvasTemplate,
-    type DrawingStroke,
-    type MemeEditorDraftState,
-} from '@/lib/editorDraft';
 import {
     DEFAULT_CREATOR_BRANDING,
     fitWatermarkFontSize,
@@ -240,12 +233,19 @@ function clampTopBannerHeight(imageHeight: number, requestedHeight: number): num
     return Math.max(minHeight, Math.min(maxHeight, Math.round(requestedHeight)));
 }
 
-export default function MemeEditor({
-    template,
-    onReset,
-    restoreSavedDraft = false,
-    expectedDraftUpdatedAt,
-}: MemeEditorProps) {
+type DrawingStroke = {
+    points: { x: number; y: number }[];
+    color: string;
+    size: number;
+    eraser: boolean;
+};
+
+type CanvasTemplate = Template & {
+    mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+    source: ImageSourceAttribution;
+};
+
+export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const primaryCaptionRef = useRef<HTMLTextAreaElement | null>(null);
     const [canvasTemplate, setCanvasTemplate] =
@@ -446,97 +446,13 @@ export default function MemeEditor({
     const [creatorWorkspaceCollapsed, setCreatorWorkspaceCollapsed] =
         useState(false);
 
-    const restoreDraftState = useCallback((draft: MemeEditorDraftState) => {
-        setCanvasTemplate(draft.canvasTemplate);
-        canvasTemplateRef.current = draft.canvasTemplate;
-        setTopBannerEnabled(
-            draft.canvasTemplate?.layout?.type === 'top-banner' ||
-                draft.template.layout?.type === 'top-banner'
-        );
-        setTopBannerHeight(
-            draft.canvasTemplate?.layout?.bannerHeight ??
-                draft.template.layout?.bannerHeight ??
-                0
-        );
-        setTexts(draft.texts);
-        setTranslationSourceTexts(draft.texts);
-        setTextLayerIds(draft.texts.map(() => createTextLayerId()));
-        setTextBoxes(draft.textBoxes);
-        setTextBoxRotations(draft.textBoxRotations);
-        setOriginalTextBoxCount(
-            draft.canvasTemplate?.textBoxes.length ??
-                draft.template.textBoxes.length
-        );
-        setTextSettings(
-            draft.textSettings.map((settings) => ({
-                ...settings,
-                fontFamily: getCanonicalFontFamily(settings.fontFamily),
-            }))
-        );
-        imageOverlaysRef.current = draft.imageOverlays;
-        setImageOverlays(draft.imageOverlays);
-        replaceShapes(draft.shapeOverlays);
-        setStrokes(draft.strokes);
-        setBranding(draft.branding ?? { ...DEFAULT_CREATOR_BRANDING });
-        setSelectedTextIndex(-1);
-        setSelectedImageIndex(-1);
-        setSelectedShapeIndex(-1);
-    }, [replaceShapes, setSelectedShapeIndex]);
-
     useEffect(() => {
         if (topBannerEnabled && topBannerHeight <= 0) {
             setTopBannerHeight(getTopBannerHeight(effectiveTemplate, 1));
         }
     }, [effectiveTemplate, topBannerEnabled, topBannerHeight]);
 
-    const draftState = useMemo<MemeEditorDraftState>(() => ({
-        template,
-        canvasTemplate,
-        texts,
-        textBoxes,
-        textBoxRotations,
-        textSettings,
-        imageOverlays,
-        shapeOverlays,
-        strokes,
-        branding,
-    }), [
-        branding,
-        canvasTemplate,
-        imageOverlays,
-        shapeOverlays,
-        strokes,
-        template,
-        textBoxes,
-        textBoxRotations,
-        textSettings,
-        texts,
-    ]);
-    const draftStateRef = useRef(draftState);
-    draftStateRef.current = draftState;
-    const prepareDraftSave = useCallback(async () => {
-        await waitForPendingImageAdds();
-        return {
-            ...draftStateRef.current,
-            canvasTemplate: canvasTemplateRef.current,
-            imageOverlays: imageOverlaysRef.current,
-        };
-    }, [waitForPendingImageAdds]);
-
-    const {
-        canEdit: canEditDraft,
-        isReady: isDraftReady,
-        restoreError: draftRestoreError,
-        saveNow,
-        status: draftStatus,
-    } = useEditorDraft({
-        state: draftState,
-        onRestore: restoreDraftState,
-        beforeSave: prepareDraftSave,
-        restoreSavedDraft,
-        expectedDraftUpdatedAt,
-    });
-    const editorCanEdit = canEditDraft && !isLeaving;
+    const editorCanEdit = !isLeaving;
 
     useEffect(() => {
         const warnAboutPendingImage = (event: BeforeUnloadEvent) => {
@@ -554,25 +470,9 @@ export default function MemeEditor({
         isLeavingRef.current = true;
         setIsLeaving(true);
 
-        try {
-            await waitForPendingImageAdds();
-            await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-            await saveNow();
-            onReset();
-        } catch {
-            toast.error('Your draft could not be saved. Please retry before leaving.');
-            if (
-                window.confirm(
-                    'Your draft could not be saved. Leave without saving these latest changes?'
-                )
-            ) {
-                onReset();
-                return;
-            }
-            isLeavingRef.current = false;
-            setIsLeaving(false);
-        }
-    }, [onReset, saveNow, waitForPendingImageAdds]);
+        await waitForPendingImageAdds();
+        onReset();
+    }, [onReset, waitForPendingImageAdds]);
 
     const loadAndCacheImage = useCallback(async (src: string): Promise<HTMLImageElement> => {
         if (imageCache.current.has(src)) {
@@ -1519,8 +1419,7 @@ export default function MemeEditor({
         }
     ): Promise<boolean> => {
         if (
-            (isLeavingRef.current && !options?.continueWhileLeaving) ||
-            !canEditDraft
+            isLeavingRef.current && !options?.continueWhileLeaving
         ) {
             return false;
         }
@@ -1643,12 +1542,6 @@ export default function MemeEditor({
                     `A meme can contain up to ${EDITOR_IMAGE_LAYER_LIMIT} image layers. Remove one before adding another.`
                 );
             }
-            assertMemeEditorDraftLocalMediaCapacity({
-                ...draftStateRef.current,
-                canvasTemplate: canvasTemplateRef.current,
-                imageOverlays: nextImageOverlays,
-            });
-
             if (options?.preserveWorkspaceTab) {
                 workspaceTabPreservingImageId.current = overlayId;
             }
@@ -1693,7 +1586,7 @@ export default function MemeEditor({
         } finally {
             finishPendingImageAdd();
         }
-    }, [beginPendingImageAdd, canEditDraft, decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setGifDecodePending, setSelectedShapeIndex, startBackgroundGifDecode]);
+    }, [beginPendingImageAdd, decodeGifForOverlay, getAnimationNow, isUnsupportedAnimatedUploadCandidate, loadAndCacheImage, setGifDecodePending, setSelectedShapeIndex, startBackgroundGifDecode]);
 
     const addMediaFromLibrary = useCallback(
         async (item: GiphyMediaItem) => {
@@ -1733,7 +1626,7 @@ export default function MemeEditor({
 
     const addDiscoveredImageToCanvas = useCallback(
         async (asset: DiscoveryImageAsset) => {
-            if (isLeavingRef.current || !canEditDraft) {
+            if (isLeavingRef.current) {
                 throw new Error('The editor is leaving. This image was not added.');
             }
             const finishPendingImageAdd = beginPendingImageAdd();
@@ -1761,12 +1654,12 @@ export default function MemeEditor({
                 finishPendingImageAdd();
             }
         },
-        [addImageOverlay, beginPendingImageAdd, canEditDraft]
+        [addImageOverlay, beginPendingImageAdd]
     );
 
     const startFromDiscoveredImage = useCallback(
         async (asset: DiscoveryImageAsset) => {
-            if (isLeavingRef.current || !canEditDraft) {
+            if (isLeavingRef.current) {
                 throw new Error(
                     'The editor is leaving. This image was not used.'
                 );
@@ -1790,7 +1683,6 @@ export default function MemeEditor({
             ) {
                 return false;
             }
-            const sceneBeforeImageLoad = draftStateRef.current;
             let candidateLocalImage: string | null = null;
             let candidateCommitted = false;
 
@@ -1822,12 +1714,6 @@ export default function MemeEditor({
                         )
                     );
                 }
-                if (draftStateRef.current !== sceneBeforeImageLoad) {
-                    throw new Error(
-                        'Your meme changed while the image was loading, so nothing was replaced. Try again when you are ready.'
-                    );
-                }
-
                 const horizontalMargin = Math.max(
                     12,
                     Math.round(imageWidth * 0.04)
@@ -1909,18 +1795,6 @@ export default function MemeEditor({
                     mimeType,
                     source: getDiscoveryImageSource(asset),
                 };
-                const nextDraftState: MemeEditorDraftState = {
-                    ...draftStateRef.current,
-                    canvasTemplate: nextCanvasTemplate,
-                    texts: nextTexts,
-                    textBoxes: nextTextBoxes,
-                    textBoxRotations: [0, 0],
-                    textSettings: nextTextSettings,
-                    imageOverlays: [],
-                    shapeOverlays: [],
-                    strokes: [],
-                };
-                assertMemeEditorDraftLocalMediaCapacity(nextDraftState);
                 const replacedCachedSources = [
                     canvasTemplateRef.current?.image ?? template.image,
                     ...imageOverlaysRef.current.map(
@@ -1935,8 +1809,6 @@ export default function MemeEditor({
                 textLayerIdsRef.current = nextTextLayerIds;
                 textSettingsRef.current = nextTextSettings;
                 imageOverlaysRef.current = [];
-                draftStateRef.current = nextDraftState;
-
                 setCanvasTemplate(nextCanvasTemplate);
                 setTexts(nextTexts);
                 setTranslationSourceTexts(nextTexts);
@@ -1999,7 +1871,6 @@ export default function MemeEditor({
         },
         [
             beginPendingImageAdd,
-            canEditDraft,
             getDefaultFont,
             loadAndCacheImage,
             replaceShapes,
@@ -4788,11 +4659,6 @@ export default function MemeEditor({
                     `A meme can contain up to ${EDITOR_IMAGE_LAYER_LIMIT} image layers. Remove one before duplicating another.`
                 );
             }
-            assertMemeEditorDraftLocalMediaCapacity({
-                ...draftStateRef.current,
-                canvasTemplate: canvasTemplateRef.current,
-                imageOverlays: nextImageOverlays,
-            });
             imageOverlaysRef.current = nextImageOverlays;
             setImageOverlays(nextImageOverlays);
             setSelectedImageIndex(nextImageOverlays.length - 1);
@@ -5076,12 +4942,6 @@ export default function MemeEditor({
     const animatedExportLabel =
         animatedExportCapability.format === 'mp4' ? 'Video MP4' : 'Animated GIF';
     const exportButtonLabel = exportStatus ?? (hasPendingAnimatedOverlays ? 'Preparing GIF...' : 'Download');
-    const draftStatusLabel = {
-        restoring: 'Restoring draft…',
-        saving: 'Saving…',
-        saved: 'Draft saved',
-        error: 'Draft not saved',
-    }[draftStatus];
     const toggleDrawingMode = () => {
         const nextDrawingMode = !isDrawingMode;
         if (nextDrawingMode) {
@@ -5093,38 +4953,13 @@ export default function MemeEditor({
 
     return (
         <>
-            {!isDraftReady && (
-                <div
-                    role="status"
-                    aria-live="polite"
-                    className="mb-3 rounded-xl border border-[#6a7bd1]/30 bg-[#6a7bd1]/10 px-4 py-3 text-sm"
-                >
-                    Restoring your saved draft before editing…
-                </div>
-            )}
-            {draftRestoreError && (
-                <div
-                    role="alert"
-                    className="mb-3 flex flex-col gap-3 rounded-xl border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <span>{draftRestoreError}</span>
-                    <button
-                        type="button"
-                        onClick={onReset}
-                        className="rounded-md border border-red-400/40 px-3 py-2 font-semibold"
-                    >
-                        Return to templates
-                    </button>
-                </div>
-            )}
             <motion.section
-                aria-busy={!isDraftReady}
                 inert={!editorCanEdit}
                 className={`min-h-[65vh] space-y-3 max-sm:min-h-[75vh] ${
                     editorCanEdit ? '' : 'pointer-events-none opacity-60'
                 }`}
                 initial={{ opacity: 0 }}
-                animate={{ opacity: isDraftReady ? 1 : 0.6 }}
+                animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
             >
             <div className="flex items-center justify-between">
@@ -5138,16 +4973,6 @@ export default function MemeEditor({
                 >
                     <MoveLeft className='h-4 w-4' /> &nbsp; Back
                 </motion.button>
-                <span
-                    aria-live="polite"
-                    className={`text-xs ${
-                        draftStatus === 'error'
-                            ? 'text-red-400'
-                            : 'text-black/50 dark:text-white/50'
-                    }`}
-                >
-                    {draftStatusLabel}
-                </span>
             </div>
             <EditorCanvasLayout toolsCollapsed={creatorWorkspaceCollapsed}>
                 <EditorCanvasStage className="self-start rounded-xl border border-white/10 bg-[#101016] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_14px_36px_rgba(0,0,0,0.2)] lg:sticky lg:top-4">
