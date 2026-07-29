@@ -132,7 +132,10 @@ import ImageLayerTools from '@/components/ImageLayerTools';
 import CreatorBrandPanel from '@/components/CreatorBrandPanel';
 import CreatorDiscoveryPanel from '@/components/CreatorDiscoveryPanel';
 import type { DiscoveryImageAsset } from '@/types/creatorDiscovery';
-import { settleSceneImageLoads } from '@/lib/sceneImageLoading';
+import {
+    collectCachedSceneImages,
+    settleSceneImageLoads,
+} from '@/lib/sceneImageLoading';
 import { materializeReusableImage } from '@/lib/reusableImagePersistence';
 import {
     getTemplateImageTooSmallMessage,
@@ -3498,26 +3501,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
 
     const renderScene = useCallback(async (
         canvas: HTMLCanvasElement,
-        options: SceneRenderOptions & { shouldCommit?: () => boolean }
+        options: SceneRenderOptions & {
+            prepareAssets?: boolean;
+            shouldCommit?: () => boolean;
+        }
     ) => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        const fontsToLoad = [
-            ...new Set(
-                textSettings
-                    .filter((setting) => setting.visible !== false)
-                    .map((setting) => setting.fontFamily)
-            ),
-        ];
-        try {
-            await Promise.all(fontsToLoad.map(font => waitForFont(font)));
-        } catch (error) {
-            if (!options.includeEditorControls) throw error;
-            console.warn('Preview is using a fallback font:', error);
-        }
-
-        const img = await loadAndCacheImage(effectiveTemplate.image);
         const staticImageOverlays = imageOverlays
             .filter((overlay) => overlay.visible !== false)
             .filter(
@@ -3525,27 +3516,53 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                     !overlay.animated ||
                     !decodedGifCache.current.has(overlay.id)
             );
-        const imagePromises = staticImageOverlays.map((overlay) =>
-            loadAndCacheImage(overlay.src)
-        );
-        const imageResults = await settleSceneImageLoads(imagePromises, {
-            strict: !options.includeEditorControls,
-        });
-        if (imageResults.some((result) => result.status === 'rejected')) {
-            console.warn('Some images failed to load.');
-        }
-        const loadedOverlayImages = new Map<
-            string,
-            HTMLImageElement
-        >();
-        imageResults.forEach((result, index) => {
-            if (result.status === 'fulfilled') {
-                loadedOverlayImages.set(
-                    staticImageOverlays[index].id,
-                    result.value
-                );
+        let img: HTMLImageElement | undefined;
+        let loadedOverlayImages = new Map<string, HTMLImageElement>();
+
+        if (options.prepareAssets !== false) {
+            const fontsToLoad = [
+                ...new Set(
+                    textSettings
+                        .filter((setting) => setting.visible !== false)
+                        .map((setting) => setting.fontFamily)
+                ),
+            ];
+            try {
+                await Promise.all(fontsToLoad.map(font => waitForFont(font)));
+            } catch (error) {
+                if (!options.includeEditorControls) throw error;
+                console.warn('Preview is using a fallback font:', error);
             }
-        });
+
+            img = await loadAndCacheImage(effectiveTemplate.image);
+            const imagePromises = staticImageOverlays.map((overlay) =>
+                loadAndCacheImage(overlay.src)
+            );
+            const imageResults = await settleSceneImageLoads(imagePromises, {
+                strict: !options.includeEditorControls,
+            });
+            if (imageResults.some((result) => result.status === 'rejected')) {
+                console.warn('Some images failed to load.');
+            }
+            imageResults.forEach((result, index) => {
+                if (result.status === 'fulfilled') {
+                    loadedOverlayImages.set(
+                        staticImageOverlays[index].id,
+                        result.value
+                    );
+                }
+            });
+        } else {
+            const cachedScene = collectCachedSceneImages(
+                imageCache.current,
+                effectiveTemplate.image,
+                staticImageOverlays
+            );
+            img = cachedScene.templateImage;
+            loadedOverlayImages = cachedScene.overlayImages;
+        }
+
+        if (!img) return;
 
         if (options.shouldCommit && !options.shouldCommit()) {
             return;
@@ -4049,6 +4066,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         await renderScene(canvas, {
             timeMs,
             includeEditorControls: true,
+            prepareAssets: !isElementInteracting,
             resetAnimations: false,
             shouldCommit: () =>
                 previewRenderRevision.current === renderRevision,

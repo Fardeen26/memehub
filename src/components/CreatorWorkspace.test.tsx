@@ -54,6 +54,17 @@ describe('CreatorWorkspace keyboard navigation', () => {
         ).toBe(Symbol.for('react.memo'));
     });
 
+    it('does not mount inactive panels until the creator opens their tab', () => {
+        render(<WorkspaceHarness />);
+
+        expect(screen.queryByText('Style panel')).not.toBeInTheDocument();
+        expect(screen.queryByText('Layer panel')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Text' }));
+
+        expect(screen.getByText('Style panel')).toBeInTheDocument();
+    });
+
     it('renders as a desktop tool rail with a scrollable panel', () => {
         vi.stubGlobal(
             'matchMedia',

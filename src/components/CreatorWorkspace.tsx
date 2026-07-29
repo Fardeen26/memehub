@@ -60,6 +60,9 @@ function CreatorWorkspace({
 }: CreatorWorkspaceProps) {
     const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
     const [verticalTabs, setVerticalTabs] = useState(false);
+    const [visitedTabs, setVisitedTabs] = useState<Set<CreatorWorkspaceTab>>(
+        () => new Set([activeTab])
+    );
     const panels: Record<CreatorWorkspaceTab, ReactNode> = {
         discover,
         styles,
@@ -69,9 +72,20 @@ function CreatorWorkspace({
     };
 
     const selectTab = (tab: CreatorWorkspaceTab) => {
+        setVisitedTabs((current) => {
+            if (current.has(tab)) return current;
+            return new Set([...current, tab]);
+        });
         onTabChange(tab);
         onCollapsedChange(false);
     };
+
+    useEffect(() => {
+        setVisitedTabs((current) => {
+            if (current.has(activeTab)) return current;
+            return new Set([...current, activeTab]);
+        });
+    }, [activeTab]);
 
     useEffect(() => {
         if (typeof window.matchMedia !== 'function') return;
@@ -210,7 +224,7 @@ function CreatorWorkspace({
                         hidden={activeTab !== id}
                         className={activeTab === id ? 'p-3' : 'hidden'}
                     >
-                        {panels[id]}
+                        {visitedTabs.has(id) ? panels[id] : null}
                     </div>
                 ))}
             </div>
