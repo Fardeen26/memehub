@@ -417,34 +417,40 @@ describe('MemeEditor accessibility', () => {
         ).toBeInTheDocument();
     });
 
-    it('applies a visible one-tap text style to the focused text layer', () => {
+    it('applies a one-tap text style to the selected text layer without layer picker controls', () => {
         render(
             <MemeEditor
                 template={{
                     image: 'data:image/png;base64,dGVzdA==',
-                    textBoxes: [
-                        {
-                            x: 20,
-                            y: 20,
-                            width: 300,
-                            height: 80,
-                            fontSize: 42,
-                            minFont: 10,
-                            align: 'center',
-                        },
-                    ],
+                    textBoxes: Array.from({ length: 5 }, (_, index) => ({
+                        x: 20,
+                        y: 20 + index * 90,
+                        width: 300,
+                        height: 80,
+                        fontSize: 42,
+                        minFont: 10,
+                        align: 'center' as const,
+                    })),
                 }}
                 onReset={vi.fn()}
             />
         );
 
         fireEvent.click(screen.getByRole('tab', { name: 'Text' }));
-        fireEvent.focus(screen.getByRole('textbox', { name: 'text position 1' }));
+        fireEvent.focus(screen.getByRole('textbox', { name: 'text position 5' }));
         fireEvent.click(
             screen.getByRole('button', { name: 'Apply Black Bar style' })
         );
 
-        expect(screen.getByText('Black Bar applied to Text 1')).toBeInTheDocument();
+        expect(
+            screen.getByText('Black Bar applied to the selected text')
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByLabelText('Choose text layer')
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText(/Apply to Text .*font size stays unchanged\./)
+        ).not.toBeInTheDocument();
     });
 
     it('shows text in the layer workspace and lets creators hide it non-destructively', () => {

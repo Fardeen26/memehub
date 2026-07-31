@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Type } from 'lucide-react';
+import { Check, RotateCcw, Type } from 'lucide-react';
 import {
     TEXT_STYLE_PRESETS,
     type TextStylePresetId,
@@ -10,8 +10,8 @@ import {
 type TextStylePanelProps = {
     activeTextIndex: number;
     textCount: number;
-    onSelectText: (index: number) => void;
     onApplyPreset: (presetId: TextStylePresetId, index: number) => void;
+    onResetStyle: (index: number) => void;
 };
 
 const PREVIEW_CLASS: Record<TextStylePresetId, string> = {
@@ -30,14 +30,12 @@ const PREVIEW_COPY: Record<TextStylePresetId, string> = {
 export default function TextStylePanel({
     activeTextIndex,
     textCount,
-    onSelectText,
     onApplyPreset,
+    onResetStyle,
 }: TextStylePanelProps) {
     const [announcement, setAnnouncement] = useState<string | null>(null);
-    const safeIndex =
-        textCount === 0
-            ? -1
-            : Math.max(0, Math.min(activeTextIndex, textCount - 1));
+    const hasSelectedText =
+        activeTextIndex >= 0 && activeTextIndex < textCount;
 
     if (textCount === 0) {
         return (
@@ -53,36 +51,23 @@ export default function TextStylePanel({
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-                <div>
-                    <p className="text-xs font-semibold text-white">
-                        One-tap text styles
-                    </p>
-                    <p className="text-[10px] text-white/45">
-                        Apply to Text {safeIndex + 1}; font size stays unchanged.
-                    </p>
-                </div>
-                {textCount > 1 && (
-                    <div
-                        className="flex max-w-[55%] gap-1 overflow-x-auto"
-                        aria-label="Choose text layer"
-                    >
-                        {Array.from({ length: textCount }, (_, index) => (
-                            <button
-                                key={index}
-                                type="button"
-                                aria-pressed={safeIndex === index}
-                                onClick={() => onSelectText(index)}
-                                className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors ${
-                                    safeIndex === index
-                                        ? 'bg-[#6a7bd1] text-white'
-                                        : 'bg-white/8 text-white/55 hover:bg-white/15'
-                                }`}
-                            >
-                                Text {index + 1}
-                            </button>
-                        ))}
-                    </div>
-                )}
+                <p className="text-xs font-semibold text-white">
+                    One-tap text styles
+                </p>
+                <button
+                    type="button"
+                    aria-label="Reset text style"
+                    disabled={!hasSelectedText}
+                    onClick={() => {
+                        if (!hasSelectedText) return;
+                        onResetStyle(activeTextIndex);
+                        setAnnouncement('Text style reset to normal');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/12 bg-white/5 px-2 py-1 text-[10px] font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-white/5"
+                >
+                    <RotateCcw className="h-3 w-3" />
+                    Reset style
+                </button>
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -94,13 +79,15 @@ export default function TextStylePanel({
                             type="button"
                             aria-label={`Apply ${displayLabel} style`}
                             title={preset.description}
+                            disabled={!hasSelectedText}
                             onClick={() => {
-                                onApplyPreset(preset.id, safeIndex);
+                                if (!hasSelectedText) return;
+                                onApplyPreset(preset.id, activeTextIndex);
                                 setAnnouncement(
-                                    `${displayLabel} applied to Text ${safeIndex + 1}`
+                                    `${displayLabel} applied to the selected text`
                                 );
                             }}
-                            className="group min-h-24 overflow-hidden rounded-lg border border-white/12 bg-black/30 text-left transition-all hover:-translate-y-0.5 hover:border-[#7f8ff0]/70 hover:bg-[#6a7bd1]/10"
+                            className="group min-h-24 overflow-hidden rounded-lg border border-white/12 bg-black/30 text-left transition-all hover:-translate-y-0.5 hover:border-[#7f8ff0]/70 hover:bg-[#6a7bd1]/10 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 disabled:hover:border-white/12 disabled:hover:bg-black/30"
                         >
                             <span className="flex h-14 items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,#36394f,#181923_72%)] px-2 text-center">
                                 <span
@@ -124,7 +111,7 @@ export default function TextStylePanel({
                 aria-live="polite"
                 className="min-h-4 text-[10px] text-[#aeb8ff]"
             >
-                {announcement}
+                {announcement ?? (!hasSelectedText ? 'Select a text box to apply a style.' : null)}
             </p>
         </div>
     );

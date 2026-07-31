@@ -1107,6 +1107,57 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
         updateTextBoxToContent,
     ]);
 
+    const handleResetTextStyle = useCallback((index: number) => {
+        const currentSettings = textSettings[index];
+        const textLayerId = textLayerIds[index];
+        const textBox = textBoxes[index];
+        if (!currentSettings || !textLayerId || !textBox) return;
+
+        const normalSettings = {
+            ...createDefaultTextSettings(template, textBox),
+            fontFamily:
+                template.layout?.type === 'top-banner'
+                    ? 'Arial'
+                    : getDefaultFont(),
+        };
+        const nextSettings = {
+            ...normalSettings,
+            fontSize: currentSettings.fontSize,
+            fontFamily: currentSettings.fontFamily,
+            fontWeight: currentSettings.fontWeight,
+            visible: currentSettings.visible,
+        };
+
+        setTextSettings((current) => {
+            const updated = [...current];
+            updated[index] = nextSettings;
+            return updated;
+        });
+        updateTextBoxToContent(index, texts[index] || '', nextSettings);
+
+        if (FONT_CONFIGS[nextSettings.fontFamily]) {
+            loadFont(FONT_CONFIGS[nextSettings.fontFamily])
+                .then(() => {
+                    if (isLeavingRef.current) return;
+                    const currentIndex =
+                        textLayerIdsRef.current.indexOf(textLayerId);
+                    const currentSettings =
+                        textSettingsRef.current[currentIndex];
+                    if (
+                        currentIndex === -1 ||
+                        currentSettings?.fontFamily !==
+                            nextSettings.fontFamily
+                    ) return;
+                    updateTextBoxToContent(
+                        currentIndex,
+                        textsRef.current[currentIndex] || '',
+                        currentSettings
+                    );
+                })
+                .catch(() => undefined);
+        }
+    }, [getDefaultFont, loadFont, template, textBoxes, textSettings, texts, updateTextBoxToContent]);
+
     const handleShadowChange = useCallback((idx: number, shadowProperty: keyof TextSettings['shadow'], value: string | number) => {
         const currentSettings = textSettings[idx];
         if (!currentSettings) return;
@@ -5028,18 +5079,14 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
     const workspaceStyles = useMemo(() => (
         <div className="space-y-3">
             <TextStylePanel
-                activeTextIndex={selectedTextIndex >= 0 ? selectedTextIndex : 0}
+                activeTextIndex={selectedTextIndex}
                 textCount={texts.length}
-                onSelectText={(index) => {
-                    setSelectedTextIndex(index);
-                    setSelectedImageIndex(-1);
-                    setSelectedShapeIndex(-1);
-                }}
                 onApplyPreset={handleApplyTextStyle}
+                onResetStyle={handleResetTextStyle}
             />
             <CreatorBrandPanel branding={branding} onChange={setBranding} />
         </div>
-    ), [branding, handleApplyTextStyle, selectedTextIndex, setSelectedShapeIndex, texts.length]);
+    ), [branding, handleApplyTextStyle, handleResetTextStyle, selectedTextIndex, setSelectedShapeIndex, texts.length]);
 
     const workspaceAssets = useMemo(() => (
         <div className="space-y-4">
