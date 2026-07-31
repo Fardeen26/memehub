@@ -20,7 +20,6 @@ const PREVIEW_CLASS: Record<TextStylePresetId, string> = {
     subtitle: 'font-bold text-white',
     reaction:
         'font-black uppercase tracking-wide text-[#ffd400] [-webkit-text-stroke:1px_#000]',
-    'hindi-bold': 'font-bold text-white',
 };
 
 const PREVIEW_COPY: Record<TextStylePresetId, string> = {
@@ -28,7 +27,6 @@ const PREVIEW_COPY: Record<TextStylePresetId, string> = {
     'headline-news': 'BREAKING',
     subtitle: 'What happened next…',
     reaction: 'SERIOUSLY?',
-    'hindi-bold': 'जब मीम तैयार हो',
 };
 
 function getDisplayLabel(id: TextStylePresetId, label: string): string {

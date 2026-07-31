@@ -1,0 +1,115 @@
+<div id="trend-radar-demo">
+  <style>
+    #trend-radar-demo .radar-layout { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(260px,.85fr); gap:16px; align-items:start; }
+    #trend-radar-demo .radar-list { display:grid; gap:8px; }
+    #trend-radar-demo .trend-card { width:100%; text-align:left; display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; }
+    #trend-radar-demo .trend-card .trend-name { font-weight:500; }
+    #trend-radar-demo .trend-card .trend-meta { grid-column:2 / 4; }
+    #trend-radar-demo .trend-card.is-active { background:var(--accent); color:var(--accent-foreground); }
+    #trend-radar-demo .signal { width:10px; height:10px; border-radius:50%; background:var(--viz-series-1); }
+    #trend-radar-demo .meme-preview { aspect-ratio:1 / 1; display:grid; place-items:center; text-align:center; background:var(--muted); color:var(--muted-foreground); padding:20px; }
+    #trend-radar-demo .meme-top, #trend-radar-demo .meme-bottom { font-weight:500; }
+    #trend-radar-demo .meme-mid { padding:28px 10px; color:var(--foreground); }
+    #trend-radar-demo .idea-options { display:grid; gap:8px; }
+    #trend-radar-demo .idea-option { width:100%; text-align:left; }
+    #trend-radar-demo .detail-title { margin:0; }
+    @media (max-width:620px) { #trend-radar-demo .radar-layout { grid-template-columns:1fr; } }
+  </style>
+
+  <div class="viz-controls" aria-label="Trend radar filters">
+    <button type="button" class="btn btn-primary" aria-pressed="true">For you</button>
+    <button type="button" class="btn" aria-pressed="false">India</button>
+    <button type="button" class="btn" aria-pressed="false">Internet</button>
+    <button type="button" class="btn" aria-pressed="false">Workplace</button>
+    <button type="button" class="btn" aria-pressed="false">Gaming</button>
+  </div>
+
+  <div class="radar-layout">
+    <section aria-label="Live trend opportunities">
+      <div class="radar-list" role="list">
+        <button type="button" class="btn trend-card is-active" data-trend="cricket" aria-pressed="true">
+          <span class="signal" aria-hidden="true"></span>
+          <span class="trend-name">Last-over cricket panic</span>
+          <span class="viz-badge">Rising</span>
+          <span class="text-small trend-meta">Sports · 42 min ago · 18 creator posts spotted</span>
+        </button>
+        <button type="button" class="btn trend-card" data-trend="office" aria-pressed="false">
+          <span class="signal" aria-hidden="true"></span>
+          <span class="trend-name">“Quick call?” workplace jokes</span>
+          <span class="viz-badge">Early</span>
+          <span class="text-small trend-meta">Workplace · 1 hr ago · spreading across Reddit</span>
+        </button>
+        <button type="button" class="btn trend-card" data-trend="movie" aria-pressed="false">
+          <span class="signal" aria-hidden="true"></span>
+          <span class="trend-name">New film reaction clips</span>
+          <span class="viz-badge">Rising</span>
+          <span class="text-small trend-meta">Entertainment · 2 hr ago · strong short-video fit</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="card" aria-live="polite">
+      <p class="text-small text-muted" id="detail-kicker">Rising now · sports</p>
+      <h3 class="detail-title" id="detail-title">Last-over cricket panic</h3>
+      <p class="text-small" id="detail-summary">Good for relatable, fandom, and office versions. Move quickly: the moment is still fresh.</p>
+      <div class="meme-preview" aria-label="Editable meme draft preview">
+        <span class="meme-top" id="preview-top">ME: “This chase is easy.”</span>
+        <span class="meme-mid" id="preview-template">Drake hotline bling</span>
+        <span class="meme-bottom" id="preview-bottom">ME AFTER ONE WICKET: “WE’RE FINISHED.”</span>
+      </div>
+      <p class="text-small text-muted" id="template-note">Suggested format: reaction template · square Instagram post</p>
+      <div class="idea-options" aria-label="Caption angles">
+        <button type="button" class="btn idea-option is-selected" data-idea="0" aria-pressed="true">Relatable fan panic</button>
+        <button type="button" class="btn idea-option" data-idea="1" aria-pressed="false">Hinglish group-chat version</button>
+        <button type="button" class="btn idea-option" data-idea="2" aria-pressed="false">Office deadline analogy</button>
+      </div>
+      <p class="text-small text-muted" id="why-now">Why now: discussion volume accelerated during the match’s final overs.</p>
+      <button type="button" class="btn btn-primary btn-block" id="make-meme">Make this meme</button>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById('trend-radar-demo');
+      const data = {
+        cricket: {
+          kicker: 'Rising now · sports', title: 'Last-over cricket panic', summary: 'Good for relatable, fandom, and office versions. Move quickly: the moment is still fresh.', template: 'Drake hotline bling', note: 'Suggested format: reaction template · square Instagram post', why: 'Why now: discussion volume accelerated during the match’s final overs.',
+          ideas: [
+            ['Relatable fan panic', 'ME: “This chase is easy.”', 'ME AFTER ONE WICKET: “WE’RE FINISHED.”'],
+            ['Hinglish group-chat version', 'GROUP CHAT AT 18 OVERS:', '“AARAM SE JEET JAYENGE.”'],
+            ['Office deadline analogy', 'ME AT 4:00 PM:', '“THIS DECK IS BASICALLY DONE.”']
+          ]
+        },
+        office: {
+          kicker: 'Early signal · workplace', title: '“Quick call?” workplace jokes', summary: 'A repeatable work-life moment with room for your audience’s own version.', template: 'Two buttons', note: 'Suggested format: two-choice template · LinkedIn/Instagram square', why: 'Why now: multiple high-engagement posts are repeating the same phrase.',
+          ideas: [
+            ['Relatable work version', 'MY BOSS:', '“JUST A QUICK FIVE-MINUTE CALL.”'],
+            ['Hinglish team version', 'MANAGER: “BAS EK CHHOTA SYNC.”', 'CALENDAR: 2 HOURS BLOCKED'],
+            ['Creator version', 'CLIENT: “SMALL CHANGE.”', 'THE ENTIRE DESIGN: NEEDS REDOING']
+          ]
+        },
+        movie: {
+          kicker: 'Rising now · entertainment', title: 'New film reaction clips', summary: 'Use a short reaction or a still with a simple “expectation vs reality” angle.', template: 'Side-eye reaction clip', note: 'Suggested format: 6-second MP4 · Reels/Shorts safe zones', why: 'Why now: reaction clips are moving from fan communities into mainstream feeds.',
+          ideas: [
+            ['Expectation vs reality', 'ME EXPECTING A NORMAL ENDING', 'THE LAST TEN MINUTES:'],
+            ['Friend recommendation', 'FRIEND: “TRUST ME, WATCH IT.”', 'ME AFTER THE PLOT TWIST:'],
+            ['Hinglish reaction', 'BOL RAHA THA NA MASTERPIECE HAI', 'AB SAMJH AAYA']
+          ]
+        }
+      };
+      let current = 'cricket'; let idea = 0;
+      const el = (id) => root.querySelector('#' + id);
+      const render = () => {
+        const item = data[current]; const selected = item.ideas[idea];
+        el('detail-kicker').textContent = item.kicker; el('detail-title').textContent = item.title;
+        el('detail-summary').textContent = item.summary; el('preview-template').textContent = item.template;
+        el('template-note').textContent = item.note; el('why-now').textContent = item.why;
+        el('preview-top').textContent = selected[1]; el('preview-bottom').textContent = selected[2];
+        root.querySelectorAll('[data-idea]').forEach((button, index) => { button.textContent = item.ideas[index][0]; button.setAttribute('aria-pressed', String(index === idea)); button.classList.toggle('is-selected', index === idea); });
+      };
+      root.querySelectorAll('[data-trend]').forEach((button) => button.addEventListener('click', () => { current = button.dataset.trend; idea = 0; root.querySelectorAll('[data-trend]').forEach((item) => { const active = item === button; item.classList.toggle('is-active', active); item.setAttribute('aria-pressed', String(active)); }); render(); }));
+      root.querySelectorAll('[data-idea]').forEach((button, index) => button.addEventListener('click', () => { idea = index; render(); }));
+      el('make-meme').addEventListener('click', () => { el('make-meme').textContent = 'Opening editable draft…'; });
+    })();
+  </script>
+</div>

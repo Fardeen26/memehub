@@ -5,7 +5,6 @@ export const TEXT_STYLE_PRESET_IDS = [
     'headline-news',
     'subtitle',
     'reaction',
-    'hindi-bold',
 ] as const;
 
 export type TextStylePresetId = (typeof TEXT_STYLE_PRESET_IDS)[number];
@@ -119,30 +118,6 @@ export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
                 blur: 6,
                 offsetX: 3,
                 offsetY: 3,
-                color: '#000000',
-            },
-        },
-    },
-    {
-        id: 'hindi-bold',
-        label: 'Hindi Bold',
-        description: 'Shaping-safe Devanagari styling for Hindi meme copy.',
-        settings: {
-            color: '#ffffff',
-            fontFamily: 'Noto Sans Devanagari',
-            fontWeight: '700',
-            letterSpacing: 0,
-            textCase: 'normal',
-            backgroundColor: 'transparent',
-            backgroundRadius: 0,
-            outline: {
-                width: 3,
-                color: '#000000',
-            },
-            shadow: {
-                blur: 3,
-                offsetX: 2,
-                offsetY: 2,
                 color: '#000000',
             },
         },

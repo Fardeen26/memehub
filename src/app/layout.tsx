@@ -3,6 +3,7 @@ import { Bricolage_Grotesque } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import PageTransition from "@/components/PageTransition";
 import "./globals.css";
+import "./editor-fonts.css";
 import Providers from "./Provider";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";

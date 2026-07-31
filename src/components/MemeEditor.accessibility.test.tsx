@@ -67,7 +67,6 @@ vi.mock('@/lib/reusableImagePersistence', () => ({
 
 vi.mock('@/hooks/useFontLoader', () => ({
     FONT_CONFIGS: {},
-    INDIAN_SCRIPT_FONT_NAMES: [],
     getCanonicalFontFamily: (fontFamily: string) => fontFamily,
     useFontLoader: () => ({
         loadFont: vi.fn().mockResolvedValue(undefined),

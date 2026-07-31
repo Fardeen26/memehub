@@ -9,7 +9,7 @@ import {
     type FontConfig,
 } from './useFontLoader';
 
-const INDIAN_SCRIPT_FONTS = [
+const REMOVED_INDIC_FONT_FAMILIES = [
     'Noto Sans Devanagari',
     'Noto Sans Bengali',
     'Noto Sans Gurmukhi',
@@ -21,14 +21,11 @@ const INDIAN_SCRIPT_FONTS = [
     'Noto Nastaliq Urdu',
 ] as const;
 
-describe('Indian language font support', () => {
-    it.each(INDIAN_SCRIPT_FONTS)(
-        'provides regular and bold weights for %s',
+describe('editor font catalog', () => {
+    it.each(REMOVED_INDIC_FONT_FAMILIES)(
+        'does not include %s',
         (fontName) => {
-            expect(FONT_CONFIGS[fontName]).toMatchObject({
-                name: fontName,
-                weights: expect.arrayContaining(['400', '700']),
-            });
+            expect(FONT_CONFIGS[fontName]).toBeUndefined();
         }
     );
 
@@ -61,6 +58,7 @@ describe('font loading', () => {
             name: 'Memehub Loader Test',
             weights: ['400', '700'],
             display: 'swap',
+            source: 'google',
         };
         const { result } = renderHook(() => useFontLoader());
 
@@ -86,7 +84,7 @@ describe('font loading', () => {
         expect(result.current.isFontReady(config.name, config.weights)).toBe(true);
     });
 
-    it('evicts a failed request so the creator can retry the font load', async () => {
+    it('uses the locally declared Impact face without requesting Google Fonts', async () => {
         const load = vi.fn().mockResolvedValue([]);
         Object.defineProperty(document, 'fonts', {
             configurable: true,
@@ -95,38 +93,51 @@ describe('font loading', () => {
                 ready: Promise.resolve(),
             },
         });
+        const { result } = renderHook(() => useFontLoader());
+
+        expect(FONT_CONFIGS.Impact).toMatchObject({
+            name: 'Impact',
+            source: 'system',
+        });
+
+        await act(async () => {
+            await result.current.loadFont(FONT_CONFIGS.Impact);
+        });
+
+        expect(load).toHaveBeenCalledWith('400 20px "Impact"');
+        expect(
+            document.querySelector('[data-memehub-font-stylesheet]')
+        ).toBeNull();
+    });
+
+    it('uses bundled or system fonts for every configured editor font', () => {
+        expect(
+            Object.values(FONT_CONFIGS).every((font) => (
+                font.source === 'bundled' || font.source === 'system'
+            ))
+        ).toBe(true);
+    });
+
+    it('continues with a fallback when a Google Fonts stylesheet fails', async () => {
         const config: FontConfig = {
-            name: 'Memehub Retry Test',
+            name: 'Blocked Font',
             weights: ['400'],
+            source: 'google',
         };
         const { result } = renderHook(() => useFontLoader());
 
-        let firstAttempt!: Promise<void>;
+        let fontPromise!: Promise<void>;
         act(() => {
-            firstAttempt = result.current.loadFont(config);
+            fontPromise = result.current.loadFont(config);
         });
         document
             .querySelector<HTMLLinkElement>(
                 'link[data-memehub-font-stylesheet]'
             )
             ?.dispatchEvent(new Event('error'));
-        await expect(firstAttempt).rejects.toThrow(
-            'Failed to load font stylesheet'
-        );
 
-        let secondAttempt!: Promise<void>;
-        act(() => {
-            secondAttempt = result.current.loadFont(config);
-        });
-        document
-            .querySelector<HTMLLinkElement>(
-                'link[data-memehub-font-stylesheet]'
-            )
-            ?.dispatchEvent(new Event('load'));
-
-        await act(async () => {
-            await secondAttempt;
-        });
+        await expect(fontPromise).resolves.toBeUndefined();
         expect(result.current.isFontReady(config.name, config.weights)).toBe(true);
     });
+
 });

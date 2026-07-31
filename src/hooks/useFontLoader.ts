@@ -4,6 +4,7 @@ export interface FontConfig {
     name: string;
     weights: string[];
     display?: 'auto' | 'block' | 'swap' | 'fallback' | 'optional';
+    source?: 'google' | 'bundled' | 'system';
 }
 
 interface FontLoadState {
@@ -92,9 +93,11 @@ export function useFontLoader() {
 
         const loadPromise = (async () => {
             try {
-                await waitForFontStylesheet(
-                    getGoogleFontStylesheetUrl(fontConfig)
-                );
+                if (fontConfig.source === 'google') {
+                    await waitForFontStylesheet(
+                        getGoogleFontStylesheetUrl(fontConfig)
+                    );
+                }
 
                 if (document.fonts?.load) {
                     await Promise.all(
@@ -110,13 +113,15 @@ export function useFontLoader() {
                     ...prev,
                     [fontKey]: { loaded: true, loading: false, error: false }
                 }));
-            } catch (error) {
+            } catch {
                 fontLoadPromises.delete(fontKey);
                 setFontStates(prev => ({
                     ...prev,
-                    [fontKey]: { loaded: false, loading: false, error: true }
+                    [fontKey]: { loaded: true, loading: false, error: true }
                 }));
-                throw error;
+                // Canvas uses its configured fallback stack when the web font
+                // is unavailable, so a network failure must not block export.
+                loadedFonts.add(fontKey);
             }
         })();
 
@@ -150,28 +155,17 @@ export function useFontLoader() {
     };
 }
 
-export const INDIAN_SCRIPT_FONT_NAMES = [
-    'Noto Sans Devanagari',
-    'Noto Sans Bengali',
-    'Noto Sans Gurmukhi',
-    'Noto Sans Gujarati',
-    'Noto Sans Tamil',
-    'Noto Sans Telugu',
-    'Noto Sans Kannada',
-    'Noto Sans Malayalam',
-    'Noto Nastaliq Urdu',
-] as const;
-
 export function getCanonicalFontFamily(fontFamily: string): string {
     return fontFamily === 'Source Sans Pro' ? 'Source Sans 3' : fontFamily;
 }
 
 // Pre-defined font configurations for commonly used fonts
-export const FONT_CONFIGS: Record<string, FontConfig> = {
+const LOCAL_FONT_CONFIGS: Record<string, FontConfig> = {
     'Impact': {
         name: 'Impact',
         weights: ['400'],
-        display: 'swap'
+        display: 'swap',
+        source: 'system',
     },
     'Anton': {
         name: 'Anton',
@@ -233,51 +227,13 @@ export const FONT_CONFIGS: Record<string, FontConfig> = {
         weights: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
         display: 'swap'
     },
-    'Noto Sans Devanagari': {
-        name: 'Noto Sans Devanagari',
-        weights: ['400', '700'],
-        display: 'swap'
-    },
-    'Noto Sans Bengali': {
-        name: 'Noto Sans Bengali',
-        weights: ['400', '700'],
-        display: 'swap'
-    },
-    'Noto Sans Gurmukhi': {
-        name: 'Noto Sans Gurmukhi',
-        weights: ['400', '700'],
-        display: 'swap'
-    },
-    'Noto Sans Gujarati': {
-        name: 'Noto Sans Gujarati',
-        weights: ['400', '700'],
-        display: 'swap'
-    },
-    'Noto Sans Tamil': {
-        name: 'Noto Sans Tamil',
-        weights: ['400', '700'],
-        display: 'swap'
-    },
-    'Noto Sans Telugu': {
-        name: 'Noto Sans Telugu',
-        weights: ['400', '700'],
-        display: 'swap'
-    },
-    'Noto Sans Kannada': {
-        name: 'Noto Sans Kannada',
-        weights: ['400', '700'],
-        display: 'swap'
-    },
-    'Noto Sans Malayalam': {
-        name: 'Noto Sans Malayalam',
-        weights: ['400', '700'],
-        display: 'swap'
-    },
-    'Noto Nastaliq Urdu': {
-        name: 'Noto Nastaliq Urdu',
-        weights: ['400', '700'],
-        display: 'swap'
-    }
 };
+
+export const FONT_CONFIGS: Record<string, FontConfig> = Object.fromEntries(
+    Object.entries(LOCAL_FONT_CONFIGS).map(([name, font]) => [
+        name,
+        { ...font, source: font.source ?? 'bundled' },
+    ])
+);
 
 export default useFontLoader;

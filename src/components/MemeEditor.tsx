@@ -20,7 +20,6 @@ import {
     SelectGroup,
     SelectItem,
     SelectLabel,
-    SelectSeparator,
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
@@ -44,7 +43,6 @@ import Image from 'next/image';
 import {
     useFontLoader,
     FONT_CONFIGS,
-    INDIAN_SCRIPT_FONT_NAMES,
     getCanonicalFontFamily,
 } from '@/hooks/useFontLoader';
 import { useCanvasShapes } from '@/hooks/useCanvasShapes';
@@ -5511,15 +5509,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                                                                 <SelectItem value="Nunito">Nunito</SelectItem>
                                                                 <SelectItem value="Inter">Inter</SelectItem>
                                                                 <SelectItem value="Work Sans">Work Sans</SelectItem>
-                                                            </SelectGroup>
-                                                            <SelectSeparator />
-                                                            <SelectGroup>
-                                                                <SelectLabel>Indian scripts</SelectLabel>
-                                                                {INDIAN_SCRIPT_FONT_NAMES.map((fontName) => (
-                                                                    <SelectItem key={fontName} value={fontName}>
-                                                                        {fontName}
-                                                                    </SelectItem>
-                                                                ))}
                                                             </SelectGroup>
                                                         </SelectContent>
                                                     </Select>

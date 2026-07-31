@@ -28,7 +28,7 @@ const currentSettings: TextSettings = {
 };
 
 describe('text style presets', () => {
-    it('exposes five useful creator presets in a stable UI order', () => {
+    it('exposes four useful creator presets in a stable UI order', () => {
         expect(
             TEXT_STYLE_PRESETS.map(({ id, label }) => ({ id, label }))
         ).toEqual([
@@ -36,7 +36,6 @@ describe('text style presets', () => {
             { id: 'headline-news', label: 'Headline / News' },
             { id: 'subtitle', label: 'Subtitle' },
             { id: 'reaction', label: 'Reaction' },
-            { id: 'hindi-bold', label: 'Hindi Bold' },
         ]);
         expect(
             TEXT_STYLE_PRESETS.every(
@@ -99,15 +98,4 @@ describe('text style presets', () => {
         });
     });
 
-    it('uses a shaping-safe Devanagari style for Hindi Bold', () => {
-        expect(
-            applyTextStylePreset(currentSettings, 'hindi-bold')
-        ).toMatchObject({
-            fontSize: 73,
-            fontFamily: 'Noto Sans Devanagari',
-            fontWeight: '700',
-            letterSpacing: 0,
-            textCase: 'normal',
-        });
-    });
 });
