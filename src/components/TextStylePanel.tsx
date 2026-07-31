@@ -15,23 +15,17 @@ type TextStylePanelProps = {
 };
 
 const PREVIEW_CLASS: Record<TextStylePresetId, string> = {
-    classic: 'font-black uppercase text-white [-webkit-text-stroke:1px_#000]',
-    'headline-news': 'font-black uppercase tracking-tight text-white',
-    subtitle: 'font-bold text-white',
+    'black-bar': 'bg-black px-2 py-1 font-black text-white',
+    'meme-outline': 'font-black uppercase text-white [-webkit-text-stroke:2px_#000] [text-shadow:2px_2px_0_#000]',
     reaction:
         'font-black uppercase tracking-wide text-[#ffd400] [-webkit-text-stroke:1px_#000]',
 };
 
 const PREVIEW_COPY: Record<TextStylePresetId, string> = {
-    classic: 'MEME',
-    'headline-news': 'BREAKING',
-    subtitle: 'What happened next…',
+    'black-bar': 'Say less.',
+    'meme-outline': 'NO WAY',
     reaction: 'SERIOUSLY?',
 };
-
-function getDisplayLabel(id: TextStylePresetId, label: string): string {
-    return id === 'classic' ? 'Classic Meme' : label;
-}
 
 export default function TextStylePanel({
     activeTextIndex,
@@ -93,10 +87,7 @@ export default function TextStylePanel({
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {TEXT_STYLE_PRESETS.map((preset) => {
-                    const displayLabel = getDisplayLabel(
-                        preset.id,
-                        preset.label
-                    );
+                    const displayLabel = preset.label;
                     return (
                         <button
                             key={preset.id}

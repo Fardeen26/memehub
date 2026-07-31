@@ -410,10 +410,10 @@ describe('MemeEditor accessibility', () => {
         expect(screen.getByRole('tab', { name: 'Export' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('tab', { name: 'Text' }));
         expect(
-            screen.getByRole('button', { name: 'Apply Classic Meme style' })
+            screen.getByRole('button', { name: 'Apply Black Bar style' })
         ).toBeInTheDocument();
         expect(
-            screen.getByRole('button', { name: 'Apply Hindi Bold style' })
+            screen.getByRole('button', { name: 'Apply Reaction style' })
         ).toBeInTheDocument();
     });
 
@@ -441,10 +441,10 @@ describe('MemeEditor accessibility', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Text' }));
         fireEvent.focus(screen.getByRole('textbox', { name: 'text position 1' }));
         fireEvent.click(
-            screen.getByRole('button', { name: 'Apply Hindi Bold style' })
+            screen.getByRole('button', { name: 'Apply Black Bar style' })
         );
 
-        expect(screen.getByText('Hindi Bold applied to Text 1')).toBeInTheDocument();
+        expect(screen.getByText('Black Bar applied to Text 1')).toBeInTheDocument();
     });
 
     it('shows text in the layer workspace and lets creators hide it non-destructively', () => {

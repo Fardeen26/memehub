@@ -1,16 +1,15 @@
 import type { TextSettings } from '@/types/editor';
 
 export const TEXT_STYLE_PRESET_IDS = [
-    'classic',
-    'headline-news',
-    'subtitle',
+    'black-bar',
+    'meme-outline',
     'reaction',
 ] as const;
 
 export type TextStylePresetId = (typeof TEXT_STYLE_PRESET_IDS)[number];
 
 export type TextStylePresetSettings = Readonly<
-    Omit<TextSettings, 'fontSize' | 'outline' | 'shadow' | 'backgroundColor' | 'backgroundRadius'> & {
+    Omit<TextSettings, 'fontSize' | 'fontFamily' | 'fontWeight' | 'outline' | 'shadow' | 'backgroundColor' | 'backgroundRadius'> & {
         backgroundColor: string;
         backgroundRadius: number;
         outline: Readonly<TextSettings['outline']>;
@@ -27,73 +26,45 @@ export type TextStylePreset = Readonly<{
 
 export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
     {
-        id: 'classic',
-        label: 'Classic',
-        description: 'The familiar high-contrast Impact meme style.',
+        id: 'black-bar',
+        label: 'Black Bar',
+        description: 'White text on a solid black bar for clear captions anywhere.',
         settings: {
             color: '#ffffff',
-            fontFamily: 'Impact',
-            fontWeight: '900',
-            letterSpacing: 0,
-            textCase: 'uppercase',
-            backgroundColor: 'transparent',
-            backgroundRadius: 0,
-            outline: {
-                width: 4,
-                color: '#000000',
-            },
-            shadow: {
-                blur: 4,
-                offsetX: 2,
-                offsetY: 2,
-                color: '#000000',
-            },
-        },
-    },
-    {
-        id: 'headline-news',
-        label: 'Headline / News',
-        description: 'A compact editorial treatment for headlines and quotes.',
-        settings: {
-            color: '#ffffff',
-            fontFamily: 'Source Sans 3',
-            fontWeight: '900',
-            letterSpacing: 0,
-            textCase: 'uppercase',
-            backgroundColor: 'transparent',
-            backgroundRadius: 0,
-            outline: {
-                width: 2,
-                color: '#000000',
-            },
-            shadow: {
-                blur: 2,
-                offsetX: 1,
-                offsetY: 2,
-                color: '#000000',
-            },
-        },
-    },
-    {
-        id: 'subtitle',
-        label: 'Subtitle',
-        description: 'Readable mixed-case copy for dialogue and attribution.',
-        settings: {
-            color: '#ffffff',
-            fontFamily: 'Source Sans 3',
-            fontWeight: '700',
             letterSpacing: 0,
             textCase: 'normal',
-            backgroundColor: 'transparent',
+            backgroundColor: '#000000',
             backgroundRadius: 0,
             outline: {
-                width: 2,
+                width: 0,
                 color: '#000000',
             },
             shadow: {
-                blur: 2,
-                offsetX: 1,
-                offsetY: 1,
+                blur: 0,
+                offsetX: 0,
+                offsetY: 0,
+                color: '#000000',
+            },
+        },
+    },
+    {
+        id: 'meme-outline',
+        label: 'Meme Outline',
+        description: 'High-contrast white lettering with a strong black stroke and hard shadow.',
+        settings: {
+            color: '#ffffff',
+            letterSpacing: 0,
+            textCase: 'uppercase',
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
+            outline: {
+                width: 5,
+                color: '#000000',
+            },
+            shadow: {
+                blur: 3,
+                offsetX: 2,
+                offsetY: 2,
                 color: '#000000',
             },
         },
@@ -104,8 +75,6 @@ export const TEXT_STYLE_PRESETS: readonly TextStylePreset[] = [
         description: 'Bold yellow reaction copy that stands out on busy images.',
         settings: {
             color: '#ffd400',
-            fontFamily: 'Anton',
-            fontWeight: '400',
             letterSpacing: 1,
             textCase: 'uppercase',
             backgroundColor: 'transparent',
@@ -145,6 +114,8 @@ export function applyTextStylePreset(
     return {
         ...settings,
         fontSize: currentSettings.fontSize,
+        fontFamily: currentSettings.fontFamily,
+        fontWeight: currentSettings.fontWeight,
         visible: currentSettings.visible,
         outline: { ...settings.outline },
         shadow: { ...settings.shadow },

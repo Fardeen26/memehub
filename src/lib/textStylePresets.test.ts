@@ -28,46 +28,64 @@ const currentSettings: TextSettings = {
 };
 
 describe('text style presets', () => {
-    it('exposes four useful creator presets in a stable UI order', () => {
+    it('keeps only the three useful multi-control effects without replacing the chosen font', () => {
         expect(
             TEXT_STYLE_PRESETS.map(({ id, label }) => ({ id, label }))
         ).toEqual([
-            { id: 'classic', label: 'Classic' },
-            { id: 'headline-news', label: 'Headline / News' },
-            { id: 'subtitle', label: 'Subtitle' },
+            { id: 'black-bar', label: 'Black Bar' },
+            { id: 'meme-outline', label: 'Meme Outline' },
             { id: 'reaction', label: 'Reaction' },
         ]);
         expect(
             TEXT_STYLE_PRESETS.every(
-                (preset) => !('fontSize' in preset.settings)
+                (preset) =>
+                    !('fontSize' in preset.settings) &&
+                    !('fontFamily' in preset.settings) &&
+                    !('fontWeight' in preset.settings)
             )
         ).toBe(true);
+        expect(
+            TEXT_STYLE_PRESETS.filter(
+                (preset) => preset.settings.backgroundColor !== 'transparent'
+            ).map(({ id }) => id)
+        ).toEqual(['black-bar']);
     });
 
     it('returns a preset by its typed id', () => {
-        expect(getTextStylePreset('headline-news')).toMatchObject({
-            id: 'headline-news',
-            label: 'Headline / News',
+        expect(getTextStylePreset('black-bar')).toMatchObject({
+            id: 'black-bar',
+            label: 'Black Bar',
             settings: {
-                fontFamily: 'Source Sans 3',
-                fontWeight: '900',
-                textCase: 'uppercase',
+                color: '#ffffff',
+                backgroundColor: '#000000',
+                backgroundRadius: 0,
+                textCase: 'normal',
+                outline: { width: 0 },
+                shadow: { blur: 0 },
             },
         });
     });
 
     it('applies a preset without changing the creator-selected font size', () => {
-        const result = applyTextStylePreset(currentSettings, 'classic');
+        const result = applyTextStylePreset(currentSettings, 'meme-outline');
 
         expect(result.fontSize).toBe(73);
         expect(result).toMatchObject({
             color: '#ffffff',
-            fontFamily: 'Impact',
-            fontWeight: '900',
+            backgroundColor: 'transparent',
+            backgroundRadius: 0,
+            fontFamily: 'Inter',
+            fontWeight: '500',
             letterSpacing: 0,
             textCase: 'uppercase',
             outline: {
-                width: 4,
+                width: 5,
+                color: '#000000',
+            },
+            shadow: {
+                blur: 3,
+                offsetX: 2,
+                offsetY: 2,
                 color: '#000000',
             },
         });
@@ -77,7 +95,7 @@ describe('text style presets', () => {
         expect(
             applyTextStylePreset(
                 { ...currentSettings, visible: false },
-                'headline-news'
+                'meme-outline'
             ).visible
         ).toBe(false);
     });
