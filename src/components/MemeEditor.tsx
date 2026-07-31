@@ -1689,19 +1689,6 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                 );
             }
 
-            const hasMeaningfulScene =
-                textsRef.current.some((text) => text.trim().length > 0) ||
-                imageOverlaysRef.current.length > 0 ||
-                shapeOverlays.length > 0 ||
-                strokes.length > 0;
-            if (
-                hasMeaningfulScene &&
-                !window.confirm(
-                    'Start with this image? Your current canvas layers will be cleared.'
-                )
-            ) {
-                return false;
-            }
             let candidateLocalImage: string | null = null;
             let candidateCommitted = false;
 

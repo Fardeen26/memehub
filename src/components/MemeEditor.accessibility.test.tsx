@@ -1581,10 +1581,8 @@ describe('MemeEditor accessibility', () => {
         );
     });
 
-    it('keeps the current meme untouched when template replacement is cancelled', async () => {
-        const confirmReplacement = vi
-            .spyOn(window, 'confirm')
-            .mockReturnValue(false);
+    it('replaces the current meme without asking for confirmation', async () => {
+        const confirmReplacement = vi.spyOn(window, 'confirm');
 
         render(
             <MemeEditor
@@ -1618,19 +1616,12 @@ describe('MemeEditor accessibility', () => {
             })
         );
 
-        expect(confirmReplacement).toHaveBeenCalledWith(
-            'Start with this image? Your current canvas layers will be cleared.'
+        await vi.waitFor(() =>
+            expect(
+                reusableImagePersistenceMock.materializeReusableImage
+            ).toHaveBeenCalledOnce()
         );
-        expect(
-            reusableImagePersistenceMock.materializeReusableImage
-        ).not.toHaveBeenCalled();
-
-        const snapshot = await editorDraftMock.beforeSave!();
-        expect(snapshot.texts).toEqual(['Keep this joke']);
-        expect(
-            (snapshot as typeof snapshot & { canvasTemplate?: unknown })
-                .canvasTemplate
-        ).toBeUndefined();
+        expect(confirmReplacement).not.toHaveBeenCalled();
     });
 
     it('stops waiting when a remote image never finishes loading', async () => {

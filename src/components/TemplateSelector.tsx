@@ -14,18 +14,19 @@ import {
 } from "@/components/ui/pagination";
 import useSelected from '@/hooks/useSelected';
 import CustomTemplateUpload from './CustomTemplateUpload';
-import { Upload } from 'lucide-react';
+import { FilePlus2, Upload } from 'lucide-react';
 
 type TemplateSelectorProps = {
     templates: Record<string, Template>;
     onSelect: (key: string) => void;
     onCustomTemplateSelect?: (template: Template) => void;
+    onStartFromScratch?: () => void;
 };
 
 const TEMPLATES_PER_PAGE = 60;
 const PRELOAD_NEXT_PAGE = true;
 
-export default function TemplateSelector({ templates, onSelect, onCustomTemplateSelect }: TemplateSelectorProps) {
+export default function TemplateSelector({ templates, onSelect, onCustomTemplateSelect, onStartFromScratch }: TemplateSelectorProps) {
     const { currentPage, setCurrentPage } = useSelected();
 
     const templateEntries = useMemo(() => Object.entries(templates), [templates]);
@@ -140,7 +141,7 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
 
     return (
         <div className="space-y-6 w-full">
-            <div className="flex">
+            <div className="flex flex-wrap gap-2">
                 <CustomTemplateUpload
                     onTemplateCreate={onCustomTemplateSelect || (() => { })}
                     buttonText="Use Custom Template"
@@ -149,6 +150,14 @@ export default function TemplateSelector({ templates, onSelect, onCustomTemplate
                     title="Upload Custom Template"
                     description="Upload your own image to create a custom meme template."
                 />
+                <button
+                    type="button"
+                    onClick={onStartFromScratch}
+                    className="py-2 px-3 h-8 rounded-md bg-black/80 text-white dark:bg-white/20 border dark:border-gray-200/20 transition-colors flex items-center gap-2 text-sm font-semibold"
+                >
+                    <FilePlus2 className="h-4 w-4" />
+                    Start from Scratch
+                </button>
             </div>
 
             <section className="grid grid-cols-6 max-sm:grid-cols-2 max-md:grid-cols-3 max-lg:grid-cols-4 gap-6 grid-flow-dense w-full max-sm:-mt-3">

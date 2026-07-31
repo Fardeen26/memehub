@@ -32,6 +32,24 @@ function renderWithSelectedProvider(children: React.ReactNode) {
 }
 
 describe('TemplateSelector', () => {
+    it('starts an empty canvas from the start-from-scratch button', () => {
+        const onStartFromScratch = vi.fn();
+
+        renderWithSelectedProvider(
+            <TemplateSelector
+                templates={{ 'distracted-boyfriend': exampleTemplate }}
+                onSelect={vi.fn()}
+                onStartFromScratch={onStartFromScratch}
+            />
+        );
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Start from Scratch' })
+        );
+
+        expect(onStartFromScratch).toHaveBeenCalledOnce();
+    });
+
     it('renders template choices as focusable semantic buttons with meaningful names', () => {
         const onSelect = vi.fn();
 

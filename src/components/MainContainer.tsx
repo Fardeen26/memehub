@@ -6,6 +6,7 @@ import DynamicMemeEditor from './DynamicMemeEditor';
 import type { Template } from '@/types/template';
 import { motion, AnimatePresence } from 'framer-motion';
 import useSelected from '@/hooks/useSelected';
+import { blankCanvasTemplate } from '@/lib/blankCanvas';
 
 type TemplateKey = string;
 
@@ -35,6 +36,10 @@ export default function MainContainer({ templates }: MainContainerProps) {
         handleCustomTemplateSelect(template);
     };
 
+    const handleStartFromScratch = () => {
+        handleCustomTemplateSelect(blankCanvasTemplate);
+    };
+
     const handleReset = async () => {
         setSelected('');
         setIsCustomTemplate(false);
@@ -53,6 +58,7 @@ export default function MainContainer({ templates }: MainContainerProps) {
                             templates={templates}
                             onSelect={handleSelect}
                             onCustomTemplateSelect={handleCustomSelect}
+                            onStartFromScratch={handleStartFromScratch}
                         />
                     </div>
                 ) : (
