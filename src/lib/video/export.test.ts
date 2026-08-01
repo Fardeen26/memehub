@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getVideoExportDimensions, getVideoRecorderMimeType } from '@/lib/video/export';
+import { getVideoExportDimensions, getVideoRecorderMimeType, transformVideoText } from '@/lib/video/export';
 
 describe('video export helpers', () => {
     it('contains export dimensions within 1080 and makes them even', () => {
@@ -14,5 +14,11 @@ describe('video export helpers', () => {
         expect(getVideoRecorderMimeType((type) => type === 'video/webm;codecs=vp9,opus')).toBe(
             'video/webm;codecs=vp9,opus'
         );
+    });
+
+    it('uses the selected text case before rendering a caption', () => {
+        expect(transformVideoText('Hello Video', 'uppercase')).toBe('HELLO VIDEO');
+        expect(transformVideoText('Hello Video', 'lowercase')).toBe('hello video');
+        expect(transformVideoText('Hello Video', 'normal')).toBe('Hello Video');
     });
 });

@@ -24,6 +24,41 @@ export function getVideoRecorderMimeType(
     return RECORDER_TYPES.find((type) => isTypeSupported(type)) ?? null;
 }
 
+export function transformVideoText(
+    text: string,
+    textCase: 'uppercase' | 'lowercase' | 'normal'
+): string {
+    if (textCase === 'uppercase') return text.toUpperCase();
+    if (textCase === 'lowercase') return text.toLowerCase();
+    return text;
+}
+
+function getSpacedTextWidth(ctx: CanvasRenderingContext2D, text: string, letterSpacing: number): number {
+    return ctx.measureText(text).width + Math.max(0, text.length - 1) * letterSpacing;
+}
+
+function drawSpacedText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    letterSpacing: number,
+    stroke: boolean
+): void {
+    if (!letterSpacing) {
+        if (stroke) ctx.strokeText(text, x, y);
+        else ctx.fillText(text, x, y);
+        return;
+    }
+    const width = getSpacedTextWidth(ctx, text, letterSpacing);
+    let cursor = ctx.textAlign === 'center' ? x - width / 2 : ctx.textAlign === 'right' ? x - width : x;
+    for (const character of text) {
+        if (stroke) ctx.strokeText(character, cursor, y);
+        else ctx.fillText(character, cursor, y);
+        cursor += ctx.measureText(character).width + letterSpacing;
+    }
+}
+
 function drawMultilineText(
     ctx: CanvasRenderingContext2D,
     text: string,
@@ -32,14 +67,15 @@ function drawMultilineText(
     width: number,
     height: number,
     fontSize: number,
-    align: CanvasTextAlign
+    align: CanvasTextAlign,
+    letterSpacing: number
 ): void {
     const words = text.split(/\s+/).filter(Boolean);
     const lines: string[] = [];
     let line = '';
     for (const word of words) {
         const candidate = line ? `${line} ${word}` : word;
-        if (line && ctx.measureText(candidate).width > width) {
+        if (line && getSpacedTextWidth(ctx, candidate, letterSpacing) > width) {
             lines.push(line);
             line = word;
         } else {
@@ -50,8 +86,8 @@ function drawMultilineText(
     const lineHeight = fontSize * 1.1;
     const startY = y + Math.max(fontSize, (height - lines.length * lineHeight) / 2 + fontSize * 0.75);
     const textX = align === 'left' ? x : align === 'right' ? x + width : x + width / 2;
-    lines.forEach((lineValue, index) => ctx.strokeText(lineValue, textX, startY + index * lineHeight));
-    lines.forEach((lineValue, index) => ctx.fillText(lineValue, textX, startY + index * lineHeight));
+    lines.forEach((lineValue, index) => drawSpacedText(ctx, lineValue, textX, startY + index * lineHeight, letterSpacing, true));
+    lines.forEach((lineValue, index) => drawSpacedText(ctx, lineValue, textX, startY + index * lineHeight, letterSpacing, false));
 }
 
 export function renderVideoProjectFrame(
@@ -84,19 +120,40 @@ export function renderVideoProjectFrame(
         ctx.translate(x + layerWidth / 2, y + layerHeight / 2);
         ctx.rotate((transform.rotation * Math.PI) / 180);
         ctx.translate(-layerWidth / 2, -layerHeight / 2);
-        ctx.font = `${Math.round(fontSize)}px ${style.fontFamily}, sans-serif`;
+        ctx.font = `${style.fontWeight} ${Math.round(fontSize)}px ${style.fontFamily}, sans-serif`;
         ctx.textAlign = style.textAlign;
         ctx.textBaseline = 'alphabetic';
         ctx.lineJoin = 'round';
         ctx.lineWidth = Math.max(1, style.outlineWidth * Math.min(width, height));
         ctx.strokeStyle = style.outlineColor;
         ctx.fillStyle = style.color;
+        ctx.shadowColor = style.shadow.color;
+        ctx.shadowBlur = style.shadow.blur * Math.min(width, height);
+        ctx.shadowOffsetX = style.shadow.offsetX * Math.min(width, height);
+        ctx.shadowOffsetY = style.shadow.offsetY * Math.min(width, height);
         if (style.backgroundColor !== 'transparent') {
             ctx.fillStyle = style.backgroundColor;
-            ctx.fillRect(0, 0, layerWidth, layerHeight);
+            const radius = Math.min(layerWidth / 2, layerHeight / 2, style.backgroundRadius * Math.min(width, height));
+            if (radius > 0 && typeof ctx.roundRect === 'function') {
+                ctx.beginPath();
+                ctx.roundRect(0, 0, layerWidth, layerHeight, radius);
+                ctx.fill();
+            } else {
+                ctx.fillRect(0, 0, layerWidth, layerHeight);
+            }
             ctx.fillStyle = style.color;
         }
-        drawMultilineText(ctx, layer.text, 0, 0, layerWidth, layerHeight, fontSize, style.textAlign);
+        drawMultilineText(
+            ctx,
+            transformVideoText(layer.text, style.textCase),
+            0,
+            0,
+            layerWidth,
+            layerHeight,
+            fontSize,
+            style.textAlign,
+            style.letterSpacing * fontSize
+        );
         ctx.restore();
     }
 }

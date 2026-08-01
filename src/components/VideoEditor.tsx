@@ -4,11 +4,24 @@ import { ChangeEvent, PointerEvent, useCallback, useEffect, useRef, useState } f
 import { Download, Loader2, Pause, Play, Plus, Upload, Volume2, VolumeX, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { VideoProjectV1, VideoTextLayer } from '@/types/videoProject';
-import { VIDEO_FILTER_PRESETS, createVideoProject, createVideoTextLayer } from '@/lib/video/project';
+import {
+    VIDEO_FILTER_PRESETS,
+    VIDEO_TEXT_FONT_OPTIONS,
+    VIDEO_TEXT_STYLE_PRESETS,
+    applyVideoTextStylePreset,
+    createVideoProject,
+    createVideoTextLayer,
+} from '@/lib/video/project';
 import { renderVideoProjectFrame, recordVideoProject, VIDEO_EXPORT_MAX_UPLOAD_BYTES } from '@/lib/video/export';
 import { validateVideoFile, validateVideoMetadata } from '@/lib/video/validation';
 import { buildCloudinaryMp4Url, downloadRemoteUrl, uploadVideoCaptureToCloudinary, waitForCloudinaryMp4 } from '@/lib/cloudinaryVideoExport';
 import { downloadBlob } from '@/lib/canvasExport';
+import {
+    VIDEO_PREVIEW_CANVAS_CLASS,
+    VIDEO_PREVIEW_FRAME_CLASS,
+    VIDEO_PREVIEW_PLAYER_CLASS,
+    VIDEO_PREVIEW_SURFACE_CLASS,
+} from '@/lib/video/preview';
 
 type DragState = { id: string; startX: number; startY: number; originX: number; originY: number };
 
@@ -217,22 +230,26 @@ export default function VideoEditor() {
 
     return (
         <section className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="rounded-2xl border border-white/10 bg-[#15151c] p-3 shadow-2xl">
-                <div ref={stageRef} className="relative mx-auto overflow-hidden rounded-xl bg-black" onPointerMove={handlePointerMove} onPointerUp={() => setDrag(null)} onPointerLeave={() => setDrag(null)}>
-                    <video ref={videoRef} src={sourceUrlRef.current ?? undefined} playsInline className="hidden" onLoadedData={render} onPause={() => setIsPlaying(false)} onPlay={() => setIsPlaying(true)} />
-                    <canvas ref={canvasRef} className="block h-auto w-full" aria-label="Video preview" />
-                    {project.layers.map((layer) => (
-                        <button key={layer.id} type="button" aria-label="Move text box" onClick={() => setSelectedLayerId(layer.id)} onPointerDown={(event) => {
-                            event.currentTarget.setPointerCapture(event.pointerId);
-                            setSelectedLayerId(layer.id);
-                            setDrag({ id: layer.id, startX: event.clientX, startY: event.clientY, originX: layer.transform.x, originY: layer.transform.y });
-                        }} style={{ left: `${layer.transform.x * 100}%`, top: `${layer.transform.y * 100}%`, width: `${layer.transform.width * 100}%`, height: `${layer.transform.height * 100}%` }} className={`absolute cursor-move rounded border-2 ${selectedLayerId === layer.id ? 'border-[#9eaaf8]' : 'border-transparent'} bg-transparent focus:outline-none`} />
-                    ))}
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                    <button type="button" onClick={() => void togglePlayback()} className="rounded-md border border-white/15 p-2 text-white hover:bg-white/10" aria-label={isPlaying ? 'Pause video' : 'Play video'}>{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
-                    <input aria-label="Video progress" type="range" min="0" max={project.source.durationMs / 1000} step="0.01" value={currentTime} onChange={(event) => { const video = videoRef.current; if (video) { video.currentTime = Number(event.target.value); setCurrentTime(video.currentTime); render(); } }} className="w-full accent-[#7f8ff0]" />
-                    <span className="whitespace-nowrap text-xs text-white/65">{formatTime(currentTime)} / {formatTime(project.source.durationMs / 1000)}</span>
+            <div className="min-w-0">
+                <div className="flex w-full justify-center">
+                    <div className={VIDEO_PREVIEW_SURFACE_CLASS}>
+                        <div ref={stageRef} className={VIDEO_PREVIEW_FRAME_CLASS} onPointerMove={handlePointerMove} onPointerUp={() => setDrag(null)} onPointerLeave={() => setDrag(null)}>
+                            <video ref={videoRef} src={sourceUrlRef.current ?? undefined} playsInline className="hidden" onLoadedData={render} onPause={() => setIsPlaying(false)} onPlay={() => setIsPlaying(true)} />
+                            <canvas ref={canvasRef} className={VIDEO_PREVIEW_CANVAS_CLASS} aria-label="Video preview" />
+                            {project.layers.map((layer) => (
+                                <button key={layer.id} type="button" aria-label="Move text box" onClick={() => setSelectedLayerId(layer.id)} onPointerDown={(event) => {
+                                    event.currentTarget.setPointerCapture(event.pointerId);
+                                    setSelectedLayerId(layer.id);
+                                    setDrag({ id: layer.id, startX: event.clientX, startY: event.clientY, originX: layer.transform.x, originY: layer.transform.y });
+                                }} style={{ left: `${layer.transform.x * 100}%`, top: `${layer.transform.y * 100}%`, width: `${layer.transform.width * 100}%`, height: `${layer.transform.height * 100}%` }} className={`absolute cursor-move rounded border-2 ${selectedLayerId === layer.id ? 'border-[#9eaaf8]' : 'border-transparent'} bg-transparent focus:outline-none`} />
+                            ))}
+                        </div>
+                        <div className={VIDEO_PREVIEW_PLAYER_CLASS}>
+                            <button type="button" onClick={() => void togglePlayback()} className="rounded-md border border-white/15 p-2 text-white hover:bg-white/10" aria-label={isPlaying ? 'Pause video' : 'Play video'}>{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</button>
+                            <input aria-label="Video progress" type="range" min="0" max={project.source.durationMs / 1000} step="0.01" value={currentTime} onChange={(event) => { const video = videoRef.current; if (video) { video.currentTime = Number(event.target.value); setCurrentTime(video.currentTime); render(); } }} className="min-w-0 flex-1 accent-[#7f8ff0]" />
+                            <span className="whitespace-nowrap text-xs text-white/65">{formatTime(currentTime)} / {formatTime(project.source.durationMs / 1000)}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -240,7 +257,63 @@ export default function VideoEditor() {
                 <div className="flex items-center justify-between"><p className="text-sm font-semibold text-white">Video tools</p><label className="cursor-pointer text-xs text-[#aeb8ff] hover:text-white">Replace<input className="sr-only" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={onUpload} /></label></div>
                 <div><p className="mb-2 text-xs font-medium text-white/60">Filter</p><div className="grid grid-cols-2 gap-2">{VIDEO_FILTER_PRESETS.map((filter) => { const selected = project.effects[0]?.preset === filter.id; return <button key={filter.id} type="button" onClick={() => updateProject((current) => ({ ...current, effects: [{ kind: 'filter', preset: filter.id }] }))} className={`rounded-md border px-2 py-2 text-xs ${selected ? 'border-[#7f8ff0] bg-[#6a7bd1]/20 text-white' : 'border-white/10 text-white/65 hover:bg-white/5'}`}>{filter.label}</button>; })}</div></div>
                 <div className="border-t border-white/10 pt-4"><div className="mb-2 flex items-center justify-between"><p className="text-xs font-medium text-white/60">Text boxes</p><button type="button" onClick={() => { const layer = createVideoTextLayer(project.layers.length); updateProject((current) => ({ ...current, layers: [...current.layers, layer] })); setSelectedLayerId(layer.id); }} className="inline-flex items-center gap-1 text-xs text-[#aeb8ff]"><Plus className="h-3.5 w-3.5" /> Add</button></div>{project.layers.map((layer, index) => <button type="button" key={layer.id} onClick={() => setSelectedLayerId(layer.id)} className={`mb-1 flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs ${selectedLayerId === layer.id ? 'bg-[#6a7bd1]/20 text-white' : 'text-white/65 hover:bg-white/5'}`}><span className="truncate">{layer.text || `Text ${index + 1}`}</span><span className="text-white/35">{index + 1}</span></button>)}</div>
-                {selectedLayer && <div className="space-y-3 border-t border-white/10 pt-4"><div className="flex justify-between"><p className="text-xs font-medium text-white/60">Selected text</p><button type="button" onClick={() => { updateProject((current) => ({ ...current, layers: current.layers.filter((layer) => layer.id !== selectedLayer.id) })); setSelectedLayerId(project.layers.find((layer) => layer.id !== selectedLayer.id)?.id ?? null); }} className="text-white/55 hover:text-red-300" aria-label="Delete text box"><X className="h-4 w-4" /></button></div><textarea value={selectedLayer.text} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, text: event.target.value }))} className="min-h-20 w-full rounded-md border border-white/15 bg-black/25 p-2 text-sm text-white" aria-label="Text content" /><div className="grid grid-cols-2 gap-2"><label className="text-[11px] text-white/55">Color<input type="color" value={selectedLayer.style.color} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, color: event.target.value } }))} className="mt-1 block h-8 w-full" /></label><label className="text-[11px] text-white/55">Font<select value={selectedLayer.style.fontFamily} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, fontFamily: event.target.value } }))} className="mt-1 h-8 w-full rounded border border-white/15 bg-black/25 px-1 text-xs text-white"><option>Impact</option><option>Arial</option><option>Anton</option><option>Inter</option></select></label></div><label className="block text-[11px] text-white/55">Text size<input type="range" min="0.035" max="0.16" step="0.005" value={selectedLayer.style.fontSize} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, fontSize: Number(event.target.value) } }))} className="mt-1 w-full accent-[#7f8ff0]" /></label></div>}
+                {selectedLayer && (
+                    <div className="space-y-3 border-t border-white/10 pt-4">
+                        <div className="flex justify-between">
+                            <p className="text-xs font-medium text-white/60">Selected text</p>
+                            <button type="button" onClick={() => { updateProject((current) => ({ ...current, layers: current.layers.filter((layer) => layer.id !== selectedLayer.id) })); setSelectedLayerId(project.layers.find((layer) => layer.id !== selectedLayer.id)?.id ?? null); }} className="text-white/55 hover:text-red-300" aria-label="Delete text box"><X className="h-4 w-4" /></button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                            {VIDEO_TEXT_STYLE_PRESETS.map((preset) => (
+                                <button key={preset.id} type="button" onClick={() => updateLayer(selectedLayer.id, (layer) => applyVideoTextStylePreset(layer, preset.id))} className="rounded-md border border-white/10 bg-black/20 px-2 py-1.5 text-left text-[10px] text-white/75 hover:border-[#7f8ff0]/60 hover:bg-[#6a7bd1]/10">{preset.label}</button>
+                            ))}
+                        </div>
+                        <textarea value={selectedLayer.text} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, text: event.target.value }))} className="min-h-20 w-full rounded-md border border-white/15 bg-black/25 p-2 text-sm text-white" aria-label="Text content" />
+                        <div className="grid grid-cols-2 gap-2">
+                            <label className="text-[11px] text-white/55">Font
+                                <select value={selectedLayer.style.fontFamily} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, fontFamily: event.target.value } }))} className="mt-1 h-8 w-full rounded border border-white/15 bg-black/25 px-1 text-xs text-white" style={{ fontFamily: selectedLayer.style.fontFamily }}>
+                                    {VIDEO_TEXT_FONT_OPTIONS.map((font) => <option key={font} value={font} style={{ fontFamily: font }}>{font}</option>)}
+                                </select>
+                            </label>
+                            <label className="text-[11px] text-white/55">Weight
+                                <select value={selectedLayer.style.fontWeight} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, fontWeight: event.target.value } }))} className="mt-1 h-8 w-full rounded border border-white/15 bg-black/25 px-1 text-xs text-white">
+                                    {['400', '500', '600', '700', '800', '900'].map((weight) => <option key={weight} value={weight}>{weight}</option>)}
+                                </select>
+                            </label>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <label className="text-[11px] text-white/55">Case
+                                <select value={selectedLayer.style.textCase} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, textCase: event.target.value as VideoTextLayer['style']['textCase'] } }))} className="mt-1 h-8 w-full rounded border border-white/15 bg-black/25 px-1 text-xs text-white"><option value="uppercase">UPPERCASE</option><option value="normal">Normal</option><option value="lowercase">lowercase</option></select>
+                            </label>
+                            <div className="text-[11px] text-white/55">Align
+                                <div className="mt-1 grid h-8 grid-cols-3 overflow-hidden rounded border border-white/15">{(['left', 'center', 'right'] as const).map((align) => <button key={align} type="button" onClick={() => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, textAlign: align } }))} className={selectedLayer.style.textAlign === align ? 'bg-[#6a7bd1] text-white' : 'bg-black/25 text-white/60'}>{align === 'left' ? 'L' : align === 'center' ? 'C' : 'R'}</button>)}</div>
+                            </div>
+                        </div>
+                        <label className="block text-[11px] text-white/55">Text size: {Math.round(selectedLayer.style.fontSize * 100)}%
+                            <input type="range" min="0.035" max="0.16" step="0.005" value={selectedLayer.style.fontSize} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, fontSize: Number(event.target.value) } }))} className="mt-1 w-full accent-[#7f8ff0]" />
+                        </label>
+                        <label className="block text-[11px] text-white/55">Letter spacing: {selectedLayer.style.letterSpacing.toFixed(2)}em
+                            <input type="range" min="-0.04" max="0.16" step="0.01" value={selectedLayer.style.letterSpacing} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, letterSpacing: Number(event.target.value) } }))} className="mt-1 w-full accent-[#7f8ff0]" />
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <label className="text-[11px] text-white/55">Fill<input type="color" value={selectedLayer.style.color} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, color: event.target.value } }))} className="mt-1 block h-8 w-full" /></label>
+                            <label className="text-[11px] text-white/55">Outline<input type="color" value={selectedLayer.style.outlineColor} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, outlineColor: event.target.value } }))} className="mt-1 block h-8 w-full" /></label>
+                        </div>
+                        <label className="block text-[11px] text-white/55">Outline: {Math.round(selectedLayer.style.outlineWidth * 1000)}
+                            <input type="range" min="0" max="0.025" step="0.001" value={selectedLayer.style.outlineWidth} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, outlineWidth: Number(event.target.value) } }))} className="mt-1 w-full accent-[#7f8ff0]" />
+                        </label>
+                        <div className="rounded-md border border-white/10 bg-black/15 p-2 space-y-2">
+                            <div className="grid grid-cols-2 gap-2"><label className="text-[11px] text-white/55">Background<input type="color" disabled={selectedLayer.style.backgroundColor === 'transparent'} value={selectedLayer.style.backgroundColor === 'transparent' ? '#111111' : selectedLayer.style.backgroundColor} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, backgroundColor: event.target.value } }))} className="mt-1 block h-8 w-full disabled:opacity-40" /></label><label className="flex items-end gap-2 pb-1 text-[11px] text-white/65"><input type="checkbox" checked={selectedLayer.style.backgroundColor !== 'transparent'} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, backgroundColor: event.target.checked ? '#111111' : 'transparent' } }))} className="accent-[#7f8ff0]" /> Show background</label></div>
+                            <label className="block text-[11px] text-white/55">Background roundness
+                                <input type="range" min="0" max="0.06" step="0.002" value={selectedLayer.style.backgroundRadius} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, backgroundRadius: Number(event.target.value) } }))} className="mt-1 w-full accent-[#7f8ff0]" />
+                            </label>
+                        </div>
+                        <div className="rounded-md border border-white/10 bg-black/15 p-2 space-y-2">
+                            <div className="grid grid-cols-2 gap-2"><label className="text-[11px] text-white/55">Shadow<input type="color" value={selectedLayer.style.shadow.color} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, shadow: { ...layer.style.shadow, color: event.target.value } } }))} className="mt-1 block h-8 w-full" /></label><label className="text-[11px] text-white/55">Blur: {selectedLayer.style.shadow.blur.toFixed(3)}<input type="range" min="0" max="0.04" step="0.002" value={selectedLayer.style.shadow.blur} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, shadow: { ...layer.style.shadow, blur: Number(event.target.value) } } }))} className="mt-1 w-full accent-[#7f8ff0]" /></label></div>
+                            <div className="grid grid-cols-2 gap-2"><label className="text-[11px] text-white/55">Shadow X<input type="range" min="-0.04" max="0.04" step="0.002" value={selectedLayer.style.shadow.offsetX} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, shadow: { ...layer.style.shadow, offsetX: Number(event.target.value) } } }))} className="mt-1 w-full accent-[#7f8ff0]" /></label><label className="text-[11px] text-white/55">Shadow Y<input type="range" min="-0.04" max="0.04" step="0.002" value={selectedLayer.style.shadow.offsetY} onChange={(event) => updateLayer(selectedLayer.id, (layer) => ({ ...layer, style: { ...layer.style, shadow: { ...layer.style.shadow, offsetY: Number(event.target.value) } } }))} className="mt-1 w-full accent-[#7f8ff0]" /></label></div>
+                        </div>
+                    </div>
+                )}
                 <label className="flex cursor-pointer items-center justify-between border-t border-white/10 pt-4 text-xs text-white/75"><span className="inline-flex items-center gap-2">{project.audio.enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />} Keep original sound</span><input type="checkbox" checked={project.audio.enabled} onChange={(event) => updateProject((current) => ({ ...current, audio: { enabled: event.target.checked } }))} className="accent-[#7f8ff0]" /></label>
                 <button type="button" disabled={isExporting} onClick={() => void exportVideo()} className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#6a7bd1] text-sm font-semibold text-white hover:bg-[#7889e8] disabled:opacity-50">{isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{isExporting ? `Exporting ${Math.round(exportProgress * 100)}%` : 'Export MP4'}</button>
                 <p className="text-[10px] leading-relaxed text-white/40">Your original stays in this browser. If your browser records WebM, Memehub temporarily sends only the rendered export to Cloudinary for MP4 conversion.</p>

@@ -19,11 +19,21 @@ export type NormalizedTransform = {
 export type VideoTextStyle = {
     fontFamily: string;
     fontSize: number;
+    fontWeight: string;
+    letterSpacing: number;
+    textCase: 'uppercase' | 'lowercase' | 'normal';
     color: string;
     outlineColor: string;
     outlineWidth: number;
     backgroundColor: string;
+    backgroundRadius: number;
     textAlign: 'left' | 'center' | 'right';
+    shadow: {
+        blur: number;
+        offsetX: number;
+        offsetY: number;
+        color: string;
+    };
 };
 
 export type VideoTextLayer = {

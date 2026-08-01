@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     createVideoProject,
     createVideoTextLayer,
+    applyVideoTextStylePreset,
     isTextLayerVisibleAt,
     normalizeVideoProject,
 } from '@/lib/video/project';
@@ -54,5 +55,18 @@ describe('video project', () => {
         expect(added.id).not.toBe(project.layers[0].id);
         expect(added.text).toBe('Your text');
         expect(added.transform.y).toBeGreaterThan(project.layers[0].transform.y);
+    });
+
+    it('applies a cinematic caption preset without discarding the chosen font size', () => {
+        const layer = createVideoTextLayer();
+        layer.style.fontSize = 0.12;
+
+        const styled = applyVideoTextStylePreset(layer, 'cinema-caption');
+
+        expect(styled.style.fontSize).toBe(0.12);
+        expect(styled.style.fontFamily).toBe('Montserrat');
+        expect(styled.style.fontWeight).toBe('800');
+        expect(styled.style.shadow).toEqual({ blur: 0.012, offsetX: 0, offsetY: 0.008, color: '#000000' });
+        expect(styled.style.textCase).toBe('uppercase');
     });
 });
