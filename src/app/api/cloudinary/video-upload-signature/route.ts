@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 const EXPORT_FOLDER = 'memehub/generated-exports';
 const EXPORT_TAGS = 'memehub-export,temp-export';
 const EXPORT_ALLOWED_FORMATS = 'mp4,webm,mov';
-const EXPORT_MAX_FILE_SIZE = String(25 * 1024 * 1024);
+const EXPORT_MAX_FILE_SIZE = String(50 * 1024 * 1024);
 
 function getEnv(name: string): string | undefined {
     const value = process.env[name]?.trim();

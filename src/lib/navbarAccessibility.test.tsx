@@ -21,6 +21,14 @@ afterEach(() => {
 });
 
 describe("Navbar accessibility", () => {
+  it("links to the dedicated video editor", async () => {
+    render(<Navbar />);
+
+    expect((await screen.findByRole("link", { name: "Video editor" })).getAttribute("href")).toBe(
+      "/video-editor"
+    );
+  });
+
   it("offers dark mode with a moon icon when the resolved theme is light", async () => {
     themeState.resolvedTheme = "light";
     render(<Navbar />);

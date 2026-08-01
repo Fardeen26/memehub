@@ -1,6 +1,6 @@
 "use client"
 
-import { Heart, MoonIcon, SunIcon, Laugh } from "lucide-react"
+import { Heart, MoonIcon, SunIcon, Laugh, Video } from "lucide-react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { useEffect, useState } from "react"
@@ -34,6 +34,12 @@ export default function Navbar() {
                         </Link>
                     </div>
                     <div className="flex items-center gap-2">
+                        <Link
+                            href="/video-editor"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#6a7bd1]/60 bg-[#6a7bd1]/10 px-3 text-xs font-semibold text-[#4d5fbe] transition-colors hover:bg-[#6a7bd1]/20 dark:text-[#c5ccff]"
+                        >
+                            <Video className="h-3.5 w-3.5" /> Video editor
+                        </Link>
                         <button
                             onClick={() => setTheme(nextTheme)}
                             aria-label={`Switch to ${nextTheme} theme`}
