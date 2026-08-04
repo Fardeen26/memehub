@@ -29,60 +29,6 @@ export const VIDEO_TEXT_STYLE_PRESETS = TEXT_STYLE_PRESETS;
 
 export type VideoTextStylePresetId = TextStylePresetId;
 
-export const VIDEO_TEXT_FONT_OPTIONS = [
-    'Impact',
-    'Anton',
-    'Bebas Neue',
-    'Oswald',
-    'Montserrat',
-    'Poppins',
-    'Roboto Condensed',
-    'Inter',
-    'Nunito',
-    'Work Sans',
-] as const;
-
-export const VIDEO_TEXT_STYLE_PRESETS = [
-    {
-        id: 'cinema-caption',
-        label: 'Cinema caption',
-        style: {
-            fontFamily: 'Montserrat', fontWeight: '800', letterSpacing: 0.03, textCase: 'uppercase' as const,
-            color: '#ffffff', outlineColor: '#000000', outlineWidth: 0, backgroundColor: 'transparent', backgroundRadius: 0,
-            textAlign: 'center' as const, shadow: { blur: 0.012, offsetX: 0, offsetY: 0.008, color: '#000000' },
-        },
-    },
-    {
-        id: 'meme-classic',
-        label: 'Meme classic',
-        style: {
-            fontFamily: 'Impact', fontWeight: '400', letterSpacing: 0.01, textCase: 'uppercase' as const,
-            color: '#ffffff', outlineColor: '#000000', outlineWidth: 0.012, backgroundColor: 'transparent', backgroundRadius: 0,
-            textAlign: 'center' as const, shadow: { blur: 0.004, offsetX: 0.003, offsetY: 0.004, color: '#000000' },
-        },
-    },
-    {
-        id: 'pop-caption',
-        label: 'Pop caption',
-        style: {
-            fontFamily: 'Poppins', fontWeight: '900', letterSpacing: 0, textCase: 'normal' as const,
-            color: '#ffffff', outlineColor: '#000000', outlineWidth: 0, backgroundColor: '#17171d', backgroundRadius: 0.018,
-            textAlign: 'center' as const, shadow: { blur: 0, offsetX: 0, offsetY: 0, color: '#000000' },
-        },
-    },
-    {
-        id: 'neon-reaction',
-        label: 'Neon reaction',
-        style: {
-            fontFamily: 'Anton', fontWeight: '400', letterSpacing: 0.02, textCase: 'uppercase' as const,
-            color: '#ffe95c', outlineColor: '#261c6b', outlineWidth: 0.006, backgroundColor: 'transparent', backgroundRadius: 0,
-            textAlign: 'center' as const, shadow: { blur: 0.018, offsetX: 0, offsetY: 0.006, color: '#7f5cff' },
-        },
-    },
-] as const;
-
-export type VideoTextStylePresetId = (typeof VIDEO_TEXT_STYLE_PRESETS)[number]['id'];
-
 export const VIDEO_FILTER_PRESETS: Array<{
     id: VideoFilterPreset;
     label: string;

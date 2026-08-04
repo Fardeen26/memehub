@@ -5474,6 +5474,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                         <Settings className="h-4 w-4 text-white/35" />
                     </div>
                     {/* Text inputs — primary */}
+                    <div className="space-y-2">
                     {texts.map((txt, i) => (
                         <motion.div
                             key={i}
@@ -5865,6 +5866,7 @@ export default function MemeEditor({ template, onReset }: MemeEditorProps) {
                             </div>
                         </motion.div>
                     ))}
+                    </div>
 
                     {/* Action Buttons Row */}
                     <div className="hidden" aria-hidden="true">
