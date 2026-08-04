@@ -1,5 +1,5 @@
 import type { VideoProjectV1 } from '@/types/videoProject';
-import { getVideoFilterCss, isTextLayerVisibleAt } from './project';
+import { getVideoFilterCss, getVideoFilterOverlay, isTextLayerVisibleAt } from './project';
 
 export const VIDEO_EXPORT_MAX_DIMENSION = 1080;
 export const VIDEO_EXPORT_MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -107,6 +107,19 @@ export function renderVideoProjectFrame(
     ctx.filter = getVideoFilterCss(project);
     ctx.drawImage(video, 0, 0, width, height);
     ctx.restore();
+
+    const overlay = getVideoFilterOverlay(project);
+    if (overlay) {
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, overlay.colors[0]);
+        gradient.addColorStop(0.5, overlay.colors[1]);
+        gradient.addColorStop(1, overlay.colors[2]);
+        ctx.save();
+        ctx.globalCompositeOperation = overlay.blendMode;
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+    }
 
     for (const layer of project.layers) {
         if (!isTextLayerVisibleAt(layer, timeMs) || !layer.text.trim()) continue;

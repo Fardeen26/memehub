@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    VIDEO_FILTER_PRESETS,
+    VIDEO_TEXT_STYLE_PRESETS,
     createVideoProject,
     createVideoTextLayer,
     applyVideoTextStylePreset,
@@ -48,6 +50,25 @@ describe('video project', () => {
         expect(normalized.effects).toEqual([{ kind: 'filter', preset: 'original' }]);
     });
 
+    it('offers the Rio de Janeiro split-tone Instagram filter', () => {
+        expect(VIDEO_FILTER_PRESETS).toContainEqual({
+            id: 'rio-de-janeiro',
+            label: 'Rio de Janeiro',
+            cssFilter: 'saturate(1.75) contrast(1.12) brightness(1.04)',
+            overlay: {
+                colors: ['rgba(35, 76, 255, 0.32)', 'rgba(232, 35, 255, 0.3)', 'rgba(255, 91, 35, 0.34)'],
+                blendMode: 'screen',
+            },
+        });
+
+        const project = createVideoProject(source);
+        project.effects = [{ kind: 'filter', preset: 'rio-de-janeiro' }];
+
+        expect(normalizeVideoProject(project).effects).toEqual([
+            { kind: 'filter', preset: 'rio-de-janeiro' },
+        ]);
+    });
+
     it('creates a new text layer without sharing the initial layer identity', () => {
         const project = createVideoProject(source);
         const added = createVideoTextLayer(project.layers.length);
@@ -57,16 +78,30 @@ describe('video project', () => {
         expect(added.transform.y).toBeGreaterThan(project.layers[0].transform.y);
     });
 
-    it('applies a cinematic caption preset without discarding the chosen font size', () => {
+    it('offers exactly the same text style presets as the image editor', () => {
+        expect(VIDEO_TEXT_STYLE_PRESETS.map(({ id, label }) => ({ id, label }))).toEqual([
+            { id: 'black-bar', label: 'Black Bar' },
+            { id: 'meme-outline', label: 'Meme Outline' },
+            { id: 'reaction', label: 'Reaction' },
+        ]);
+    });
+
+    it('applies an image-editor text preset without discarding video font controls', () => {
         const layer = createVideoTextLayer();
         layer.style.fontSize = 0.12;
+        layer.style.fontFamily = 'Inter';
+        layer.style.fontWeight = '500';
+        layer.style.textAlign = 'left';
 
-        const styled = applyVideoTextStylePreset(layer, 'cinema-caption');
+        const styled = applyVideoTextStylePreset(layer, 'reaction');
 
         expect(styled.style.fontSize).toBe(0.12);
-        expect(styled.style.fontFamily).toBe('Montserrat');
-        expect(styled.style.fontWeight).toBe('800');
-        expect(styled.style.shadow).toEqual({ blur: 0.012, offsetX: 0, offsetY: 0.008, color: '#000000' });
+        expect(styled.style.fontFamily).toBe('Inter');
+        expect(styled.style.fontWeight).toBe('500');
+        expect(styled.style.textAlign).toBe('left');
+        expect(styled.style.color).toBe('#ffd400');
+        expect(styled.style.outlineWidth).toBe(0.005);
+        expect(styled.style.shadow).toEqual({ blur: 0.006, offsetX: 0.003, offsetY: 0.003, color: '#000000' });
         expect(styled.style.textCase).toBe('uppercase');
     });
 });

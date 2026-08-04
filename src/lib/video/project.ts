@@ -6,6 +6,11 @@ import {
     type VideoSourceMetadata,
     type VideoTextLayer,
 } from '@/types/videoProject';
+import {
+    TEXT_STYLE_PRESETS,
+    getTextStylePreset,
+    type TextStylePresetId,
+} from '@/lib/textStylePresets';
 
 export const VIDEO_TEXT_FONT_OPTIONS = [
     'Impact',
@@ -20,51 +25,18 @@ export const VIDEO_TEXT_FONT_OPTIONS = [
     'Work Sans',
 ] as const;
 
-export const VIDEO_TEXT_STYLE_PRESETS = [
-    {
-        id: 'cinema-caption',
-        label: 'Cinema caption',
-        style: {
-            fontFamily: 'Montserrat', fontWeight: '800', letterSpacing: 0.03, textCase: 'uppercase' as const,
-            color: '#ffffff', outlineColor: '#000000', outlineWidth: 0, backgroundColor: 'transparent', backgroundRadius: 0,
-            textAlign: 'center' as const, shadow: { blur: 0.012, offsetX: 0, offsetY: 0.008, color: '#000000' },
-        },
-    },
-    {
-        id: 'meme-classic',
-        label: 'Meme classic',
-        style: {
-            fontFamily: 'Impact', fontWeight: '400', letterSpacing: 0.01, textCase: 'uppercase' as const,
-            color: '#ffffff', outlineColor: '#000000', outlineWidth: 0.012, backgroundColor: 'transparent', backgroundRadius: 0,
-            textAlign: 'center' as const, shadow: { blur: 0.004, offsetX: 0.003, offsetY: 0.004, color: '#000000' },
-        },
-    },
-    {
-        id: 'pop-caption',
-        label: 'Pop caption',
-        style: {
-            fontFamily: 'Poppins', fontWeight: '900', letterSpacing: 0, textCase: 'normal' as const,
-            color: '#ffffff', outlineColor: '#000000', outlineWidth: 0, backgroundColor: '#17171d', backgroundRadius: 0.018,
-            textAlign: 'center' as const, shadow: { blur: 0, offsetX: 0, offsetY: 0, color: '#000000' },
-        },
-    },
-    {
-        id: 'neon-reaction',
-        label: 'Neon reaction',
-        style: {
-            fontFamily: 'Anton', fontWeight: '400', letterSpacing: 0.02, textCase: 'uppercase' as const,
-            color: '#ffe95c', outlineColor: '#261c6b', outlineWidth: 0.006, backgroundColor: 'transparent', backgroundRadius: 0,
-            textAlign: 'center' as const, shadow: { blur: 0.018, offsetX: 0, offsetY: 0.006, color: '#7f5cff' },
-        },
-    },
-] as const;
+export const VIDEO_TEXT_STYLE_PRESETS = TEXT_STYLE_PRESETS;
 
-export type VideoTextStylePresetId = (typeof VIDEO_TEXT_STYLE_PRESETS)[number]['id'];
+export type VideoTextStylePresetId = TextStylePresetId;
 
 export const VIDEO_FILTER_PRESETS: Array<{
     id: VideoFilterPreset;
     label: string;
     cssFilter: string;
+    overlay?: {
+        colors: [string, string, string];
+        blendMode: GlobalCompositeOperation;
+    };
 }> = [
     { id: 'original', label: 'Original', cssFilter: 'none' },
     { id: 'black-and-white', label: 'B&W', cssFilter: 'grayscale(1) contrast(1.15)' },
@@ -72,6 +44,19 @@ export const VIDEO_FILTER_PRESETS: Array<{
     { id: 'warm', label: 'Warm', cssFilter: 'sepia(.2) saturate(1.15) brightness(1.03)' },
     { id: 'cool', label: 'Cool', cssFilter: 'hue-rotate(180deg) saturate(.9) brightness(1.04)' },
     { id: 'high-contrast', label: 'High contrast', cssFilter: 'contrast(1.28) saturate(1.18)' },
+    {
+        id: 'rio-de-janeiro',
+        label: 'Rio de Janeiro',
+        cssFilter: 'saturate(1.75) contrast(1.12) brightness(1.04)',
+        overlay: {
+            colors: [
+                'rgba(35, 76, 255, 0.32)',
+                'rgba(232, 35, 255, 0.3)',
+                'rgba(255, 91, 35, 0.34)',
+            ],
+            blendMode: 'screen',
+        },
+    },
 ];
 
 const FILTER_IDS = new Set<VideoFilterPreset>(VIDEO_FILTER_PRESETS.map((preset) => preset.id));
@@ -118,14 +103,24 @@ export function applyVideoTextStylePreset(
     layer: VideoTextLayer,
     presetId: VideoTextStylePresetId
 ): VideoTextLayer {
-    const preset = VIDEO_TEXT_STYLE_PRESETS.find((candidate) => candidate.id === presetId);
-    if (!preset) throw new RangeError(`Unknown video text style preset: ${presetId}`);
+    const { settings } = getTextStylePreset(presetId);
     return {
         ...layer,
         style: {
-            ...preset.style,
-            fontSize: layer.style.fontSize,
-            shadow: { ...preset.style.shadow },
+            ...layer.style,
+            color: settings.color,
+            letterSpacing: settings.letterSpacing / 100,
+            textCase: settings.textCase,
+            backgroundColor: settings.backgroundColor,
+            backgroundRadius: settings.backgroundRadius / 1000,
+            outlineColor: settings.outline.color,
+            outlineWidth: settings.outline.width / 1000,
+            shadow: {
+                blur: settings.shadow.blur / 1000,
+                offsetX: settings.shadow.offsetX / 1000,
+                offsetY: settings.shadow.offsetY / 1000,
+                color: settings.shadow.color,
+            },
         },
     };
 }
@@ -174,4 +169,9 @@ export function isTextLayerVisibleAt(layer: VideoTextLayer, timeMs: number): boo
 export function getVideoFilterCss(project: VideoProjectV1): string {
     const filter = project.effects.find((effect) => effect.kind === 'filter')?.preset ?? 'original';
     return VIDEO_FILTER_PRESETS.find((preset) => preset.id === filter)?.cssFilter ?? 'none';
+}
+
+export function getVideoFilterOverlay(project: VideoProjectV1) {
+    const filter = project.effects.find((effect) => effect.kind === 'filter')?.preset ?? 'original';
+    return VIDEO_FILTER_PRESETS.find((preset) => preset.id === filter)?.overlay;
 }

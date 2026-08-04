@@ -6,7 +6,8 @@ export type VideoFilterPreset =
     | 'sepia'
     | 'warm'
     | 'cool'
-    | 'high-contrast';
+    | 'high-contrast'
+    | 'rio-de-janeiro';
 
 export type NormalizedTransform = {
     x: number;
